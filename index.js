@@ -1863,7 +1863,7 @@ bot.command("random", async ctx => {
   }
   const min = Number(match[1]);
   const max = Number(match[2]);
-  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || max < min || max - min > 1000000000) {
+  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || Math.abs(min) > 2 ** 48 - 2 || Math.abs(max) > 2 ** 48 - 2 || max < min || max - min > 1000000000) {
     await ctx.reply("❌ Нужны целые числа в корректном диапазоне (разница не более 1 000 000 000).");
     return;
   }
@@ -2110,7 +2110,7 @@ bot.command("status", async ctx => {
     "Стикеры: " + (ffmpegPath && CLOUDFLARE_API_TOKEN ? "✅" : "❌") + "\n" +
     "Видеокружки: " + (ffmpegPath ? "✅" : "❌") + "\n" +
     "Текстовые ИИ-инструменты: " + (GROQ_API_KEY || OPENROUTER_API_KEY ? "✅" : "❌") + "\n" +
-    "Калькулятор / конвертер / генераторы: ✅\n"
+    "Калькулятор / конвертер / генераторы: ✅\n" +
     "Улучшение фото: " + (ffmpegPath ? "✅" : "❌") + "\n" +
     "Расшифровка аудио: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Голосовое распознавание: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
