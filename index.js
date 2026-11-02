@@ -350,18 +350,6 @@ function allCommandsText() {
 <code>/skill 501 запрос</code> — запустить выбранный навык.
 
 ━━━━━━━━━━━━━━━━━━
-🎮 <b>NEXUS GAME AI — MINECRAFT</b>
-<code>/game</code> — инструкция по игровому ИИ.
-<code>/gameid</code> — показать Telegram ID для защиты управления.
-<code>/gameconnect</code> — подключить персонажа.
-<code>/gamestatus</code> — состояние персонажа.
-<code>/gameobserve</code> — описать окружение с помощью ИИ.
-<code>/gamefollow ник</code> — следовать за игроком.
-<code>/gamestart задача</code> — запустить автономный режим.
-<code>/gamestop</code> — остановить автономный режим.
-<code>/gamedisconnect</code> — отключить персонажа.
-
-━━━━━━━━━━━━━━━━━━
 🌐 <b>ВНЕШНИЕ API</b>
 <code>/api</code> — посмотреть подключённые API.
 <code>/weather город</code> — получить текущую погоду.
@@ -1570,7 +1558,6 @@ async function runAgent(ctx, task) {
     await ctx.reply(
       "🤖 Напиши задачу для агента.\n\n" +
       "Примеры:\n" +
-      "/agent создай PDF-инструкцию по Minecraft\n" +
       "/agent создай презентацию о космосе\n" +
       "/agent нарисуй футуристический город\n" +
       "/agent объясни, как исправить ошибку в коде"
@@ -2075,7 +2062,6 @@ bot.command("transcribe", async ctx => {
 // NEXUS AI — 1,000 SKILL LIBRARY + PUBLIC API TOOLS
 // ======================================================
 const { SKILLS, getSkill, skillsPage } = require("./nexus-catalog");
-const { GameAgent } = require("./game-agent");
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -2247,122 +2233,6 @@ bot.command("api", async ctx => {
     "Для других платных API нужны отдельные ключи в Render Environment. Никогда не отправляй ключи в чат.");
 });
 
-// ======================================================
-// NEXUS GAME AI — MINECRAFT AGENT
-// ======================================================
-const gameAgent = new GameAgent({
-  decide: async (task, observation) => {
-    const messages = [
-      {
-        role: "system",
-        content: [
-          "Ты управляешь игровым персонажем Minecraft как осторожный самостоятельный игрок.",
-          "Проанализируй задачу и наблюдение, выбери ровно одно действие.",
-          "Верни только JSON без Markdown: {\"action\":\"wait|follow|look|say|explore|stop|gather_wood|craft_basics|mine_stone|eat|flee\",\"target\":\"имя игрока\",\"message\":\"короткая фраза\"}.",
-          "Ты самостоятельный игрок с характером и собственными целями, а не исполнитель каждой команды владельца.",
-          "Оценивай здоровье, голод, инвентарь, блоки, мобов, игроков, время и воспоминания.",
-          "При голоде выбирай eat только если еда есть. При опасности выбирай flee.",
-          "Если нет древесины, выбери gather_wood; затем craft_basics; при наличии кирки добывай камень через mine_stone.",
-          "Не выдумывай объекты, не используй команды сервера, не спамь чат и не повторяй бесполезное действие подряд."
-        ].join("\n")
-      },
-      {
-        role: "user",
-        content: "ЗАДАЧА: " + task + "\nНАБЛЮДЕНИЕ: " + JSON.stringify(observation)
-      }
-    ];
-    const result = await askGroq(messages);
-    const fence = String.fromCharCode(96).repeat(3);
-    const raw = String(result.answer || "").replace(new RegExp(fence + "(?:json)?", "gi"), "").trim();
-    const json = raw.match(/\{[\s\S]*\}/);
-    if (!json) throw new Error("ИИ вернул некорректное решение.");
-    const decision = JSON.parse(json[0]);
-    const allowed = new Set(["wait", "follow", "look", "say", "explore", "stop"]);
-    if (!allowed.has(String(decision.action || "").toLowerCase())) return { action: "wait" };
-    return decision;
-  }
-});
-
-function gameControlAllowed(ctx) {
-  const allowedId = String(process.env.MC_CONTROL_USER_ID || "").trim();
-  return Boolean(allowedId && String(ctx.from?.id) === allowedId);
-}
-
-function gameControlDenied(ctx) {
-  return ctx.reply("⛔ Игровое управление закрыто. Настрой MC_CONTROL_USER_ID в Render Environment. Твой Telegram ID: " + ctx.from.id);
-}
-
-bot.command("gameid", async ctx => {
-  await ctx.reply("Твой Telegram ID: " + ctx.from.id + "\nДобавь его в Render → Environment → MC_CONTROL_USER_ID.");
-});
-
-bot.command("game", async ctx => {
-  await ctx.reply(
-    "🎮 NEXUS GAME AI — Minecraft\n\n" +
-    "/gameconnect — подключить персонажа\n" +
-    "/gamestatus — состояние персонажа\n" +
-    "/gameobserve — осмотреть окружение\n" +
-    "/gamefollow [ник] — следовать за игроком\n" +
-    "/gamestart [задача] — включить автономное мышление\n" +
-    "/gamestop — остановить автономные действия\n" +
-    "/gamedisconnect — отключиться\n" +
-    "/gameid — узнать Telegram ID\n\n" +
-    "Автономный режим развивается поэтапно: самостоятельные цели, выживание, ресурсы и исследование."
-  );
-});
-
-bot.command("gameconnect", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  try { await ctx.reply(gameAgent.connect()); }
-  catch (error) { await ctx.reply("❌ " + error.message); }
-});
-
-bot.command("gamedisconnect", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  try { await ctx.reply(gameAgent.disconnect()); }
-  catch (error) { await ctx.reply("❌ " + error.message); }
-});
-
-bot.command("gamestatus", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  await ctx.reply("🎮 NEXUS GAME AI\n\n" + gameAgent.status());
-});
-
-bot.command("gameobserve", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  try {
-    const observation = gameAgent.observe();
-    const messages = [
-      { role: "system", content: "Кратко и по-русски опиши, что происходит вокруг игрового персонажа Minecraft. Не выдумывай детали." },
-      { role: "user", content: JSON.stringify(observation) }
-    ];
-    const result = await askGroq(messages);
-    await ctx.reply("👁 Наблюдение NEXUS:\n" + result.answer.slice(0, 3500));
-  } catch (error) { await ctx.reply("❌ " + error.message); }
-});
-
-bot.command("gamefollow", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  try {
-    const target = String(ctx.match || process.env.MC_OWNER || "Edison0009").trim();
-    await ctx.reply(gameAgent.follow(target));
-  } catch (error) { await ctx.reply("❌ " + error.message); }
-});
-
-bot.command("gamestart", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  try {
-    const task = String(ctx.match || "Исследуй ближайшую безопасную область и следуй за владельцем, если он рядом.").trim();
-    await ctx.reply(await gameAgent.startAutonomy(task));
-  } catch (error) { await ctx.reply("❌ " + error.message); }
-});
-
-bot.command("gamestop", async ctx => {
-  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
-  gameAgent.stopAutonomy();
-  await ctx.reply("🛑 Автономный режим остановлен. Игровой бот остаётся подключённым.");
-});
-
 // BASIC COMMANDS
 // ======================================================
 
@@ -2435,7 +2305,6 @@ bot.command("status", async ctx => {
     "Голосовое распознавание: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Озвучивание: ✅ Edge TTS\n" +
     "Агент: ✅\n" +
-    "Minecraft Game AI: модуль загружен, подключение по команде /gameconnect\n" +
     "Сохранённых фактов: " + memory.facts.length + "\n" +
     "Голосовой режим: " + (voiceUsers.has(ctx.from.id) ? "🔊" : "🔇")
   );
