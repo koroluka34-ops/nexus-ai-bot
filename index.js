@@ -267,71 +267,88 @@ function errorText(data) {
 
 function allCommandsText() {
   return `✦ <b>NEXUS AI — ВСЕ КОМАНДЫ</b> ✦
-<i>Твой персональный ИИ-помощник</i> 🤖
-
-Ниже написано, что делает каждая команда и как ей пользоваться.
+<i>Команды, инструменты и примеры использования</i> 🤖
 
 ━━━━━━━━━━━━━━━━━━
-🤖 <b>ЗАПУСК И УПРАВЛЕНИЕ</b>
-
-<code>/start</code> — запустить бота и открыть приветствие.
-<code>/menu</code> — открыть главное меню с кнопками.
-<code>/commands</code> — показать этот список команд.
-<code>/status</code> — проверить состояние основных функций бота.
-<code>/reset</code> — начать новый диалог, очистив историю общения.
-<code>/agent задача</code> — поручить ИИ выполнить задачу. Вместо слова «задача» напиши, что нужно сделать.
-
-━━━━━━━━━━━━━━━━━━
-💬 <b>ОБЩЕНИЕ И РАБОТА С ТЕКСТОМ</b>
-
-Просто напиши сообщение — бот ответит как обычный ИИ-помощник.
-Кнопка <b>«🌐 Поиск»</b> в меню — найти информацию в интернете.
-<code>/translate язык текст</code> — перевести текст. Например: <code>/translate английский Привет!</code>
-<code>/summary</code> — кратко пересказать текст. Отправь команду ответом на сообщение с текстом.
-<code>/code</code> — получить помощь с программированием. Отправь команду ответом на код или напиши задачу после команды.
+🤖 <b>УПРАВЛЕНИЕ</b>
+<code>/start</code> — запустить бота.
+<code>/menu</code> — открыть главное меню.
+<code>/commands</code> — показать все команды.
+<code>/status</code> — проверить состояние сервисов.
+<code>/reset</code> — очистить текущую историю диалога.
+<code>/agent задача</code> — поручить ИИ выполнить задачу.
 
 ━━━━━━━━━━━━━━━━━━
-🧠 <b>ПАМЯТЬ БОТА</b>
-
-<code>/remember текст</code> — сохранить факт, который бот должен помнить. Например: <code>/remember Я изучаю Python</code>
-<code>/memory</code> — посмотреть, что бот запомнил о тебе.
-<code>/forget</code> — удалить сохранённую память о тебе.
+💬 <b>ТЕКСТ И ИИ</b>
+<code>/translate язык текст</code> — перевести текст.
+<code>/summary</code> — кратко пересказать текст (можно ответом на сообщение).
+<code>/explain</code> — объяснить тему простыми словами.
+<code>/rewrite</code> — переписать текст понятнее и грамотнее.
+<code>/ideas</code> — придумать идеи по теме.
+<code>/email</code> — составить письмо.
+<code>/plan</code> — составить пошаговый план.
+<code>/quiz</code> — создать тест с вопросами.
+<code>/table</code> — оформить информацию в таблицу.
+<code>/json</code> — преобразовать описание в JSON.
+<code>/regex</code> — создать и объяснить регулярное выражение.
+<code>/review</code> — проверить текст, идею или проект.
+<code>/title</code> — придумать заголовки.
+<code>/social</code> — написать пост для соцсетей.
+<code>/story</code> — придумать историю.
+<code>/compare</code> — сравнить варианты.
+<code>/steps</code> — разложить задачу на шаги.
+<code>/proscons</code> — перечислить плюсы и минусы.
+<code>/code</code> — написать, объяснить или проверить код.
 
 ━━━━━━━━━━━━━━━━━━
-🎨 <b>ФОТО, КАРТИНКИ И ВИДЕО</b>
+🧠 <b>ПАМЯТЬ</b>
+<code>/remember текст</code> — сохранить факт о себе.
+<code>/memory</code> — посмотреть сохранённые факты.
+<code>/forget</code> — удалить память и историю.
 
-<code>/image описание</code> — создать новую картинку по твоему описанию. После команды напиши, что должно быть на изображении.
-<code>/sticker описание</code> — создать стикер по текстовому описанию.
-<code>/sticker</code> — превратить фотографию в стикер. Для этого ответь командой на сообщение с фото.
-<code>/enhance</code> — увеличить и улучшить чёткость фотографии. Используй команду ответом на фото.
-<code>/circle</code> — сделать круглое видео (видеосообщение). Ответь командой на фото или видео.
-<code>/video</code> — узнать о возможностях создания ИИ-видео.
+━━━━━━━━━━━━━━━━━━
+🎨 <b>ИЗОБРАЖЕНИЯ И МЕДИА</b>
+<code>/image описание</code> — создать изображение по описанию.
+<code>/sticker описание</code> — создать стикер по тексту.
+<code>/sticker</code> — сделать стикер из фото (ответом на фото).
+<code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
+<code>/circle</code> — сделать видеокружок из фото или видео.
+<code>/video</code> — посмотреть информацию о генерации ИИ-видео.
 
 ━━━━━━━━━━━━━━━━━━
 🎙 <b>ГОЛОС И АУДИО</b>
-
-<code>/voice</code> — переключить режим голосовых ответов.
-<code>/voice_on</code> — включить голосовые ответы бота.
-<code>/voice_off</code> — выключить голосовые ответы бота.
-<code>/say текст</code> — озвучить написанный текст. Например: <code>/say Привет! Как дела?</code>
-<code>/transcribe</code> — перевести голосовое сообщение или аудиофайл в текст. Ответь командой на аудио.
+<code>/voice</code> — включить или выключить голосовые ответы.
+<code>/voice_on</code> — включить голосовые ответы.
+<code>/voice_off</code> — выключить голосовые ответы.
+<code>/say текст</code> — озвучить текст.
+<code>/transcribe</code> — расшифровать аудио (ответом на аудио).
 
 ━━━━━━━━━━━━━━━━━━
-📁 <b>СОЗДАНИЕ ФАЙЛОВ</b>
-
-<code>/create docx текст</code> — создать документ Word.
-<code>/create pdf текст</code> — создать документ PDF.
-<code>/create xlsx текст</code> — создать таблицу Excel.
+📁 <b>ФАЙЛЫ</b>
+<code>/create docx текст</code> — создать Word.
+<code>/create pdf текст</code> — создать PDF.
+<code>/create xlsx текст</code> — создать Excel.
 <code>/create pptx текст</code> — создать презентацию PowerPoint.
-
-После типа файла напиши, что должно быть внутри. Например: <code>/create docx План на неделю</code>
+Отправь PDF, DOCX, TXT, CSV или файл с кодом — бот сможет прочитать его и ответить на вопрос.
 
 ━━━━━━━━━━━━━━━━━━
-✨ <b>КАК НАЧАТЬ</b>
+🧰 <b>ПОЛЕЗНЫЕ ИНСТРУМЕНТЫ</b>
+<code>/calc выражение</code> — посчитать пример. Например: <code>/calc (25+5)*3</code>
+<code>/convert число единица единица</code> — конвертировать длину, вес или температуру. Например: <code>/convert 10 km mi</code>
+<code>/password длина</code> — создать случайный пароль (по умолчанию 16 символов).
+<code>/uuid</code> — создать уникальный идентификатор.
+<code>/random минимум максимум</code> — случайное целое число в диапазоне.
+<code>/wordcount</code> — посчитать слова и символы (можно ответом на текст).
+<code>/hash текст</code> — получить SHA-256 хеш текста.
+<code>/base64 encode текст</code> — закодировать текст в Base64.
+<code>/base64 decode строка</code> — декодировать Base64.
 
-Не обязательно использовать команды. Просто напиши NEXUS AI, что тебе нужно: задать вопрос, попросить объяснить тему, написать текст или помочь с задачей.
+━━━━━━━━━━━━━━━━━━
+✨ <b>ПОДСКАЗКА</b>
+Большинство текстовых команд можно отправлять ответом на сообщение, чтобы обработать его содержимое.
+Можно просто написать боту обычным сообщением — команды не обязательны.
 
-<b>NEXUS AI — твой помощник для учёбы, работы и повседневных задач.</b> 🚀`;
+<b>NEXUS AI — больше возможностей в одном боте.</b> 🚀`;
 }
 
 function mainMenu() {
@@ -345,6 +362,7 @@ function mainMenu() {
     .text("📄 Создать документ", "menu_create")
     .text("🤖 ИИ-агент", "menu_agent")
     .row()
+    .text("🧰 Инструменты", "menu_tools")
     .text("ℹ️ Возможности", "menu_features")
     .text("📚 Все команды", "menu_commands")
     .row()
@@ -1721,6 +1739,208 @@ bot.command("code", async ctx => {
   );
 });
 
+
+// ======================================================
+// EXTRA AI PROMPT COMMANDS
+// ======================================================
+
+function registerTextPromptCommand(command, title, instruction) {
+  bot.command(command, async ctx => {
+    const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+    await runTextTool(ctx, title, instruction, source);
+  });
+}
+
+registerTextPromptCommand("explain", "🧠 Объясняю...", "Объясни тему максимально понятно на русском языке. Начни с простого объяснения, затем приведи пример и краткий вывод.");
+registerTextPromptCommand("rewrite", "✍️ Переписываю...", "Перепиши текст грамотно, понятно и естественно, сохранив исходный смысл. Не добавляй новых фактов.");
+registerTextPromptCommand("ideas", "💡 Подбираю идеи...", "Предложи 15 разнообразных, конкретных и полезных идей по теме. К каждой добавь короткое объяснение.");
+registerTextPromptCommand("email", "📧 Составляю письмо...", "Составь готовое письмо на русском языке. Сделай его ясным, вежливым и естественным. Если не хватает деталей, используй нейтральные формулировки, не выдумывай адреса и факты.");
+registerTextPromptCommand("plan", "🗓️ Составляю план...", "Составь реалистичный пошаговый план с порядком действий, сроками только если они указаны, и понятным результатом каждого этапа.");
+registerTextPromptCommand("quiz", "❓ Создаю тест...", "Создай тест из 10 вопросов по теме с четырьмя вариантами ответа. В конце дай правильные ответы и короткие объяснения.");
+registerTextPromptCommand("table", "📊 Создаю таблицу...", "Преобразуй информацию в аккуратную Markdown-таблицу. Не теряй важные данные и не выдумывай значения.");
+registerTextPromptCommand("json", "🧩 Формирую JSON...", "Преобразуй запрос в корректный JSON. Верни только JSON в блоке кода. Не выдумывай неизвестные значения; используй null или пустые массивы.");
+registerTextPromptCommand("regex", "🔎 Создаю регулярное выражение...", "Создай подходящее регулярное выражение для задачи. Объясни каждую часть и приведи примеры совпадений и несовпадений.");
+registerTextPromptCommand("review", "🧐 Проверяю...", "Проведи критический разбор. Найди ошибки, риски, слабые места и предложи конкретные улучшения. Не хвали без оснований.");
+registerTextPromptCommand("title", "✨ Придумываю заголовки...", "Предложи 20 разных заголовков: короткие, информативные, креативные и официальные. Отметь наиболее удачные.");
+registerTextPromptCommand("social", "📱 Готовлю публикацию...", "Напиши готовый пост для социальной сети. Сделай его живым, читабельным и без искусственного пафоса. Добавь уместные хештеги отдельно.");
+registerTextPromptCommand("story", "📖 Пишу историю...", "Напиши увлекательную оригинальную историю по заданной идее. Сделай логичное начало, развитие и завершение.");
+registerTextPromptCommand("compare", "⚖️ Сравниваю...", "Сравни указанные варианты по важным критериям. Покажи различия, преимущества, недостатки и сделай обоснованный вывод. Не выдумывай характеристики.");
+registerTextPromptCommand("steps", "🪜 Разбираю задачу...", "Разбей задачу на последовательные практические шаги. Для каждого шага объясни, что именно сделать и какой результат должен получиться.");
+registerTextPromptCommand("proscons", "⚖️ Анализирую плюсы и минусы...", "Составь честный список преимуществ, недостатков, рисков и ограничений. В конце дай краткий вывод.");
+
+// ======================================================
+// FREE BUILT-IN UTILITIES
+// ======================================================
+
+function calculateExpression(expression) {
+  const source = String(expression || "").replace(/,/g, ".").trim();
+  if (!source || source.length > 120) throw new Error("Введи короткое математическое выражение.");
+  const tokens = source.match(/(?:\d+(?:\.\d*)?|\.\d+)|[()+\-*/%^]/g) || [];
+  if (tokens.join("") !== source.replace(/\s+/g, "")) throw new Error("Допустимы только числа, скобки и знаки + - * / % ^.");
+  let pos = 0;
+  function primary() {
+    const token = tokens[pos++];
+    if (token === "+" || token === "-") {
+      const value = primary();
+      return token === "-" ? -value : value;
+    }
+    if (token === "(") {
+      const value = addSub();
+      if (tokens[pos++] !== ")") throw new Error("Не хватает закрывающей скобки.");
+      return value;
+    }
+    const value = Number(token);
+    if (!Number.isFinite(value)) throw new Error("Некорректное число.");
+    return value;
+  }
+  function power() {
+    let value = primary();
+    if (tokens[pos] === "^") {
+      pos++;
+      value = Math.pow(value, power());
+    }
+    return value;
+  }
+  function mulDiv() {
+    let value = power();
+    while (["*", "/", "%"].includes(tokens[pos])) {
+      const op = tokens[pos++];
+      const right = power();
+      if ((op === "/" || op === "%") && right === 0) throw new Error("На ноль делить нельзя.");
+      value = op === "*" ? value * right : op === "/" ? value / right : value % right;
+    }
+    return value;
+  }
+  function addSub() {
+    let value = mulDiv();
+    while (tokens[pos] === "+" || tokens[pos] === "-") {
+      const op = tokens[pos++];
+      const right = mulDiv();
+      value = op === "+" ? value + right : value - right;
+    }
+    return value;
+  }
+  const result = addSub();
+  if (pos !== tokens.length || !Number.isFinite(result)) throw new Error("Не удалось вычислить выражение.");
+  return result;
+}
+
+bot.command("calc", async ctx => {
+  const expression = String(ctx.match || "").trim();
+  if (!expression) {
+    await ctx.reply("Пример: /calc (25 + 5) * 3\nПоддерживаются +, -, *, /, %, ^ и скобки.");
+    return;
+  }
+  try {
+    const result = calculateExpression(expression);
+    await ctx.reply("🧮 " + expression + " = " + Number(result.toPrecision(12)));
+  } catch (error) {
+    await ctx.reply("❌ " + error.message);
+  }
+});
+
+bot.command("password", async ctx => {
+  const requested = Number(String(ctx.match || "").trim() || 16);
+  if (!Number.isInteger(requested) || requested < 8 || requested > 64) {
+    await ctx.reply("Укажи длину от 8 до 64. Пример: /password 20");
+    return;
+  }
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*+-_";
+  let password = "";
+  for (let i = 0; i < requested; i++) password += alphabet[crypto.randomInt(alphabet.length)];
+  await ctx.reply("🔐 Случайный пароль (" + requested + " символов):\n<code>" + password + "</code>", { parse_mode: "HTML" });
+});
+
+bot.command("uuid", async ctx => {
+  await ctx.reply("🆔 <code>" + crypto.randomUUID() + "</code>", { parse_mode: "HTML" });
+});
+
+bot.command("random", async ctx => {
+  const match = String(ctx.match || "").trim().match(/^(-?\d+)\s+(-?\d+)$/);
+  if (!match) {
+    await ctx.reply("Пример: /random 1 100");
+    return;
+  }
+  const min = Number(match[1]);
+  const max = Number(match[2]);
+  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || max < min || max - min > 1000000000) {
+    await ctx.reply("❌ Нужны целые числа в корректном диапазоне (разница не более 1 000 000 000).");
+    return;
+  }
+  await ctx.reply("🎲 Случайное число: " + crypto.randomInt(min, max + 1));
+});
+
+bot.command("wordcount", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!source) {
+    await ctx.reply("Напиши /wordcount текст или ответь этой командой на сообщение.");
+    return;
+  }
+  const words = source.match(/[\p{L}\p{N}]+(?:['’_-][\p{L}\p{N}]+)*/gu) || [];
+  const lines = source ? source.split(/\r?\n/).length : 0;
+  await ctx.reply("📏 Статистика текста:\nСлов: " + words.length + "\nСимволов: " + source.length + "\nБез пробелов: " + source.replace(/\s/g, "").length + "\nСтрок: " + lines);
+});
+
+bot.command("hash", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!source) {
+    await ctx.reply("Пример: /hash текст или ответь командой на сообщение.");
+    return;
+  }
+  const digest = crypto.createHash("sha256").update(source, "utf8").digest("hex");
+  await ctx.reply("🔏 SHA-256:\n<code>" + digest + "</code>", { parse_mode: "HTML" });
+});
+
+bot.command("base64", async ctx => {
+  const input = String(ctx.match || "").trim();
+  const match = input.match(/^(encode|decode)\s+([\s\S]+)$/i);
+  if (!match) {
+    await ctx.reply("Использование:\n/base64 encode Привет\n/base64 decode 0J/RgNC40LLQtdGC");
+    return;
+  }
+  try {
+    if (match[1].toLowerCase() === "encode") {
+      await ctx.reply("🔤 Base64:\n<code>" + Buffer.from(match[2], "utf8").toString("base64") + "</code>", { parse_mode: "HTML" });
+    } else {
+      const encoded = match[2].replace(/\s/g, "");
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 === 1) throw new Error("Некорректная строка Base64.");
+      const decoded = Buffer.from(encoded, "base64").toString("utf8");
+      await ctx.reply("🔤 Результат:\n" + decoded.slice(0, 3500));
+    }
+  } catch (error) {
+    await ctx.reply("❌ " + error.message);
+  }
+});
+
+const UNIT_TABLE = {
+  length: { mm: 0.001, cm: 0.01, m: 1, km: 1000, in: 0.0254, ft: 0.3048, mi: 1609.344 },
+  weight: { mg: 0.000001, g: 0.001, kg: 1, t: 1000, oz: 0.028349523125, lb: 0.45359237 }
+};
+
+bot.command("convert", async ctx => {
+  const match = String(ctx.match || "").trim().match(/^(-?\d+(?:[.,]\d+)?)\s*(\S+)\s+(\S+)$/);
+  if (!match) {
+    await ctx.reply("Пример: /convert 10 km mi\nДлина: mm, cm, m, km, in, ft, mi. Вес: mg, g, kg, t, oz, lb. Температура: C, F, K.");
+    return;
+  }
+  const value = Number(match[1].replace(",", "."));
+  const from = match[2].toLowerCase();
+  const to = match[3].toLowerCase();
+  let result;
+  if (["c", "f", "k"].includes(from) && ["c", "f", "k"].includes(to)) {
+    const c = from === "c" ? value : from === "f" ? (value - 32) * 5 / 9 : value - 273.15;
+    result = to === "c" ? c : to === "f" ? c * 9 / 5 + 32 : c + 273.15;
+  } else {
+    const category = Object.keys(UNIT_TABLE).find(key => UNIT_TABLE[key][from] && UNIT_TABLE[key][to]);
+    if (!category) {
+      await ctx.reply("❌ Неизвестные или несовместимые единицы измерения.");
+      return;
+    }
+    result = value * UNIT_TABLE[category][from] / UNIT_TABLE[category][to];
+  }
+  await ctx.reply("🔄 " + value + " " + from + " = " + Number(result.toPrecision(10)) + " " + to);
+});
+
 bot.command("enhance", async ctx => {
   const userId = ctx.from.id;
   const photo = ctx.message.reply_to_message?.photo?.at(-1);
@@ -1889,7 +2109,8 @@ bot.command("status", async ctx => {
     "Создание DOCX/PDF/XLSX/PPTX: ✅\n" +
     "Стикеры: " + (ffmpegPath && CLOUDFLARE_API_TOKEN ? "✅" : "❌") + "\n" +
     "Видеокружки: " + (ffmpegPath ? "✅" : "❌") + "\n" +
-    "Перевод / пересказ / код: " + (GROQ_API_KEY || OPENROUTER_API_KEY ? "✅" : "❌") + "\n" +
+    "Текстовые ИИ-инструменты: " + (GROQ_API_KEY || OPENROUTER_API_KEY ? "✅" : "❌") + "\n" +
+    "Калькулятор / конвертер / генераторы: ✅\n"
     "Улучшение фото: " + (ffmpegPath ? "✅" : "❌") + "\n" +
     "Расшифровка аудио: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Голосовое распознавание: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
@@ -2028,6 +2249,24 @@ bot.callbackQuery("menu_agent", async ctx => {
     "/agent создай PDF-инструкцию\n" +
     "/agent нарисуй город будущего\n" +
     "/agent объясни ошибку в коде"
+  );
+});
+
+bot.callbackQuery("menu_tools", async ctx => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    "🧰 <b>ИНСТРУМЕНТЫ NEXUS AI</b>\n\n" +
+    "🧮 /calc — калькулятор\n" +
+    "🔄 /convert — конвертер единиц\n" +
+    "🔐 /password — генератор паролей\n" +
+    "🆔 /uuid — уникальный ID\n" +
+    "🎲 /random — случайное число\n" +
+    "📏 /wordcount — статистика текста\n" +
+    "🔏 /hash — SHA-256 хеш\n" +
+    "🔤 /base64 — кодирование и декодирование\n\n" +
+    "Напиши команду с параметрами, чтобы воспользоваться инструментом.\n" +
+    "Например: <code>/calc (12 + 8) * 4</code>",
+    { parse_mode: "HTML" }
   );
 });
 
