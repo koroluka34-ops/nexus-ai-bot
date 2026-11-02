@@ -1639,14 +1639,15 @@ async function runOverdrive(ctx, task) {
   ];
 
   const finalResult = await overdriveModel(judgeMessages);
-  await ctx.api.editMessageText(
-    ctx.chat.id,
-    status.message_id,
-    "⚡ <b>NEXUS OVERDRIVE — ВЕРДИКТ</b>\n\n" + finalResult.answer,
-    { parse_mode: undefined }
-  ).catch(async () => {
-    await ctx.reply("⚡ NEXUS OVERDRIVE — ВЕРДИКТ\n\n" + finalResult.answer);
-  });
+  const finalText = "⚡ NEXUS OVERDRIVE — ВЕРДИКТ\n\n" + finalResult.answer;
+  if (finalText.length <= 3900) {
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id, finalText)
+      .catch(() => sendLongMessage(ctx, finalText));
+  } else {
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id, "⚡ OVERDRIVE завершён. Итог ниже.")
+      .catch(() => {});
+    await sendLongMessage(ctx, finalText);
+  }
 }
 
 bot.command("overdrive", async ctx => {
@@ -2369,6 +2370,7 @@ bot.command("start", async ctx => {
     "🎨 Стикеры из текста и фото\n" +
     "⭕ Видеокружки из фото и видео\n" +
     "🤖 ИИ-агент\n" +
+    "⚡ OVERDRIVE — четыре ИИ работают над одной задачей\n" +
     "🧠 Долговременная память\n" +
     "🎙 Голосовой диалог\n\n" +
     "Нажми «📚 Все команды», чтобы увидеть полный список команд.",
@@ -2603,7 +2605,8 @@ bot.callbackQuery("menu_features", async ctx => {
     "🎙 Распознавание голоса\n" +
     "🔊 Озвучивание ответов\n" +
     "🧠 Долговременная память\n" +
-    "🤖 Агент с ограниченным набором действий\n" +
+    "🤖 ИИ-агент\n" +
+    "⚡ OVERDRIVE: три независимых анализа и итоговый вердикт\n" +
     "🎨 Стикеры из текста и фото\n" +
     "⭕ Видеокружки из фото и видео\n" +
     "🌍 Перевод текста /translate\n" +
@@ -2617,6 +2620,7 @@ bot.callbackQuery("menu_features", async ctx => {
     "/forget — удалить память\n" +
     "/create — создать документ\n" +
     "/agent — выполнить задачу\n" +
+    "/overdrive — запустить команду четырёх ИИ\n" +
     "/video — статус бесплатной генерации видео\n" +
     "/sticker — создать стикер\n" +
     "/circle — сделать видеокружок\n" +
