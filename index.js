@@ -2129,11 +2129,100 @@ bot.command("country", async ctx => {
   } catch (error) { await ctx.reply("❌ Страна не найдена или API недоступен."); }
 });
 
+// ======================================================
+// JOKES — LANGUAGE, TRANSLATION, NEXT JOKE, DEDUPLICATION
+// ======================================================
+const jokeLanguages = new Map();
+const recentJokeIds = new Map();
+
+function jokeKeyboard() {
+  return new InlineKeyboard()
+    .text("😂 Ещё шутку", "joke:next")
+    .text("🌐 Перевести", "joke:translate")
+    .row()
+    .text("🇷🇺 Русский", "joke:lang:ru")
+    .text("🇬🇧 English", "joke:lang:en");
+}
+
+async function getFreshJoke(userId) {
+  const recent = recentJokeIds.get(userId) || [];
+  let data;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    data = await fetchJson("https://v2.jokeapi.dev/joke/Any?lang=en&safe-mode&blacklistFlags=nsfw,religious,political,racist,sexist,explicit");
+    if (data.error) throw new Error("JokeAPI не смог найти шутку.");
+    if (!recent.includes(data.id)) break;
+  }
+  recent.push(data.id);
+  recentJokeIds.set(userId, recent.slice(-30));
+  return data.type === "single" ? data.joke : data.setup + "\n" + data.delivery;
+}
+
+async function translateJoke(text) {
+  const messages = [
+    { role: "system", content: "Переведи шутку на естественный русский язык. Сохрани смысл и комический эффект. Не объясняй шутку, не добавляй вступление и верни только перевод." },
+    { role: "user", content: text }
+  ];
+  try {
+    return (await askGroq(messages)).answer.trim();
+  } catch (error) {
+    if (!OPENROUTER_API_KEY) throw error;
+    return (await askOpenRouter(messages)).answer.trim();
+  }
+}
+
+async function sendJoke(ctx, edit = false, forceTranslate = false) {
+  const userId = ctx.from.id;
+  const language = jokeLanguages.get(userId) || "ru";
+  const raw = await getFreshJoke(userId);
+  let output = raw;
+  if (forceTranslate || language === "ru") {
+    output = await translateJoke(raw);
+  }
+  const prefix = "😄 " + output + "\n\n< i >Источник: JokeAPI · Перевод: NEXUS AI</i>";
+  const cleanPrefix = prefix.replace("< i >", "<i>");
+  if (edit && ctx.callbackQuery?.message) {
+    await ctx.editMessageText(cleanPrefix, { parse_mode: "HTML", reply_markup: jokeKeyboard() });
+  } else {
+    await ctx.reply(cleanPrefix, { parse_mode: "HTML", reply_markup: jokeKeyboard() });
+  }
+}
+
 bot.command("joke", async ctx => {
   try {
-    const data = await fetchJson("https://v2.jokeapi.dev/joke/Any?lang=en&safe-mode");
-    await ctx.reply("😄 " + (data.type === "single" ? data.joke : data.setup + "\n" + data.delivery) + "\nИсточник: JokeAPI");
-  } catch (error) { await ctx.reply("❌ Сервис шуток временно недоступен."); }
+    await sendJoke(ctx);
+  } catch (error) {
+    console.error("Joke:", error.message);
+    await ctx.reply("❌ Не удалось получить или перевести шутку. Попробуй ещё раз через минуту.");
+  }
+});
+
+bot.command("jokelang", async ctx => {
+  const language = String(ctx.match || "").trim().toLowerCase();
+  if (!["ru", "en"].includes(language)) {
+    return ctx.reply("Выбери язык шуток:\n/jokelang ru — русский\n/jokelang en — английский");
+  }
+  jokeLanguages.set(ctx.from.id, language);
+  await ctx.reply(language === "ru" ? "🇷🇺 Шутки теперь будут на русском." : "🇬🇧 Jokes will now be in English.");
+});
+
+bot.callbackQuery("joke:next", async ctx => {
+  await ctx.answerCallbackQuery({ text: "Ищу новую шутку..." });
+  try { await sendJoke(ctx, true); }
+  catch (error) { await ctx.reply("❌ Не удалось получить шутку. Попробуй ещё раз."); }
+});
+
+bot.callbackQuery("joke:translate", async ctx => {
+  await ctx.answerCallbackQuery({ text: "Перевожу..." });
+  try { await sendJoke(ctx, true, true); }
+  catch (error) { await ctx.reply("❌ Перевод сейчас недоступен."); }
+});
+
+bot.callbackQuery(/^joke:lang:(ru|en)$/, async ctx => {
+  const language = ctx.match[1];
+  jokeLanguages.set(ctx.from.id, language);
+  await ctx.answerCallbackQuery({ text: language === "ru" ? "Язык: русский" : "Language: English" });
+  try { await sendJoke(ctx, true); }
+  catch (error) { await ctx.reply("Язык сохранён, но шутку сейчас получить не удалось."); }
 });
 
 bot.command("api", async ctx => {
