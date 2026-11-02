@@ -1,22 +1,17 @@
 
 require("dotenv").config();
 
-const {
-  Bot,
-  InlineKeyboard,
-  InputFile
-} = require("grammy");
-
+const { Bot, InlineKeyboard, InputFile } = require("grammy");
+const { EdgeTTS } = require("node-edge-tts");
 const http = require("http");
 const fs = require("fs/promises");
 const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
-const { EdgeTTS } = require("node-edge-tts");
 
-// ==================================================
-// NEXUS AI
-// ==================================================
+// =====================================================
+// NEXUS AI — CONFIG
+// =====================================================
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -35,6 +30,10 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+// =====================================================
+// STATE
+// =====================================================
+
 const MAX_HISTORY = 8;
 const MAX_OUTPUT = 900;
 
@@ -42,43 +41,45 @@ const histories = new Map();
 const busyUsers = new Set();
 const searchUsers = new Set();
 const voiceUsers = new Set();
+const imagePendingUsers = new Set();
+
+// =====================================================
+// SYSTEM PROMPT
+// =====================================================
 
 const SYSTEM_PROMPT = `
 Ты NEXUS AI — универсальный ИИ-помощник.
 
-ОБЯЗАТЕЛЬНО:
+Правила:
 - Отвечай на русском языке.
 - Пиши кратко и понятно.
 - Обычно используй 3–6 предложений.
-- Не растягивай ответы.
 - Не повторяй вопрос пользователя.
-- Не используй большие таблицы.
-- Для поиска давай краткую выжимку и максимум 3 ссылки.
 - Не выдумывай факты, новости и источники.
 - Если не знаешь — честно скажи.
-- Подробные инструкции давай только когда это необходимо.
+- Не используй большие таблицы.
 - Не ограничивайся тематикой Minecraft.
 `;
 
-// ==================================================
-// МЕНЮ
-// ==================================================
+// =====================================================
+// MENU
+// =====================================================
 
 function mainMenu() {
   return new InlineKeyboard()
     .text("💬 Общение с ИИ", "menu_chat")
     .text("🌐 Поиск", "menu_search")
     .row()
-    .text("🖼 Генерация картинок", "menu_image")
+    .text("🖼 Создать картинку", "menu_image")
     .text("🔊 Голос", "menu_voice")
     .row()
     .text("ℹ️ Возможности", "menu_features")
     .text("🔄 Сброс памяти", "menu_reset");
 }
 
-// ==================================================
-// ИСТОРИЯ
-// ==================================================
+// =====================================================
+// HISTORY
+// =====================================================
 
 function getHistory(userId) {
   if (!histories.has(userId)) {
@@ -98,9 +99,9 @@ function addHistory(userId, role, content) {
   }
 }
 
-// ==================================================
-// ОШИБКИ API
-// ==================================================
+// =====================================================
+// API ERROR
+// =====================================================
 
 function errorText(data) {
   if (data?.errors?.length) {
@@ -114,11 +115,11 @@ function errorText(data) {
   );
 }
 
-// ==================================================
-// GROQ
-// ==================================================
+// =====================================================
+// GROQ AI
+// =====================================================
 
-async function askGroq(messages, searchMode) {
+async function askGroq(messages, searchMode = false) {
   if (!GROQ_API_KEY) {
     throw new Error("Groq API key не настроен");
   }
@@ -165,24 +166,13 @@ async function askGroq(messages, searchMode) {
   return answer;
 }
 
-// ==================================================
-// OPENROUTER
-// ==================================================
+// =====================================================
+// OPENROUTER AI
+// =====================================================
 
-async function askOpenRouter(messages, searchMode) {
+async function askOpenRouter(messages) {
   if (!OPENROUTER_API_KEY) {
     throw new Error("OpenRouter API key не настроен");
-  }
-
-  const body = {
-    model: "openrouter/free",
-    messages,
-    max_tokens: MAX_OUTPUT,
-    temperature: 0.7
-  };
-
-  if (searchMode) {
-    body.plugins = [{ id: "web" }];
   }
 
   const response = await fetch(
@@ -195,7 +185,12 @@ async function askOpenRouter(messages, searchMode) {
         "HTTP-Referer": "https://nexus-ai-bot-kt4w.onrender.com",
         "X-Title": "NEXUS AI"
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: "openrouter/free",
+        messages,
+        max_tokens: MAX_OUTPUT,
+        temperature: 0.7
+      }),
       signal: AbortSignal.timeout(90000)
     }
   );
@@ -215,20 +210,18 @@ async function askOpenRouter(messages, searchMode) {
   return answer;
 }
 
-// ==================================================
-// ЕДИНЫЙ ИИ
-// ==================================================
+// =====================================================
+// MAIN AI
+// =====================================================
 
 async function askAI(userId, question, searchMode = false) {
-  const history = getHistory(userId);
-
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
-    ...history,
+    ...getHistory(userId),
     {
       role: "user",
       content: searchMode
-        ? `Найди информацию в интернете и ответь: ${question}`
+        ? "Найди информацию в интернете. Не выдумывай источники. Вопрос: " + question
         : question
     }
   ];
@@ -239,19 +232,22 @@ async function askAI(userId, question, searchMode = false) {
   try {
     answer = await askGroq(messages, searchMode);
     provider = "Groq";
-  } catch (groqError) {
-    console.error("Groq:", groqError.message);
+  } catch (error) {
+    console.error("Groq:", error.message);
 
     try {
-      answer = await askOpenRouter(messages, searchMode);
-      provider = "OpenRouter";
-    } catch (openRouterError) {
-      console.error("OpenRouter:", openRouterError.message);
+      if (searchMode) {
+        throw new Error("Веб-поиск Groq временно недоступен");
+      }
 
+      answer = await askOpenRouter(messages);
+      provider = "OpenRouter";
+
+    } catch (fallbackError) {
       throw new Error(
-        "Оба ИИ-провайдера сейчас недоступны.\n\n" +
-        "Groq: " + groqError.message + "\n\n" +
-        "OpenRouter: " + openRouterError.message
+        "ИИ сейчас недоступен.\n\n" +
+        "Groq: " + error.message + "\n\n" +
+        "OpenRouter: " + fallbackError.message
       );
     }
   }
@@ -262,23 +258,115 @@ async function askAI(userId, question, searchMode = false) {
   return { answer, provider };
 }
 
-// ==================================================
-// ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЙ — CLOUDFLARE FLUX
-// ==================================================
+// =====================================================
+// TRANSLATE IMAGE PROMPT
+// Russian / Ukrainian -> English
+// =====================================================
+
+async function translateImagePrompt(prompt) {
+  // English prompts are sent without changes.
+  if (!/[А-Яа-яЁёІіЇїЄєҐґ]/.test(prompt)) {
+    return prompt;
+  }
+
+  const messages = [
+    {
+      role: "system",
+      content:
+        "Translate the user's image description into clear English " +
+        "for the FLUX text-to-image model. Preserve the exact subject, " +
+        "objects, actions, setting, style and composition. " +
+        "Do not invent additional objects or scenes. " +
+        "Return ONLY the English prompt, without explanations."
+    },
+    {
+      role: "user",
+      content: prompt
+    }
+  ];
+
+  try {
+    const translated = await askGroq(messages, false);
+    return translated.trim().slice(0, 2048);
+  } catch (error) {
+    console.log("Image translation Groq:", error.message);
+  }
+
+  try {
+    const translated = await askOpenRouter(messages);
+    return translated.trim().slice(0, 2048);
+  } catch (error) {
+    console.log("Image translation OpenRouter:", error.message);
+  }
+
+  // If translation is unavailable, preserve the original prompt.
+  return prompt.slice(0, 2048);
+}
+
+// =====================================================
+// CLOUDFLARE FLUX IMAGE GENERATION
+// =====================================================
+
+function isImageBuffer(buffer, contentType = "") {
+  if (!buffer || buffer.length < 1000) {
+    return false;
+  }
+
+  const isJpeg =
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff;
+
+  const isPng =
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47;
+
+  const isWebp =
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP";
+
+  return (
+    isJpeg ||
+    isPng ||
+    isWebp ||
+    contentType.startsWith("image/")
+  );
+}
+
+function decodeBase64Image(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const clean = value.replace(
+    /^data:image\/[^;]+;base64,/i,
+    ""
+  ).trim();
+
+  if (!clean || clean.length < 100) {
+    return null;
+  }
+
+  return Buffer.from(clean, "base64");
+}
 
 async function generateImage(prompt) {
   if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
     throw new Error("Cloudflare не настроен в Render Environment");
   }
 
-  if (!prompt || prompt.length > 1800) {
-    throw new Error("Описание картинки должно быть от 1 до 1800 символов");
+  if (!prompt || prompt.length > 2048) {
+    throw new Error("Описание должно содержать от 1 до 2048 символов");
   }
 
   const url =
-    `https://api.cloudflare.com/client/v4/accounts/` +
-    `${CLOUDFLARE_ACCOUNT_ID}/ai/run/` +
-    `@cf/black-forest-labs/flux-1-schnell`;
+    "https://api.cloudflare.com/client/v4/accounts/" +
+    CLOUDFLARE_ACCOUNT_ID +
+    "/ai/run/@cf/black-forest-labs/flux-1-schnell";
+
+  console.log("FLUX PROMPT:", prompt);
 
   const response = await fetch(url, {
     method: "POST",
@@ -287,53 +375,193 @@ async function generateImage(prompt) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      prompt,
-      steps: 4
+      prompt: prompt,
+      steps: 8
     }),
     signal: AbortSignal.timeout(120000)
   });
 
-  const data = await response.json();
+  const contentType =
+    response.headers.get("content-type") || "";
 
-  if (!response.ok || data.success === false) {
+  const raw = Buffer.from(
+    await response.arrayBuffer()
+  );
+
+  if (!response.ok) {
+    const errorBody = raw.toString("utf8");
+
+    let message = errorBody;
+
+    try {
+      message = errorText(JSON.parse(errorBody));
+    } catch {}
+
+    throw new Error(
+      `Cloudflare HTTP ${response.status}: ${message.slice(0, 800)}`
+    );
+  }
+
+  // Some image responses can be returned as raw image bytes.
+  if (isImageBuffer(raw, contentType)) {
+    return {
+      buffer: raw,
+      mime: contentType.startsWith("image/")
+        ? contentType.split(";")[0]
+        : "image/jpeg"
+    };
+  }
+
+  // Other responses use a JSON envelope with Base64 image.
+  let data;
+
+  try {
+    data = JSON.parse(raw.toString("utf8"));
+  } catch {
+    throw new Error(
+      "Cloudflare вернул неизвестный формат ответа. " +
+      "Content-Type: " + contentType
+    );
+  }
+
+  if (data.success === false) {
     throw new Error(errorText(data));
   }
 
-  let imageBase64 =
-    data.result?.image ||
-    data.result?.data?.[0]?.b64_json;
+  const base64 =
+    data?.result?.image ||
+    data?.result?.image_base64 ||
+    data?.result?.data?.[0]?.b64_json ||
+    data?.image;
 
-  if (!imageBase64) {
-    throw new Error("Cloudflare не вернул изображение");
+  const imageBuffer = decodeBase64Image(base64);
+
+  if (!imageBuffer || !isImageBuffer(imageBuffer)) {
+    throw new Error(
+      "Модель не вернула настоящее изображение. " +
+      "Проверьте ответ Cloudflare в логах Render."
+    );
   }
 
-  imageBase64 = imageBase64.replace(
-    /^data:image\/[^;]+;base64,/,
-    ""
-  );
-
-  return Buffer.from(imageBase64, "base64");
+  return {
+    buffer: imageBuffer,
+    mime: "image/jpeg"
+  };
 }
 
-// ==================================================
-// РАСПОЗНАВАНИЕ ГОЛОСА — GROQ WHISPER
-// ==================================================
+// =====================================================
+// IMAGE HANDLER
+// =====================================================
+
+async function handleImage(ctx, originalPrompt) {
+  const userId = ctx.from.id;
+  const prompt = String(originalPrompt || "").trim();
+
+  if (!prompt) {
+    await ctx.reply(
+      "🖼 Напиши описание картинки:\n\n" +
+      "/image кот в космосе, реалистичный стиль"
+    );
+    return;
+  }
+
+  if (prompt.length > 1800) {
+    await ctx.reply("Описание слишком длинное. Максимум 1800 символов.");
+    return;
+  }
+
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди, предыдущий запрос ещё обрабатывается.");
+    return;
+  }
+
+  busyUsers.add(userId);
+
+  const status = await ctx.reply(
+    "🎨 Создаю изображение по твоему описанию:\n\n" +
+    prompt.slice(0, 700)
+  );
+
+  try {
+    // Translate Russian/Ukrainian prompt for FLUX.
+    const englishPrompt = await translateImagePrompt(prompt);
+
+    console.log("Original image prompt:", prompt);
+    console.log("Translated image prompt:", englishPrompt);
+
+    const result = await generateImage(englishPrompt);
+
+    const extension =
+      result.mime === "image/png" ? "png" :
+      result.mime === "image/webp" ? "webp" : "jpg";
+
+    await ctx.api.deleteMessage(
+      ctx.chat.id,
+      status.message_id
+    ).catch(() => {});
+
+    await ctx.replyWithPhoto(
+      new InputFile(
+        result.buffer,
+        `nexus-image.${extension}`
+      ),
+      {
+        caption:
+          "🖼 Изображение создано!\n\n" +
+          "📝 Твой запрос: " + prompt.slice(0, 700)
+      }
+    );
+
+  } catch (error) {
+    console.error("IMAGE ERROR:", error);
+
+    await ctx.api.editMessageText(
+      ctx.chat.id,
+      status.message_id,
+      "❌ Не удалось создать изображение:\n\n" +
+      String(error.message || error).slice(0, 2500)
+    ).catch(() => {});
+
+  } finally {
+    busyUsers.delete(userId);
+  }
+}
+
+// =====================================================
+// IMAGE COMMAND
+// =====================================================
+
+bot.command("image", async (ctx) => {
+  imagePendingUsers.delete(ctx.from.id);
+
+  const text = ctx.message?.text || "";
+
+  const prompt = text
+    .replace(/^\/image(?:@\w+)?/i, "")
+    .trim();
+
+  await handleImage(ctx, prompt);
+});
+
+// =====================================================
+// VOICE RECOGNITION — GROQ WHISPER
+// =====================================================
 
 async function transcribeVoice(ctx) {
   if (!GROQ_API_KEY) {
-    throw new Error("Для распознавания речи нужен Groq API key");
+    throw new Error("Groq API key не настроен");
   }
 
   const voice = ctx.message.voice;
 
-  if (voice.file_size && voice.file_size > 24 * 1024 * 1024) {
-    throw new Error("Голосовое слишком большое. Максимум 24 МБ.");
+  if (voice.file_size && voice.file_size > 20 * 1024 * 1024) {
+    throw new Error("Голосовое слишком большое. Максимум 20 МБ.");
   }
 
   const file = await ctx.api.getFile(voice.file_id);
 
   if (!file.file_path) {
-    throw new Error("Не удалось получить файл голосового");
+    throw new Error("Не удалось получить аудиофайл");
   }
 
   const fileUrl =
@@ -387,9 +615,9 @@ async function transcribeVoice(ctx) {
   return data.text.trim();
 }
 
-// ==================================================
-// ОЗВУЧКА ТЕКСТА — EDGE TTS
-// ==================================================
+// =====================================================
+// TEXT TO SPEECH — EDGE TTS
+// =====================================================
 
 async function makeSpeech(text) {
   const cleanText = String(text || "")
@@ -416,7 +644,14 @@ async function makeSpeech(text) {
 
     await tts.ttsPromise(cleanText, filename);
 
-    return await fs.readFile(filename);
+    const audio = await fs.readFile(filename);
+
+    if (!audio.length) {
+      throw new Error("TTS вернул пустой аудиофайл");
+    }
+
+    return audio;
+
   } finally {
     await fs.unlink(filename).catch(() => {});
   }
@@ -434,9 +669,9 @@ async function sendSpeech(ctx, text) {
   );
 }
 
-// ==================================================
-// ОТПРАВКА ОТВЕТА ИИ
-// ==================================================
+// =====================================================
+// SEND LONG TEXT
+// =====================================================
 
 async function sendLongMessage(ctx, text) {
   const maxLength = 3900;
@@ -448,6 +683,10 @@ async function sendLongMessage(ctx, text) {
   }
 }
 
+// =====================================================
+// DELIVER AI ANSWER
+// =====================================================
+
 async function deliverAnswer(ctx, userId, result) {
   await sendLongMessage(
     ctx,
@@ -458,28 +697,17 @@ async function deliverAnswer(ctx, userId, result) {
     try {
       await sendSpeech(ctx, result.answer);
     } catch (error) {
-      console.error("TTS error:", error.message);
-      await ctx.reply("⚠️ Не удалось озвучить этот ответ.");
+      console.error("TTS ERROR:", error.message);
+      await ctx.reply("⚠️ Не удалось озвучить ответ.");
     }
   }
 }
 
-// ==================================================
-// ПОИСК КОМАНДЫ ГЕНЕРАЦИИ КАРТИНОК
-// ==================================================
+// =====================================================
+// IMAGE PROMPT DETECTOR
+// =====================================================
 
 function extractImagePrompt(text) {
-  const command = text.match(
-    /^\/image(?:@\w+)?(?:\s+([\s\S]+))?$/i
-  );
-
-  if (command) {
-    return {
-      isImage: true,
-      prompt: (command[1] || "").trim()
-    };
-  }
-
   const natural = text.match(
     /^(?:нарисуй|создай(?: мне)? картинку|создай(?: мне)? изображение|сгенерируй(?: мне)? картинку|сгенерируй(?: мне)? изображение)\s+([\s\S]+)/i
   );
@@ -491,84 +719,28 @@ function extractImagePrompt(text) {
     };
   }
 
-  return { isImage: false };
+  return {
+    isImage: false,
+    prompt: ""
+  };
 }
 
-// ==================================================
-// КОМАНДА /IMAGE
-// ==================================================
-
-async function handleImage(ctx, prompt) {
-  const userId = ctx.from.id;
-
-  if (!prompt) {
-    await ctx.reply(
-      "🖼 Напиши описание картинки:\n\n" +
-      "/image красивый дракон в горах, реалистичный стиль"
-    );
-    return;
-  }
-
-  if (busyUsers.has(userId)) {
-    await ctx.reply("⏳ Подожди, я ещё обрабатываю предыдущий запрос.");
-    return;
-  }
-
-  busyUsers.add(userId);
-
-  const status = await ctx.reply(
-    "🎨 Создаю изображение...\nЭто может занять некоторое время."
-  );
-
-  try {
-    const image = await generateImage(prompt);
-
-    await ctx.api.deleteMessage(
-      ctx.chat.id,
-      status.message_id
-    ).catch(() => {});
-
-    await ctx.replyWithPhoto(
-      new InputFile(image, "nexus-image.jpg"),
-      {
-        caption: "🖼 Готово! Изображение создано через NEXUS AI."
-      }
-    );
-
-  } catch (error) {
-    console.error("Image error:", error.message);
-
-    await ctx.api.editMessageText(
-      ctx.chat.id,
-      status.message_id,
-      "❌ Не удалось создать изображение:\n" + error.message
-    ).catch(() => {});
-
-  } finally {
-    busyUsers.delete(userId);
-  }
-}
-
-bot.command("image", async (ctx) => {
-  await handleImage(ctx, String(ctx.match || "").trim());
-});
-
-// ==================================================
-// START / MENU / STATUS
-// ==================================================
+// =====================================================
+// BASIC COMMANDS
+// =====================================================
 
 bot.command("start", async (ctx) => {
+  imagePendingUsers.delete(ctx.from.id);
   searchUsers.delete(ctx.from.id);
 
   await ctx.reply(
     "👋 Привет! Я NEXUS AI.\n\n" +
-    "Я универсальный ИИ-помощник.\n\n" +
     "💬 Общение с ИИ\n" +
     "🌐 Поиск информации\n" +
-    "🖼 Создание изображений\n" +
+    "🖼 Генерация изображений\n" +
     "🎙 Распознавание голосовых\n" +
     "🔊 Озвучивание ответов\n\n" +
-    "Выбери нужную функцию:",
+    "Выбери функцию:",
     { reply_markup: mainMenu() }
   );
 });
@@ -579,52 +751,47 @@ bot.command("menu", async (ctx) => {
   });
 });
 
-bot.command("status", async (ctx) => {
-  await ctx.reply(
-    "🤖 NEXUS AI — статус\n\n" +
-    "Telegram: ✅ Подключён\n" +
-    "Groq: " + (GROQ_API_KEY ? "✅ Настроен" : "❌ Не настроен") + "\n" +
-    "OpenRouter: " + (OPENROUTER_API_KEY ? "✅ Настроен" : "❌ Не настроен") + "\n" +
-    "Cloudflare: " +
-    (CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_API_TOKEN
-      ? "✅ Настроен"
-      : "❌ Не настроен") + "\n" +
-    "Edge TTS: ✅ Включён в код\n\n" +
-    "Генерация картинок: " +
-    (CLOUDFLARE_API_TOKEN ? "✅" : "❌") + "\n" +
-    "Распознавание голосовых: " +
-    (GROQ_API_KEY ? "✅" : "❌") + "\n" +
-    "Голосовые ответы: " +
-    (voiceUsers.has(ctx.from.id) ? "🔊 Включены" : "🔇 Выключены")
-  );
-});
-
 bot.command("reset", async (ctx) => {
   histories.delete(ctx.from.id);
   searchUsers.delete(ctx.from.id);
+  imagePendingUsers.delete(ctx.from.id);
 
   await ctx.reply("🧹 Память диалога очищена.");
 });
 
-// ==================================================
-// ГОЛОСОВОЙ РЕЖИМ
-// ==================================================
+bot.command("status", async (ctx) => {
+  await ctx.reply(
+    "🤖 NEXUS AI — статус\n\n" +
+    "Telegram: ✅ Подключён\n" +
+    "Groq: " + (GROQ_API_KEY ? "✅ Настроен" : "❌ Нет ключа") + "\n" +
+    "OpenRouter: " + (OPENROUTER_API_KEY ? "✅ Настроен" : "❌ Нет ключа") + "\n" +
+    "Cloudflare: " +
+    (CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_API_TOKEN
+      ? "✅ Настроен"
+      : "❌ Не настроен") + "\n" +
+    "Генерация изображений: " +
+    (CLOUDFLARE_API_TOKEN ? "✅" : "❌") + "\n" +
+    "Распознавание голоса: " +
+    (GROQ_API_KEY ? "✅" : "❌") + "\n" +
+    "Озвучивание: ✅ Edge TTS\n" +
+    "Голосовой режим: " +
+    (voiceUsers.has(ctx.from.id) ? "🔊 Включён" : "🔇 Выключен")
+  );
+});
+
+// =====================================================
+// VOICE MODE COMMANDS
+// =====================================================
 
 bot.command("voice", async (ctx) => {
   const userId = ctx.from.id;
 
   if (voiceUsers.has(userId)) {
     voiceUsers.delete(userId);
-
-    await ctx.reply(
-      "🔇 Голосовые ответы выключены.\nТеперь я буду отвечать текстом."
-    );
+    await ctx.reply("🔇 Голосовые ответы выключены.");
   } else {
     voiceUsers.add(userId);
-
-    await ctx.reply(
-      "🔊 Голосовые ответы включены!\nТеперь после текстового ответа я буду отправлять озвучку."
-    );
+    await ctx.reply("🔊 Голосовые ответы включены.");
   }
 });
 
@@ -638,16 +805,17 @@ bot.command("voice_off", async (ctx) => {
   await ctx.reply("🔇 Голосовые ответы выключены.");
 });
 
-// ==================================================
-// ОЗВУЧИТЬ ОТДЕЛЬНЫЙ ТЕКСТ
-// ==================================================
+// =====================================================
+// SAY COMMAND
+// =====================================================
 
 bot.command("say", async (ctx) => {
   const text = String(ctx.match || "").trim();
 
   if (!text) {
     await ctx.reply(
-      "🔊 Напиши текст для озвучивания:\n\n/say Привет! Это NEXUS AI."
+      "Напиши текст для озвучивания:\n\n" +
+      "/say Привет! Это NEXUS AI."
     );
     return;
   }
@@ -671,8 +839,6 @@ bot.command("say", async (ctx) => {
     );
 
   } catch (error) {
-    console.error("Speech error:", error.message);
-
     await ctx.api.editMessageText(
       ctx.chat.id,
       status.message_id,
@@ -681,12 +847,14 @@ bot.command("say", async (ctx) => {
   }
 });
 
-// ==================================================
-// КНОПКИ МЕНЮ
-// ==================================================
+// =====================================================
+// MENU CALLBACKS
+// =====================================================
 
 bot.callbackQuery("menu_chat", async (ctx) => {
+  imagePendingUsers.delete(ctx.from.id);
   searchUsers.delete(ctx.from.id);
+
   await ctx.answerCallbackQuery();
 
   await ctx.reply(
@@ -695,7 +863,9 @@ bot.callbackQuery("menu_chat", async (ctx) => {
 });
 
 bot.callbackQuery("menu_search", async (ctx) => {
+  imagePendingUsers.delete(ctx.from.id);
   searchUsers.add(ctx.from.id);
+
   await ctx.answerCallbackQuery();
 
   await ctx.reply(
@@ -704,14 +874,18 @@ bot.callbackQuery("menu_search", async (ctx) => {
 });
 
 bot.callbackQuery("menu_image", async (ctx) => {
+  searchUsers.delete(ctx.from.id);
+  imagePendingUsers.add(ctx.from.id);
+
   await ctx.answerCallbackQuery();
 
   await ctx.reply(
-    "🖼 Генерация изображений\n\n" +
-    "Напиши:\n" +
-    "/image описание картинки\n\n" +
+    "🖼 Режим генерации включён!\n\n" +
+    "Теперь просто напиши описание картинки.\n\n" +
     "Например:\n" +
-    "/image футуристический город ночью, реалистичный стиль"
+    "Кот в космосе, в скафандре, Земля на заднем плане, фотореализм.\n\n" +
+    "Также можно использовать команду:\n" +
+    "/image кот в космосе"
   );
 });
 
@@ -722,21 +896,19 @@ bot.callbackQuery("menu_voice", async (ctx) => {
     voiceUsers.delete(userId);
 
     await ctx.answerCallbackQuery({
-      text: "Голосовые ответы выключены"
+      text: "Голос выключен"
     });
 
-    await ctx.reply("🔇 Теперь ответы будут только текстовыми.");
+    await ctx.reply("🔇 Голосовые ответы выключены.");
 
   } else {
     voiceUsers.add(userId);
 
     await ctx.answerCallbackQuery({
-      text: "Голосовые ответы включены"
+      text: "Голос включён"
     });
 
-    await ctx.reply(
-      "🔊 Теперь после текстовых ответов я буду отправлять озвучку."
-    );
+    await ctx.reply("🔊 Голосовые ответы включены.");
   }
 });
 
@@ -745,45 +917,46 @@ bot.callbackQuery("menu_features", async (ctx) => {
 
   await ctx.reply(
     "✨ Возможности NEXUS AI:\n\n" +
-    "💬 Общение с искусственным интеллектом\n" +
-    "🌐 Поиск информации\n" +
+    "💬 Общение с ИИ\n" +
+    "🌐 Поиск информации — кнопка Поиск\n" +
     "🖼 Генерация изображений — /image\n" +
     "🎙 Распознавание голосовых сообщений\n" +
-    "🔊 Озвучка текста — /say\n" +
+    "🔊 Озвучивание текста — /say\n" +
     "🔊 Автоматическая озвучка — /voice\n" +
     "🧠 Память диалога\n" +
     "🔄 Переключение Groq / OpenRouter\n\n" +
     "Команды:\n" +
     "/start — запуск\n" +
     "/menu — меню\n" +
-    "/status — состояние\n" +
+    "/status — статус\n" +
     "/reset — очистить память\n" +
+    "/image — создать изображение\n" +
     "/voice — включить или выключить голос\n" +
-    "/say — озвучить текст\n" +
-    "/image — создать картинку"
+    "/say — озвучить текст"
   );
 });
 
 bot.callbackQuery("menu_reset", async (ctx) => {
   histories.delete(ctx.from.id);
   searchUsers.delete(ctx.from.id);
+  imagePendingUsers.delete(ctx.from.id);
 
   await ctx.answerCallbackQuery({
-    text: "Память очищена!"
+    text: "Память очищена"
   });
 
-  await ctx.reply("🧹 История диалога удалена.");
+  await ctx.reply("🧹 История диалога очищена.");
 });
 
-// ==================================================
-// ОБРАБОТКА ГОЛОСОВЫХ СООБЩЕНИЙ
-// ==================================================
+// =====================================================
+// VOICE MESSAGE HANDLER
+// =====================================================
 
 bot.on("message:voice", async (ctx) => {
   const userId = ctx.from.id;
 
   if (busyUsers.has(userId)) {
-    await ctx.reply("⏳ Подожди, я ещё обрабатываю предыдущий запрос.");
+    await ctx.reply("⏳ Подожди, предыдущий запрос ещё обрабатывается.");
     return;
   }
 
@@ -794,30 +967,24 @@ bot.on("message:voice", async (ctx) => {
   try {
     const transcript = await transcribeVoice(ctx);
 
-    await ctx.reply(
-      "📝 Я распознал:\n" + transcript
-    );
-
-    const result = await askAI(
-      userId,
-      transcript,
-      false
-    );
-
-    await ctx.api.deleteMessage(
+    await ctx.api.editMessageText(
       ctx.chat.id,
-      status.message_id
+      status.message_id,
+      "📝 Распознал:\n" + transcript
     ).catch(() => {});
+
+    const result = await askAI(userId, transcript, false);
 
     await deliverAnswer(ctx, userId, result);
 
   } catch (error) {
-    console.error("Voice error:", error.message);
+    console.error("VOICE ERROR:", error.message);
 
     await ctx.api.editMessageText(
       ctx.chat.id,
       status.message_id,
-      "❌ Не удалось обработать голосовое:\n" + error.message
+      "❌ Ошибка обработки голосового:\n" +
+      String(error.message || error).slice(0, 2000)
     ).catch(() => {});
 
   } finally {
@@ -825,20 +992,27 @@ bot.on("message:voice", async (ctx) => {
   }
 });
 
-// ==================================================
-// ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ
-// ==================================================
+// =====================================================
+// TEXT MESSAGE HANDLER
+// =====================================================
 
 bot.on("message:text", async (ctx) => {
   const userId = ctx.from.id;
   const question = ctx.message.text.trim();
 
-  if (!question || question.startsWith("/")) {
+  if (!question) return;
+
+  // Commands are processed by bot.command handlers.
+  if (question.startsWith("/")) return;
+
+  // Image button mode: next normal text becomes image prompt.
+  if (imagePendingUsers.has(userId)) {
+    imagePendingUsers.delete(userId);
+    await handleImage(ctx, question);
     return;
   }
 
-  // Проверяем запрос на изображение
-
+  // Natural image request.
   const imageRequest = extractImagePrompt(question);
 
   if (imageRequest.isImage) {
@@ -878,12 +1052,12 @@ bot.on("message:text", async (ctx) => {
     await deliverAnswer(ctx, userId, result);
 
   } catch (error) {
-    console.error("AI error:", error.message);
+    console.error("AI ERROR:", error.message);
 
     await ctx.api.editMessageText(
       ctx.chat.id,
       status.message_id,
-      "❌ " + error.message
+      "❌ " + String(error.message || error).slice(0, 2500)
     ).catch(() => {});
 
   } finally {
@@ -891,9 +1065,9 @@ bot.on("message:text", async (ctx) => {
   }
 });
 
-// ==================================================
-// WEBHOOK / RENDER
-// ==================================================
+// =====================================================
+// RENDER WEBHOOK SERVER
+// =====================================================
 
 async function start() {
   await bot.init();
@@ -942,13 +1116,13 @@ async function start() {
   });
 
   server.listen(PORT, async () => {
-    console.log("================================");
-    console.log("NEXUS AI запущен!");
+    console.log("=================================");
+    console.log("NEXUS AI started on port", PORT);
     console.log("Groq:", Boolean(GROQ_API_KEY));
     console.log("OpenRouter:", Boolean(OPENROUTER_API_KEY));
     console.log("Cloudflare:", Boolean(CLOUDFLARE_API_TOKEN));
     console.log("Edge TTS: enabled");
-    console.log("================================");
+    console.log("=================================");
 
     const renderUrl = process.env.RENDER_EXTERNAL_URL;
 
@@ -969,6 +1143,6 @@ async function start() {
 }
 
 start().catch(error => {
-  console.error("Startup error:", error);
+  console.error("STARTUP ERROR:", error);
   process.exit(1);
 });
