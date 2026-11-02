@@ -1,6 +1,6 @@
 "use strict";
 
-const mineflayer = require("mineflayer");
+const mineflayer = require("@wp2508/mineflayer");
 const { pathfinder, Movements, goals } = require("mineflayer-pathfinder");
 
 class GameAgent {
