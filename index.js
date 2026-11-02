@@ -1573,6 +1573,186 @@ bot.command("forget", async ctx => {
 });
 
 // ======================================================
+// EXTRA AI TOOLS — TRANSLATE, SUMMARY, CODE, ENHANCE, TRANSCRIBE
+// ======================================================
+
+function getRepliedText(ctx) {
+  const replied = ctx.message.reply_to_message;
+  return String(replied?.text || replied?.caption || "").trim();
+}
+
+async function runTextTool(ctx, title, instruction, input) {
+  const userId = ctx.from.id;
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди предыдущую задачу.");
+    return;
+  }
+  const clean = String(input || "").trim();
+  if (!clean) {
+    await ctx.reply("Напиши текст или ответь командой на сообщение с текстом.");
+    return;
+  }
+  busyUsers.add(userId);
+  const status = await ctx.reply(title);
+  try {
+    const result = await askAI(
+      userId,
+      instruction + "\n\nТекст пользователя:\n" + clean.slice(0, 18000),
+      false
+    );
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await deliverAnswer(ctx, userId, result);
+  } catch (error) {
+    await ctx.api.editMessageText(
+      ctx.chat.id, status.message_id,
+      "❌ " + String(error.message).slice(0, 1800)
+    ).catch(() => {});
+  } finally {
+    busyUsers.delete(userId);
+  }
+}
+
+bot.command("translate", async ctx => {
+  const input = String(ctx.match || "").trim();
+  const match = input.match(/^(\S+)(?:\s+([\s\S]*))?$/);
+  if (!match) {
+    await ctx.reply("Пример: /translate английский Привет, как дела?\nМожно ответить /translate английский на сообщение.");
+    return;
+  }
+  const language = match[1];
+  const source = (match[2] || getRepliedText(ctx)).trim();
+  if (!source) {
+    await ctx.reply("Укажи текст или ответь командой на сообщение. Пример: /translate украинский Hello!");
+    return;
+  }
+  await runTextTool(
+    ctx, "🌍 Перевожу...",
+    "Переведи текст на " + language + ". Сохрани смысл, тон и форматирование. Верни только перевод, без вступления.",
+    source
+  );
+});
+
+bot.command("summary", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  await runTextTool(
+    ctx, "📝 Делаю краткое содержание...",
+    "Сделай точное и понятное резюме текста на русском языке. Выдели главные мысли, важные факты и выводы. Не добавляй отсутствующие в оригинале сведения.",
+    source
+  );
+});
+
+bot.command("code", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  await runTextTool(
+    ctx, "💻 Анализирую код...",
+    "Ты опытный программист. Проверь предоставленный код: найди ошибки и уязвимости, объясни причины и предложи исправленный вариант. Если это задача на написание кода — верни полный рабочий пример. Не утверждай, что запускал или тестировал код, если этого не делал. Сохраняй язык и используемые технологии.",
+    source
+  );
+});
+
+bot.command("enhance", async ctx => {
+  const userId = ctx.from.id;
+  const photo = ctx.message.reply_to_message?.photo?.at(-1);
+  if (!photo) {
+    await ctx.reply("🖼 Чтобы улучшить фото, ответь командой /enhance на фотографию.");
+    return;
+  }
+  if (!ffmpegPath) {
+    await ctx.reply("❌ FFmpeg недоступен на сервере.");
+    return;
+  }
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди предыдущую задачу.");
+    return;
+  }
+  busyUsers.add(userId);
+  const status = await ctx.reply("✨ Улучшаю резкость, освещение и размер фото...");
+  let input;
+  let output;
+  try {
+    const buffer = await downloadTelegramFile(ctx, photo.file_id, MAX_IMAGE_BYTES);
+    input = await mediaTempPath("img");
+    output = await mediaTempPath("jpg");
+    await fs.writeFile(input, buffer);
+    await runFfmpeg([
+      "-y", "-i", input,
+      "-vf",
+      "scale=iw*2:ih*2:flags=lanczos,eq=contrast=1.08:saturation=1.05:brightness=0.015,unsharp=5:5:0.8:3:3:0.4",
+      "-frames:v", "1", "-q:v", "3", output
+    ]);
+    const result = await fs.readFile(output);
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await ctx.replyWithPhoto(
+      new InputFile(result, "nexus-enhanced.jpg"),
+      { caption: "✨ Готово! Фото увеличено в 2 раза и обработано: резкость, контраст и освещение.\n\nЭто бесплатная фильтровая обработка, не AI-реставрация." }
+    );
+  } catch (error) {
+    await ctx.api.editMessageText(
+      ctx.chat.id, status.message_id,
+      "❌ Не удалось улучшить фото: " + String(error.message).slice(0, 1400)
+    ).catch(() => {});
+  } finally {
+    if (input) await fs.unlink(input).catch(() => {});
+    if (output) await fs.unlink(output).catch(() => {});
+    busyUsers.delete(userId);
+  }
+});
+
+async function transcribeAudioBuffer(buffer, filename, mime) {
+  if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY не настроен.");
+  const form = new FormData();
+  form.append("file", new Blob([buffer], { type: mime || "application/octet-stream" }), filename || "audio.bin");
+  form.append("model", "whisper-large-v3-turbo");
+  form.append("response_format", "json");
+  const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + GROQ_API_KEY },
+    body: form,
+    signal: AbortSignal.timeout(90000)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(errorText(data));
+  if (!data.text) throw new Error("Whisper не распознал речь.");
+  return String(data.text).trim();
+}
+
+bot.command("transcribe", async ctx => {
+  const replied = ctx.message.reply_to_message;
+  const media = replied?.voice || replied?.audio ||
+    (replied?.document?.mime_type?.startsWith("audio/") ? replied.document : null);
+  if (!media) {
+    await ctx.reply("🎙 Ответь командой /transcribe на голосовое сообщение или аудиофайл.");
+    return;
+  }
+  if (busyUsers.has(ctx.from.id)) {
+    await ctx.reply("⏳ Подожди предыдущую задачу.");
+    return;
+  }
+  busyUsers.add(ctx.from.id);
+  const status = await ctx.reply("🎙 Расшифровываю аудио через Whisper...");
+  try {
+    const buffer = await downloadTelegramFile(ctx, media.file_id, 20 * 1024 * 1024);
+    const filename = media.file_name || (replied.voice ? "voice.ogg" : "audio");
+    const mime = media.mime_type || (replied.voice ? "audio/ogg" : "application/octet-stream");
+    const transcript = await transcribeAudioBuffer(buffer, filename, mime);
+    await ctx.api.editMessageText(
+      ctx.chat.id, status.message_id,
+      "📝 Расшифровка:\n\n" + transcript.slice(0, 3800)
+    ).catch(async () => {
+      await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+      await sendLongMessage(ctx, "📝 Расшифровка:\n\n" + transcript);
+    });
+  } catch (error) {
+    await ctx.api.editMessageText(
+      ctx.chat.id, status.message_id,
+      "❌ Ошибка расшифровки: " + String(error.message).slice(0, 1500)
+    ).catch(() => {});
+  } finally {
+    busyUsers.delete(ctx.from.id);
+  }
+});
+
+// ======================================================
 // BASIC COMMANDS
 // ======================================================
 
@@ -1586,6 +1766,11 @@ bot.command("start", async ctx => {
     "🖼 Генерация изображений\n" +
     "📸 Анализ фотографий\n" +
     "📄 Чтение и создание документов\n" +
+    "🌍 Перевод текста\n" +
+    "📝 Краткое содержание\n" +
+    "💻 Помощь с программированием\n" +
+    "✨ Улучшение фотографий\n" +
+    "🎙 Расшифровка аудио\n" +
     "🎨 Стикеры из текста и фото\n" +
     "⭕ Видеокружки из фото и видео\n" +
     "🤖 ИИ-агент\n" +
@@ -1629,6 +1814,9 @@ bot.command("status", async ctx => {
     "Создание DOCX/PDF/XLSX/PPTX: ✅\n" +
     "Стикеры: " + (ffmpegPath && CLOUDFLARE_API_TOKEN ? "✅" : "❌") + "\n" +
     "Видеокружки: " + (ffmpegPath ? "✅" : "❌") + "\n" +
+    "Перевод / пересказ / код: " + (GROQ_API_KEY || OPENROUTER_API_KEY ? "✅" : "❌") + "\n" +
+    "Улучшение фото: " + (ffmpegPath ? "✅" : "❌") + "\n" +
+    "Расшифровка аудио: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Голосовое распознавание: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Озвучивание: ✅ Edge TTS\n" +
     "Агент: ✅\n" +
@@ -1784,7 +1972,12 @@ bot.callbackQuery("menu_features", async ctx => {
     "🧠 Долговременная память\n" +
     "🤖 Агент с ограниченным набором действий\n" +
     "🎨 Стикеры из текста и фото\n" +
-    "⭕ Видеокружки из фото и видео\n\n" +
+    "⭕ Видеокружки из фото и видео\n" +
+    "🌍 Перевод текста /translate\n" +
+    "📝 Краткое содержание /summary\n" +
+    "💻 Помощь с кодом /code\n" +
+    "✨ Улучшение фото /enhance\n" +
+    "🎙 Расшифровка аудио /transcribe\n\n" +
     "Команды:\n" +
     "/remember — запомнить факт\n" +
     "/memory — посмотреть память\n" +
@@ -1794,6 +1987,11 @@ bot.callbackQuery("menu_features", async ctx => {
     "/video — статус бесплатной генерации видео\n" +
     "/sticker — создать стикер\n" +
     "/circle — сделать видеокружок\n" +
+    "/translate — перевод текста\n" +
+    "/summary — краткое содержание текста\n" +
+    "/code — помощь с программированием\n" +
+    "/enhance — улучшить фото (ответом на фото)\n" +
+    "/transcribe — расшифровать аудио (ответом)\n" +
     "/image — создать картинку\n" +
     "/voice — голосовой режим\n" +
     "/status — статус\n" +
