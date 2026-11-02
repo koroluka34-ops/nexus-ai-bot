@@ -571,37 +571,49 @@ const server = http.createServer((req, res) => {
 // START
 // =====================================================
 
-server.listen(PORT, async () => {
-  console.log(`NEXUS AI started on port ${PORT}`);
+// =====================================================
+// START
+// =====================================================
 
-  if (!RENDER_URL) {
-    console.error(
-      "RENDER_EXTERNAL_URL не найден. Webhook не настроен."
-    );
-    return;
-  }
-
+(async () => {
   try {
-    await bot.api.setWebhook(
-      `${RENDER_URL.replace(/\/$/, "")}/telegram`
-    );
+    // Инициализация Telegram-бота
+    await bot.init();
 
-    console.log("Telegram webhook connected!");
+    console.log("Telegram bot initialized!");
 
-    console.log(
-      "Groq:",
-      GROQ_API_KEY ? "configured" : "missing"
-    );
+    server.listen(PORT, async () => {
+      console.log(`NEXUS AI started on port ${PORT}`);
 
-    console.log(
-      "Gemini:",
-      GEMINI_API_KEY ? "configured" : "missing"
-    );
+      if (!RENDER_URL) {
+        console.error("RENDER_EXTERNAL_URL не найден.");
+        return;
+      }
+
+      try {
+        await bot.api.setWebhook(
+          `${RENDER_URL.replace(/\/$/, "")}/telegram`
+        );
+
+        console.log("Telegram webhook connected!");
+
+        console.log(
+          "Groq:",
+          GROQ_API_KEY ? "configured" : "missing"
+        );
+
+        console.log(
+          "Gemini:",
+          GEMINI_API_KEY ? "configured" : "missing"
+        );
+
+      } catch (error) {
+        console.error("Webhook setup error:", error.message);
+      }
+    });
 
   } catch (error) {
-    console.error(
-      "Webhook setup error:",
-      error.message
-    );
+    console.error("NEXUS AI startup error:", error);
+    process.exit(1);
   }
-});
+})();
