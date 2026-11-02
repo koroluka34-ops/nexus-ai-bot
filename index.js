@@ -26,6 +26,10 @@ function mainMenu() {
     .text("🧹 Очистить память", "menu_reset");
 }
 
+function clearHistory(userId) {
+  histories.delete(userId);
+}
+
 bot.command("start", async (ctx) => {
   searchModes.delete(ctx.from.id);
 
@@ -44,7 +48,7 @@ bot.command("menu", async (ctx) => {
 });
 
 bot.command("reset", async (ctx) => {
-  histories.delete(ctx.from.id);
+  clearHistory(ctx.from.id);
   searchModes.delete(ctx.from.id);
   await ctx.reply("🧹 История диалога очищена!");
 });
@@ -58,19 +62,21 @@ bot.callbackQuery("menu_chat", async (ctx) => {
 bot.callbackQuery("menu_search", async (ctx) => {
   searchModes.add(ctx.from.id);
   await ctx.answerCallbackQuery();
+
   await ctx.reply(
     "🌐 Поиск в интернете включён!\n\n" +
-    "Теперь каждый твой вопрос будет проверяться через интернет.\n" +
-    "Режим отключается кнопкой «Общение»."
+    "Каждый вопрос будет проверяться через интернет.\n" +
+    "Для обычного общения нажми «Общение»."
   );
 });
 
 bot.callbackQuery("menu_features", async (ctx) => {
   await ctx.answerCallbackQuery();
+
   await ctx.reply(
     "🧠 Возможности NEXUS AI:\n\n" +
-    "💬 Ответы на вопросы\n" +
-    "🌐 Поиск в интернете\n" +
+    "💬 Общение и ответы на вопросы\n" +
+    "🌐 Поиск актуальной информации\n" +
     "📚 Объяснение сложных тем\n" +
     "✍️ Создание текстов\n" +
     "💻 Программирование\n" +
@@ -80,7 +86,7 @@ bot.callbackQuery("menu_features", async (ctx) => {
 });
 
 bot.callbackQuery("menu_reset", async (ctx) => {
-  histories.delete(ctx.from.id);
+  clearHistory(ctx.from.id);
   searchModes.delete(ctx.from.id);
 
   await ctx.answerCallbackQuery({
@@ -95,18 +101,22 @@ bot.callbackQuery("menu_reset", async (ctx) => {
 bot.on("message:text", async (ctx) => {
   const userId = ctx.from.id;
   const question = ctx.message.text;
+  const useSearch = searchModes.has(userId);
 
   if (!histories.has(userId)) {
     histories.set(userId, []);
   }
 
   const history = histories.get(userId);
-  const useSearch = searchModes.has(userId);
 
   await ctx.replyWithChatAction("typing");
 
+  let statusMessage;
+
   if (useSearch) {
-    await ctx.reply("🔎 Проверяю информацию в интернете...");
+    statusMessage = await ctx.reply(
+      "🔎 Ищу информацию и проверяю источники..."
+    );
   }
 
   try {
@@ -115,31 +125,46 @@ bot.on("message:text", async (ctx) => {
       dateStyle: "long"
     }).format(new Date());
 
+    const systemPrompt =
+      `Сегодня ${today}. Ты NEXUS AI — универсальный ИИ-помощник.\n\n` +
+      "Ты помогаешь с любыми темами: технологии, игры, программирование, " +
+      "учёба, наука, история, новости и повседневная жизнь.\n\n" +
+      "ОБЩИЕ ПРАВИЛА:\n" +
+      "1. Всегда отвечай понятным русским языком.\n" +
+      "2. Обычно отвечай кратко, в 2-5 предложениях.\n" +
+      "3. Не используй таблицы без просьбы пользователя.\n" +
+      "4. Учитывай предыдущий разговор и уточнения пользователя.\n" +
+      "5. Не выдумывай факты, даты, версии, ссылки и события.\n" +
+      "6. Если не знаешь ответа, честно скажи об этом.\n" +
+      "7. Не ограничивай себя одной тематикой.\n\n" +
+
+      (useSearch
+        ? "ПРАВИЛА ИНТЕРНЕТ-ПОИСКА:\n" +
+          "1. Используй результаты browser_search для ответа.\n" +
+          "2. Не используй свои старые знания вместо свежих результатов поиска.\n" +
+          "3. Проверяй даты публикаций и актуальность информации.\n" +
+          "4. Отдавай предпочтение официальным сайтам и первоисточникам.\n" +
+          "5. Не придумывай названия сайтов, URL и источники.\n" +
+          "6. Подкрепляй факты маркерами цитирования из результатов поиска " +
+          "в оригинальном формате, например 〖1†L1-L5〗.\n" +
+          "7. Если источники не подтверждают информацию, прямо сообщи об этом.\n" +
+          "8. Если поиск не дал достоверного результата, не угадывай.\n" +
+          "9. Уточняющие вопросы тоже проверяй новым поиском.\n" +
+          "10. Не выдавай предположения за подтверждённые факты.\n"
+        : "");
+
     const requestBody = {
       model: "openai/gpt-oss-120b",
       messages: [
         {
           role: "system",
-          content:
-          "Ты NEXUS AI — универсальный интеллектуальный помощник. " +
-          "Помогай с любыми темами: технологии, игры, программирование, " +
-          "учёба, наука, история, новости, творчество и повседневная жизнь. " +
-          "Отвечай простым и понятным русским языком. " +
-          "Обычно отвечай кратко, в 2-5 предложениях, но подробно, если пользователь просит. " +
-          "Учитывай предыдущие сообщения и не теряй контекст разговора. " +
-          "Если пользователь просит написать код, предоставляй рабочие примеры " +
-          "и объясняй, куда их вставлять. " +
-          "Если вопрос касается актуальных событий, цен, версий, обновлений " +
-          "или другой меняющейся информации — используй интернет-поиск. " +
-          "Проверяй информацию по надёжным источникам и добавляй реальные ссылки, " +
-          "если они доступны. " +
-          "Никогда не выдумывай факты, новости, источники, ссылки или события. " +
-          "Если не уверен или не можешь подтвердить информацию, честно скажи об этом. " +
-          "Не ограничивай ответы одной тематикой. " +
-          "Будь дружелюбным, грамотным и полезным."
+          content: systemPrompt
         },
         ...history,
-        { role: "user", content: question }
+        {
+          role: "user",
+          content: question
+        }
       ],
       temperature: 0.2,
       max_completion_tokens: 2048
@@ -149,6 +174,7 @@ bot.on("message:text", async (ctx) => {
       requestBody.tools = [
         { type: "browser_search" }
       ];
+
       requestBody.tool_choice = "required";
       requestBody.reasoning_effort = "low";
       requestBody.citation_options = "enabled";
@@ -162,20 +188,47 @@ bot.on("message:text", async (ctx) => {
           Authorization: `Bearer ${GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(120000)
       }
     );
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Groq:", data);
+      console.error("Groq API error:", data);
       throw new Error("Ошибка Groq API");
     }
 
     const answer =
-      data.choices?.[0]?.message?.content ||
-      "Не удалось получить ответ.";
+      data.choices?.[0]?.message?.content?.trim();
+
+    if (!answer) {
+      throw new Error("Groq вернул пустой ответ");
+    }
+
+    // Защита: не выдаём непроверенный ответ как результат поиска.
+    if (useSearch) {
+      const hasCitations =
+        /〖\d+†L\d+(?:-L\d+)?〗/.test(answer);
+
+      if (!hasCitations) {
+        console.warn(
+          "Search response has no citation markers."
+        );
+
+        if (statusMessage) {
+          await ctx.api.editMessageText(
+            ctx.chat.id,
+            statusMessage.message_id,
+            "⚠️ Не удалось получить ответ с подтверждающими источниками.\n\n" +
+            "Я не буду придумывать новости или ссылки. Попробуй повторить запрос."
+          );
+        }
+
+        return;
+      }
+    }
 
     history.push(
       { role: "user", content: question },
@@ -186,17 +239,36 @@ bot.on("message:text", async (ctx) => {
       history.shift();
     }
 
+    if (statusMessage) {
+      await ctx.api.deleteMessage(
+        ctx.chat.id,
+        statusMessage.message_id
+      ).catch(() => {});
+    }
+
     for (let i = 0; i < answer.length; i += 4000) {
       await ctx.reply(answer.slice(i, i + 4000), {
-        link_preview_options: { is_disabled: true }
+        link_preview_options: {
+          is_disabled: true
+        }
       });
     }
 
   } catch (error) {
-    console.error(error);
-    await ctx.reply(
-      "⚠️ Не удалось получить ответ. Попробуй ещё раз."
-    );
+    console.error("NEXUS AI error:", error);
+
+    if (statusMessage) {
+      await ctx.api.editMessageText(
+        ctx.chat.id,
+        statusMessage.message_id,
+        "⚠️ Не удалось выполнить поиск или получить ответ.\n\n" +
+        "Попробуй ещё раз немного позже."
+      ).catch(() => {});
+    } else {
+      await ctx.reply(
+        "⚠️ Не удалось получить ответ. Попробуй ещё раз."
+      );
+    }
   }
 });
 
@@ -207,6 +279,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       "Content-Type": "text/plain"
     });
+
     return res.end("NEXUS AI is online!");
   }
 
@@ -214,13 +287,14 @@ const server = http.createServer(async (req, res) => {
     try {
       await handleUpdate(req, res);
     } catch (error) {
-      console.error(error);
+      console.error("Webhook error:", error);
 
       if (!res.headersSent) {
         res.writeHead(500);
         res.end("Webhook error");
       }
     }
+
     return;
   }
 
