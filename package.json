@@ -1,1 +1,14 @@
-
+{
+  "name": "nexus-ai-bot",
+  "version": "1.0.0",
+  "description": "NEXUS AI Telegram Assistant",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "grammy": "^1.37.0",
+    "groq-sdk": "^0.33.0",
+    "dotenv": "^16.4.7"
+  }
+}
