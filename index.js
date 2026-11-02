@@ -2063,6 +2063,7 @@ bot.command("transcribe", async ctx => {
 // NEXUS AI — 1,000 SKILL LIBRARY + PUBLIC API TOOLS
 // ======================================================
 const { SKILLS, getSkill, skillsPage } = require("./nexus-catalog");
+const { GameAgent } = require("./game-agent");
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -2232,6 +2233,121 @@ bot.command("api", async ctx => {
     "✅ Open-Meteo — погода без ключа\n✅ Frankfurter — валюты без ключа\n✅ REST Countries — страны\n✅ JokeAPI — шутки\n\n" +
     "Команды: /weather город, /fx 100 USD EUR, /country страна, /joke\n" +
     "Для других платных API нужны отдельные ключи в Render Environment. Никогда не отправляй ключи в чат.");
+});
+
+// ======================================================
+// NEXUS GAME AI — MINECRAFT AGENT
+// ======================================================
+const gameAgent = new GameAgent({
+  decide: async (task, observation) => {
+    const messages = [
+      {
+        role: "system",
+        content: [
+          "Ты управляешь игровым персонажем Minecraft как осторожный самостоятельный игрок.",
+          "Проанализируй задачу и наблюдение, выбери ровно одно действие.",
+          "Верни только JSON без Markdown: {\"action\":\"wait|follow|look|say|explore|stop\",\"target\":\"имя игрока\",\"message\":\"текст\"}.",
+          "Не придумывай видимые объекты. Не проси пароли и не раскрывай секреты.",
+          "Не атакуй игроков, не ломай и не ставь блоки, не используй команды сервера.",
+          "Если мало информации, выбери wait или follow.",
+          "Не отправляй сообщения в чат без необходимости."
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: "ЗАДАЧА: " + task + "\nНАБЛЮДЕНИЕ: " + JSON.stringify(observation)
+      }
+    ];
+    const result = await askGroq(messages);
+    const fence = String.fromCharCode(96).repeat(3);
+    const raw = String(result.answer || "").replace(new RegExp(fence + "(?:json)?", "gi"), "").trim();
+    const json = raw.match(/\{[\s\S]*\}/);
+    if (!json) throw new Error("ИИ вернул некорректное решение.");
+    const decision = JSON.parse(json[0]);
+    const allowed = new Set(["wait", "follow", "look", "say", "explore", "stop"]);
+    if (!allowed.has(String(decision.action || "").toLowerCase())) return { action: "wait" };
+    return decision;
+  }
+});
+
+function gameControlAllowed(ctx) {
+  const allowedId = String(process.env.MC_CONTROL_USER_ID || "").trim();
+  return Boolean(allowedId && String(ctx.from?.id) === allowedId);
+}
+
+function gameControlDenied(ctx) {
+  return ctx.reply("⛔ Игровое управление закрыто. Настрой MC_CONTROL_USER_ID в Render Environment. Твой Telegram ID: " + ctx.from.id);
+}
+
+bot.command("gameid", async ctx => {
+  await ctx.reply("Твой Telegram ID: " + ctx.from.id + "\nДобавь его в Render → Environment → MC_CONTROL_USER_ID.");
+});
+
+bot.command("game", async ctx => {
+  await ctx.reply(
+    "🎮 NEXUS GAME AI — Minecraft\n\n" +
+    "/gameconnect — подключить персонажа\n" +
+    "/gamestatus — состояние персонажа\n" +
+    "/gameobserve — осмотреть окружение\n" +
+    "/gamefollow [ник] — следовать за игроком\n" +
+    "/gamestart [задача] — включить автономное мышление\n" +
+    "/gamestop — остановить автономные действия\n" +
+    "/gamedisconnect — отключиться\n" +
+    "/gameid — узнать Telegram ID\n\n" +
+    "Первый этап: наблюдение, перемещение, следование и чат. Добыча и строительство пока отключены."
+  );
+});
+
+bot.command("gameconnect", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  try { await ctx.reply(gameAgent.connect()); }
+  catch (error) { await ctx.reply("❌ " + error.message); }
+});
+
+bot.command("gamedisconnect", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  try { await ctx.reply(gameAgent.disconnect()); }
+  catch (error) { await ctx.reply("❌ " + error.message); }
+});
+
+bot.command("gamestatus", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  await ctx.reply("🎮 NEXUS GAME AI\n\n" + gameAgent.status());
+});
+
+bot.command("gameobserve", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  try {
+    const observation = gameAgent.observe();
+    const messages = [
+      { role: "system", content: "Кратко и по-русски опиши, что происходит вокруг игрового персонажа Minecraft. Не выдумывай детали." },
+      { role: "user", content: JSON.stringify(observation) }
+    ];
+    const result = await askGroq(messages);
+    await ctx.reply("👁 Наблюдение NEXUS:\n" + result.answer.slice(0, 3500));
+  } catch (error) { await ctx.reply("❌ " + error.message); }
+});
+
+bot.command("gamefollow", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  try {
+    const target = String(ctx.match || process.env.MC_OWNER || "Edison0009").trim();
+    await ctx.reply(gameAgent.follow(target));
+  } catch (error) { await ctx.reply("❌ " + error.message); }
+});
+
+bot.command("gamestart", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  try {
+    const task = String(ctx.match || "Исследуй ближайшую безопасную область и следуй за владельцем, если он рядом.").trim();
+    await ctx.reply(await gameAgent.startAutonomy(task));
+  } catch (error) { await ctx.reply("❌ " + error.message); }
+});
+
+bot.command("gamestop", async ctx => {
+  if (!gameControlAllowed(ctx)) return gameControlDenied(ctx);
+  gameAgent.stopAutonomy();
+  await ctx.reply("🛑 Автономный режим остановлен. Игровой бот остаётся подключённым.");
 });
 
 // BASIC COMMANDS
