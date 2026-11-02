@@ -15,7 +15,6 @@ const bot = new Bot(BOT_TOKEN);
 const histories = new Map();
 const searchModes = new Set();
 
-// Главное меню
 function mainMenu() {
   return new InlineKeyboard()
     .text("💬 Общение", "menu_chat")
@@ -27,8 +26,9 @@ function mainMenu() {
     .text("🧹 Очистить память", "menu_reset");
 }
 
-// Старт
 bot.command("start", async (ctx) => {
+  searchModes.delete(ctx.from.id);
+
   await ctx.reply(
     "🚀 Добро пожаловать в NEXUS AI!\n\n" +
     "Твой персональный ИИ-помощник.\n" +
@@ -37,40 +37,34 @@ bot.command("start", async (ctx) => {
   );
 });
 
-// Меню
 bot.command("menu", async (ctx) => {
-  await ctx.reply(
-    "🏠 Главное меню NEXUS AI",
-    { reply_markup: mainMenu() }
-  );
+  await ctx.reply("🏠 Главное меню NEXUS AI", {
+    reply_markup: mainMenu()
+  });
 });
 
-// Очистка памяти
 bot.command("reset", async (ctx) => {
   histories.delete(ctx.from.id);
   searchModes.delete(ctx.from.id);
   await ctx.reply("🧹 История диалога очищена!");
 });
 
-// Кнопка общения
 bot.callbackQuery("menu_chat", async (ctx) => {
   searchModes.delete(ctx.from.id);
   await ctx.answerCallbackQuery();
-  await ctx.reply("💬 Напиши мне любой вопрос!");
+  await ctx.reply("💬 Обычный чат включён!");
 });
 
-// Кнопка поиска
 bot.callbackQuery("menu_search", async (ctx) => {
   searchModes.add(ctx.from.id);
   await ctx.answerCallbackQuery();
   await ctx.reply(
-    "🌐 Режим поиска включён!\n\n" +
-    "Напиши, что нужно найти.\n" +
-    "Например: последние новости Minecraft."
+    "🌐 Поиск в интернете включён!\n\n" +
+    "Теперь каждый твой вопрос будет проверяться через интернет.\n" +
+    "Режим отключается кнопкой «Общение»."
   );
 });
 
-// Возможности
 bot.callbackQuery("menu_features", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(
@@ -79,13 +73,12 @@ bot.callbackQuery("menu_features", async (ctx) => {
     "🌐 Поиск в интернете\n" +
     "📚 Объяснение сложных тем\n" +
     "✍️ Создание текстов\n" +
-    "💻 Помощь с программированием\n" +
+    "💻 Программирование\n" +
     "🌍 Переводы\n" +
     "🧮 Решение задач"
   );
 });
 
-// Очистка через кнопку
 bot.callbackQuery("menu_reset", async (ctx) => {
   histories.delete(ctx.from.id);
   searchModes.delete(ctx.from.id);
@@ -94,13 +87,11 @@ bot.callbackQuery("menu_reset", async (ctx) => {
     text: "Память очищена!"
   });
 
-  await ctx.reply(
-    "🧹 История диалога очищена!",
-    { reply_markup: mainMenu() }
-  );
+  await ctx.reply("🧹 История очищена!", {
+    reply_markup: mainMenu()
+  });
 });
 
-// Обработка сообщений
 bot.on("message:text", async (ctx) => {
   const userId = ctx.from.id;
   const question = ctx.message.text;
@@ -112,46 +103,51 @@ bot.on("message:text", async (ctx) => {
   const history = histories.get(userId);
   const useSearch = searchModes.has(userId);
 
-  // Режим поиска используется для одного запроса
-  searchModes.delete(userId);
-
   await ctx.replyWithChatAction("typing");
 
   if (useSearch) {
-    await ctx.reply("🔎 Ищу информацию в интернете...");
+    await ctx.reply("🔎 Проверяю информацию в интернете...");
   }
 
   try {
+    const today = new Intl.DateTimeFormat("ru-RU", {
+      timeZone: "Europe/Kyiv",
+      dateStyle: "long"
+    }).format(new Date());
+
     const requestBody = {
       model: "openai/gpt-oss-120b",
-
       messages: [
         {
           role: "system",
           content:
-            "Ты NEXUS AI — умный ИИ-помощник. " +
-            "Отвечай простым русским языком. " +
-            "Пиши кратко и понятно, обычно 2–5 предложений. " +
-            "При поиске используй свежую информацию из интернета. " +
-            "Указывай источники и ссылки, если они доступны. " +
-            "Не выдумывай факты."
+            `Сегодня ${today}. Ты NEXUS AI.\n\n` +
+            "Отвечай по-русски, понятно и кратко.\n" +
+            "ВАЖНО: никогда не выдумывай новости, даты, версии, " +
+            "названия обновлений, события, ссылки или источники.\n" +
+            "Если информация не подтверждена — прямо скажи об этом.\n" +
+            "Для вопросов о текущих событиях используй только " +
+            "актуальные найденные источники.\n" +
+            "Отделяй подтверждённые факты от предположений.\n" +
+            "При поиске добавляй реальные ссылки на источники, " +
+            "если они доступны.\n" +
+            "Если пользователь задаёт уточняющий вопрос, " +
+            "учитывай предыдущий разговор и продолжай поиск."
         },
         ...history,
         { role: "user", content: question }
       ],
-
-      temperature: 0.7,
+      temperature: 0.2,
       max_completion_tokens: 2048
     };
 
-    // Подключаем настоящий интернет-поиск
     if (useSearch) {
       requestBody.tools = [
         { type: "browser_search" }
       ];
-
       requestBody.tool_choice = "required";
       requestBody.reasoning_effort = "low";
+      requestBody.citation_options = "enabled";
     }
 
     const response = await fetch(
@@ -200,7 +196,6 @@ bot.on("message:text", async (ctx) => {
   }
 });
 
-// Webhook
 const handleUpdate = webhookCallback(bot, "http");
 
 const server = http.createServer(async (req, res) => {
