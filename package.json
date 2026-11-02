@@ -17,8 +17,6 @@
     "pdfkit": "^0.17.2",
     "exceljs": "^4.4.0",
     "pptxgenjs": "^4.0.1",
-    "ffmpeg-static": "^5.2.0",
-    "@wp2508/mineflayer": "^4.42.7",
-    "mineflayer-pathfinder": "^2.4.5"
+    "ffmpeg-static": "^5.2.0"
   }
 }
