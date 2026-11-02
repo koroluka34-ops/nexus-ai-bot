@@ -1272,118 +1272,181 @@ bot.command("create", async ctx => {
 });
 
 // ======================================================
-// VIDEO — FREE IMAGE ANIMATION TO MP4
-// ======================================================
+// STICKERS — FREE IMAGE GENERATION + WEBP CONVERSION
 
-async function animateImageToVideo(imageBuffer) {
-  if (!ffmpegPath) {
-    throw new Error("FFmpeg не найден.");
-  }
+async function runFfmpeg(args) {
+  if (!ffmpegPath) throw new Error("FFmpeg не найден.");
+  await new Promise((resolve, reject) => {
+    const proc = spawn(ffmpegPath, args);
+    let err = "";
+    proc.stderr.on("data", chunk => { err += chunk.toString(); });
+    proc.on("error", reject);
+    proc.on("close", code => code === 0
+      ? resolve()
+      : reject(new Error(err.slice(-1200) || "FFmpeg завершился с ошибкой.")));
+  });
+}
 
-  const id = crypto.randomUUID();
+async function mediaTempPath(ext) {
+  return path.join(os.tmpdir(), "nexus-" + crypto.randomUUID() + "." + ext);
+}
 
-  const imagePath = path.join(os.tmpdir(), `nexus-${id}.jpg`);
-  const videoPath = path.join(os.tmpdir(), `nexus-${id}.mp4`);
-
+async function makeStickerWebp(imageBuffer) {
+  const input = await mediaTempPath("jpg");
+  const output = await mediaTempPath("webp");
   try {
-    await fs.writeFile(imagePath, imageBuffer);
-
-    await new Promise((resolve, reject) => {
-      const args = [
-        "-y",
-        "-loop", "1",
-        "-framerate", "25",
-        "-i", imagePath,
-        "-t", "5",
-        "-vf",
-        "scale=1280:720:force_original_aspect_ratio=increase," +
-        "crop=1280:720," +
-        "zoompan=z='min(zoom+0.0015,1.08)':d=125:s=1280x720:fps=25," +
-        "format=yuv420p",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        videoPath
-      ];
-
-      const process = spawn(ffmpegPath, args);
-
-      let errorOutput = "";
-
-      process.stderr.on("data", data => {
-        errorOutput += data.toString();
-      });
-
-      process.on("error", reject);
-
-      process.on("close", code => {
-        if (code === 0) resolve();
-        else reject(new Error(errorOutput.slice(-1200)));
-      });
-    });
-
-    return {
-      path: videoPath,
-      imagePath
-    };
-  } catch (error) {
-    await fs.unlink(imagePath).catch(() => {});
-    await fs.unlink(videoPath).catch(() => {});
-    throw error;
+    await fs.writeFile(input, imageBuffer);
+    await runFfmpeg([
+      "-y", "-i", input,
+      "-vf",
+      "scale=512:512:force_original_aspect_ratio=decrease," +
+      "pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,format=yuva420p",
+      "-vcodec", "libwebp", "-lossless", "0", "-q:v", "78",
+      "-compression_level", "6", "-fs", "500000", output
+    ]);
+    const result = await fs.readFile(output);
+    if (result.length > 512 * 1024) {
+      throw new Error("Стикер получился больше 512 КБ. Попробуй более простой запрос.");
+    }
+    return result;
+  } finally {
+    await fs.unlink(input).catch(() => {});
+    await fs.unlink(output).catch(() => {});
   }
 }
 
-async function handleVideo(ctx, prompt) {
-  if (!prompt) {
-    await ctx.reply("/video Город будущего ночью");
+bot.command("sticker", async ctx => {
+  const userId = ctx.from.id;
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди предыдущую задачу.");
     return;
   }
 
-  const status = await ctx.reply(
-    "🎬 Создаю изображение и превращаю его в MP4..."
-  );
+  const prompt = String(ctx.match || "").trim();
+  const replied = ctx.message.reply_to_message;
+  const repliedPhoto = replied?.photo?.at(-1);
+  if (!prompt && !repliedPhoto) {
+    await ctx.reply(
+      "🎨 Создание стикера\n\n" +
+      "Из текста: /sticker милый космический кот, мультяшный стиль\n" +
+      "Из фото: ответь командой /sticker на фотографию."
+    );
+    return;
+  }
 
-  let files;
-
+  busyUsers.add(userId);
+  const status = await ctx.reply("🎨 Готовлю стикер...");
   try {
-    const image = await generateImage(prompt);
-
-    files = await animateImageToVideo(image);
-
-    await ctx.api.deleteMessage(
+    const image = repliedPhoto
+      ? await downloadTelegramFile(ctx, repliedPhoto.file_id, MAX_IMAGE_BYTES)
+      : await generateImage(prompt);
+    const webp = await makeStickerWebp(image);
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await ctx.api.sendSticker(
       ctx.chat.id,
-      status.message_id
-    ).catch(() => {});
-
-    await ctx.replyWithVideo(
-      new InputFile(files.path, "nexus-video.mp4"),
-      {
-        caption:
-          "🎬 Готово!\n" +
-          "Бесплатная анимация изображения NEXUS AI."
-      }
+      new InputFile(webp, "nexus-sticker.webp"),
+      { reply_to_message_id: ctx.message.message_id }
     );
   } catch (error) {
     await ctx.api.editMessageText(
-      ctx.chat.id,
-      status.message_id,
-      "❌ Ошибка создания видео:\n" +
-      String(error.message).slice(0, 1500)
+      ctx.chat.id, status.message_id,
+      "❌ Не удалось создать стикер: " + String(error.message).slice(0, 1400)
     ).catch(() => {});
   } finally {
-    if (files) {
-      await fs.unlink(files.path).catch(() => {});
-      await fs.unlink(files.imagePath).catch(() => {});
+    busyUsers.delete(userId);
+  }
+});
+
+// VIDEO NOTES — CONVERT USER MEDIA, NO AI VIDEO CLAIMS
+
+async function makeVideoNote(media) {
+  const input = await mediaTempPath(media.isPhoto ? "jpg" : "mp4");
+  const output = await mediaTempPath("mp4");
+  try {
+    await fs.writeFile(input, media.buffer);
+    const args = ["-y"];
+    if (media.isPhoto) {
+      args.push("-loop", "1", "-framerate", "25", "-i", input, "-t", "3");
+    } else {
+      args.push("-i", input, "-t", "60");
     }
+    args.push(
+      "-vf",
+      "scale=640:640:force_original_aspect_ratio=increase," +
+      "crop=640:640,setsar=1,fps=25,format=yuv420p",
+      "-an", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+      "-movflags", "+faststart", "-pix_fmt", "yuv420p", output
+    );
+    await runFfmpeg(args);
+    const stat = await fs.stat(output);
+    if (stat.size > 19 * 1024 * 1024) {
+      throw new Error("Готовый кружок слишком большой для отправки.");
+    }
+    return output;
+  } catch (error) {
+    await fs.unlink(output).catch(() => {});
+    throw error;
+  } finally {
+    await fs.unlink(input).catch(() => {});
   }
 }
 
-bot.command("video", async ctx => {
-  await handleVideo(ctx, String(ctx.match || "").trim());
+bot.command("circle", async ctx => {
+  const userId = ctx.from.id;
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди предыдущую задачу.");
+    return;
+  }
+
+  const replied = ctx.message.reply_to_message;
+  const photo = replied?.photo?.at(-1);
+  const video = replied?.video || replied?.video_note || replied?.animation;
+  if (!photo && !video) {
+    await ctx.reply(
+      "⭕ Чтобы сделать кружок, ответь командой /circle на фотографию или видео.\n" +
+      "Фото превратится в короткий трёхсекундный кружок."
+    );
+    return;
+  }
+
+  busyUsers.add(userId);
+  const status = await ctx.reply("⭕ Подготавливаю видеокружок...");
+  let output;
+  try {
+    const fileId = photo?.file_id || video.file_id;
+    const buffer = await downloadTelegramFile(
+      ctx, fileId, photo ? MAX_IMAGE_BYTES : MAX_DOCUMENT_BYTES
+    );
+    output = await makeVideoNote({
+      buffer,
+      isPhoto: Boolean(photo)
+    });
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await ctx.api.sendVideoNote(
+      ctx.chat.id,
+      new InputFile(output, "nexus-circle.mp4"),
+      { reply_to_message_id: ctx.message.message_id }
+    );
+  } catch (error) {
+    await ctx.api.editMessageText(
+      ctx.chat.id, status.message_id,
+      "❌ Не удалось сделать кружок: " + String(error.message).slice(0, 1400)
+    ).catch(() => {});
+  } finally {
+    if (output) await fs.unlink(output).catch(() => {});
+    busyUsers.delete(userId);
+  }
 });
 
-// ======================================================
+// Не выдаём анимацию за генерацию ИИ-видео и не подключаем платный API.
+bot.command("video", async ctx => {
+  await ctx.reply(
+    "🎬 Настоящая ИИ-генерация видео сейчас недоступна бесплатно через подключённые сервисы.\n\n" +
+    "Я не буду выдавать обычную анимацию картинки за ИИ-видео и не подключу платный API.\n" +
+    "Для бесплатной обработки своих роликов используй /circle."
+  );
+});
+
 // SAFE AI AGENT
 // ======================================================
 
@@ -1523,7 +1586,7 @@ bot.command("start", async ctx => {
     "🖼 Генерация изображений\n" +
     "📸 Анализ фотографий\n" +
     "📄 Чтение и создание документов\n" +
-    "🎬 Создание MP4-анимации\n" +
+    "🎨 Стикеры из текста и фото\n" +\n    "⭕ Видеокружки из фото и видео\n" +
     "🤖 ИИ-агент\n" +
     "🧠 Долговременная память\n" +
     "🎙 Голосовой диалог\n\n" +
@@ -1563,7 +1626,7 @@ bot.command("status", async ctx => {
     "Анализ фотографий: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Чтение документов: ✅\n" +
     "Создание DOCX/PDF/XLSX/PPTX: ✅\n" +
-    "MP4-анимация: " + (ffmpegPath ? "✅" : "❌") + "\n" +
+    "Стикеры: " + (ffmpegPath && CLOUDFLARE_API_TOKEN ? "✅" : "❌") + "\n" +\n    "Видеокружки: " + (ffmpegPath ? "✅" : "❌") + "\n" +
     "Голосовое распознавание: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Озвучивание: ✅ Edge TTS\n" +
     "Агент: ✅\n" +
@@ -1718,14 +1781,14 @@ bot.callbackQuery("menu_features", async ctx => {
     "🔊 Озвучивание ответов\n" +
     "🧠 Долговременная память\n" +
     "🤖 Агент с ограниченным набором действий\n" +
-    "🎬 Анимация картинки в MP4\n\n" +
+    "🎨 Стикеры из текста и фото\n" +\n    "⭕ Видеокружки из фото и видео\n\n" +
     "Команды:\n" +
     "/remember — запомнить факт\n" +
     "/memory — посмотреть память\n" +
     "/forget — удалить память\n" +
     "/create — создать документ\n" +
     "/agent — выполнить задачу\n" +
-    "/video — создать MP4\n" +
+    "/video — статус бесплатной генерации видео\n" +\n    "/sticker — создать стикер\n" +\n    "/circle — сделать видеокружок\n" +
     "/image — создать картинку\n" +
     "/voice — голосовой режим\n" +
     "/status — статус\n" +
