@@ -2545,7 +2545,17 @@ bot.callbackQuery("menu_create", async ctx => {
   );
 });
 
-bot.callbackQuery("menu_overdrive", async ctx => {\n  await ctx.answerCallbackQuery();\n  await ctx.reply(\n    "⚡ <b>NEXUS OVERDRIVE</b>\\n\\n" +\n    "Три независимых ИИ-агента: аналитик, критик и стратег. Четвёртый ИИ объединяет их выводы и выносит вердикт.\\n\\n" +\n    "Пример: <code>/overdrive придумай необычную идею для моего проекта</code>",\n    { parse_mode: "HTML" }\n  );\n});\n\nbot.callbackQuery("menu_agent", async ctx => {
+bot.callbackQuery("menu_overdrive", async ctx => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    "⚡ <b>NEXUS OVERDRIVE</b>\n\n" +
+    "Три независимых ИИ-агента: аналитик, критик и стратег. Четвёртый ИИ объединяет их выводы и выносит вердикт.\n\n" +
+    "Пример: <code>/overdrive придумай необычную идею для моего проекта</code>",
+    { parse_mode: "HTML" }
+  );
+});
+
+bot.callbackQuery("menu_agent", async ctx => {
   await ctx.answerCallbackQuery();
 
   await ctx.reply(
