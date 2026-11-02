@@ -2044,6 +2044,94 @@ bot.command("transcribe", async ctx => {
 });
 
 // ======================================================
+
+// ======================================================
+// NEXUS AI — 1,000 SKILL LIBRARY + PUBLIC API TOOLS
+// ======================================================
+const { SKILLS, getSkill, skillsPage } = require("./nexus-catalog");
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "NEXUS-AI-Telegram-Bot/1.0" },
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!response.ok) throw new Error("Внешний API ответил HTTP " + response.status);
+  return response.json();
+}
+
+bot.command("skills", async ctx => {
+  const page = Number(String(ctx.match || "1").trim()) || 1;
+  await ctx.reply(skillsPage(page), { disable_web_page_preview: true });
+});
+
+bot.command("skill", async ctx => {
+  const input = String(ctx.match || "").trim();
+  const match = input.match(/^(\d+)\s+([\s\S]+)$/);
+  if (!match) {
+    await ctx.reply("Использование: /skill НОМЕР ваш запрос\nПример: /skill 501 объясни JavaScript новичку\nВсе навыки: /skills");
+    return;
+  }
+  const skill = getSkill(match[1]);
+  if (!skill) {
+    await ctx.reply("❌ Навык не найден. Доступно: 1–" + SKILLS.length + ". Напиши /skills.");
+    return;
+  }
+  await runTextTool(ctx, "🧠 Навык " + skill.id + ": " + skill.domain, skill.instruction, match[2]);
+});
+
+bot.command("weather", async ctx => {
+  const city = String(ctx.match || "").trim();
+  if (!city) return ctx.reply("Пример: /weather Kharkiv");
+  try {
+    const geo = await fetchJson("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=1&language=ru&format=json");
+    const place = geo.results?.[0];
+    if (!place) throw new Error("Город не найден.");
+    const data = await fetchJson("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m&timezone=auto");
+    const c = data.current;
+    await ctx.reply("🌦 Погода: " + [place.name, place.country].filter(Boolean).join(", ") + "\nТемпература: " + c.temperature_2m + "°C\nОщущается как: " + c.apparent_temperature + "°C\nВлажность: " + c.relative_humidity_2m + "%\nОсадки: " + c.precipitation + " мм\nВетер: " + c.wind_speed_10m + " км/ч\nИсточник: Open-Meteo");
+  } catch (error) { await ctx.reply("❌ Погода недоступна: " + error.message); }
+});
+
+bot.command("fx", async ctx => {
+  const match = String(ctx.match || "").trim().match(/^(\d+(?:[.,]\d+)?)\s+([A-Za-z]{3})\s+([A-Za-z]{3})$/);
+  if (!match) return ctx.reply("Пример: /fx 100 USD EUR");
+  try {
+    const amount = Number(match[1].replace(",", "."));
+    const from = match[2].toUpperCase(), to = match[3].toUpperCase();
+    const data = await fetchJson("https://api.frankfurter.dev/v1/latest?amount=" + amount + "&from=" + from + "&to=" + to);
+    if (typeof data.rates?.[to] !== "number") throw new Error("Валюта не найдена.");
+    await ctx.reply("💱 " + amount + " " + from + " = " + data.rates[to] + " " + to + "\nДата курса: " + data.date + "\nИсточник: Frankfurter API (справочный курс).");
+  } catch (error) { await ctx.reply("❌ Конвертация недоступна: " + error.message); }
+});
+
+bot.command("country", async ctx => {
+  const country = String(ctx.match || "").trim();
+  if (!country) return ctx.reply("Пример: /country Ukraine");
+  try {
+    const data = await fetchJson("https://restcountries.com/v3.1/name/" + encodeURIComponent(country) + "?fields=name,capital,region,population,area,currencies,languages,cca2");
+    const c = data[0];
+    const currencies = Object.entries(c.currencies || {}).map(([code, v]) => code + " (" + v.name + ")").join(", ");
+    await ctx.reply("🌍 " + c.name.common + " (" + (c.cca2 || "") + ")\nСтолица: " + (c.capital || ["—"]).join(", ") + "\nРегион: " + (c.region || "—") + "\nНаселение: " + Number(c.population || 0).toLocaleString("ru-RU") + "\nПлощадь: " + Number(c.area || 0).toLocaleString("ru-RU") + " км²\nВалюты: " + (currencies || "—") + "\nЯзыки: " + Object.values(c.languages || {}).join(", "));
+  } catch (error) { await ctx.reply("❌ Страна не найдена или API недоступен."); }
+});
+
+bot.command("joke", async ctx => {
+  try {
+    const data = await fetchJson("https://v2.jokeapi.dev/joke/Any?lang=en&safe-mode");
+    await ctx.reply("😄 " + (data.type === "single" ? data.joke : data.setup + "\n" + data.delivery) + "\nИсточник: JokeAPI");
+  } catch (error) { await ctx.reply("❌ Сервис шуток временно недоступен."); }
+});
+
+bot.command("api", async ctx => {
+  await ctx.reply("🔌 ПОДКЛЮЧЁННЫЕ API\n\n" +
+    "✅ Groq — ИИ-модели\n" +
+    (OPENROUTER_API_KEY ? "✅" : "⚪") + " OpenRouter — резервные модели\n" +
+    (CLOUDFLARE_API_TOKEN ? "✅" : "⚪") + " Cloudflare AI и KV\n" +
+    "✅ Open-Meteo — погода без ключа\n✅ Frankfurter — валюты без ключа\n✅ REST Countries — страны\n✅ JokeAPI — шутки\n\n" +
+    "Команды: /weather город, /fx 100 USD EUR, /country страна, /joke\n" +
+    "Для других платных API нужны отдельные ключи в Render Environment. Никогда не отправляй ключи в чат.");
+});
+
 // BASIC COMMANDS
 // ======================================================
 
