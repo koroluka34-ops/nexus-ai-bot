@@ -1,5 +1,5 @@
 
-const { Bot, webhookCallback } = require("grammy");
+const { Bot, InlineKeyboard, webhookCallback } = require("grammy");
 const http = require("http");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -14,26 +14,82 @@ if (!BOT_TOKEN || !GROQ_API_KEY || !WEBHOOK_URL) {
 const bot = new Bot(BOT_TOKEN);
 const histories = new Map();
 
+// Главное меню
+function mainMenu() {
+  return new InlineKeyboard()
+    .text("💬 Начать общение", "menu_chat")
+    .row()
+    .text("🧠 Возможности", "menu_features")
+    .row()
+    .text("🧹 Очистить память", "menu_reset");
+}
+
+// /start
 bot.command("start", async (ctx) => {
-  histories.delete(ctx.from.id);
   await ctx.reply(
-    "👋 Привет! Я NEXUS AI.\n\n" +
-    "Я твой персональный ИИ-помощник.\n" +
-    "Напиши мне любой вопрос!\n\n" +
-    "/reset — очистить память"
+    "🚀 Добро пожаловать в NEXUS AI!\n\n" +
+    "Твой персональный ИИ-помощник.\n" +
+    "Выбери нужное действие 👇",
+    { reply_markup: mainMenu() }
   );
 });
 
-bot.command("reset", async (ctx) => {
-  histories.delete(ctx.from.id);
-  await ctx.reply("🧹 История диалога очищена!");
+// /menu
+bot.command("menu", async (ctx) => {
+  await ctx.reply(
+    "🏠 Главное меню NEXUS AI\n\nВыбери действие:",
+    { reply_markup: mainMenu() }
+  );
 });
 
+// /reset
+bot.command("reset", async (ctx) => {
+  histories.delete(ctx.from.id);
+  await ctx.reply("🧹 Память очищена!");
+});
+
+// Кнопка: общение
+bot.callbackQuery("menu_chat", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply("💬 Отлично! Напиши мне свой вопрос.");
+});
+
+// Кнопка: возможности
+bot.callbackQuery("menu_features", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    "🧠 Что умеет NEXUS AI?\n\n" +
+    "💬 Отвечать на вопросы\n" +
+    "📚 Объяснять сложные темы\n" +
+    "✍️ Писать и редактировать тексты\n" +
+    "💻 Помогать с программированием\n" +
+    "🌍 Переводить тексты\n" +
+    "🧮 Решать задачи\n\n" +
+    "Просто напиши, что тебе нужно!"
+  );
+});
+
+// Кнопка: очистить память
+bot.callbackQuery("menu_reset", async (ctx) => {
+  histories.delete(ctx.from.id);
+  await ctx.answerCallbackQuery({
+    text: "Память очищена!"
+  });
+  await ctx.reply(
+    "🧹 История диалога очищена!",
+    { reply_markup: mainMenu() }
+  );
+});
+
+// Обработка сообщений
 bot.on("message:text", async (ctx) => {
   const userId = ctx.from.id;
   const question = ctx.message.text;
 
-  if (!histories.has(userId)) histories.set(userId, []);
+  if (!histories.has(userId)) {
+    histories.set(userId, []);
+  }
+
   const history = histories.get(userId);
 
   await ctx.replyWithChatAction("typing");
@@ -48,11 +104,16 @@ bot.on("message:text", async (ctx) => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "openai/gpt-oss-120b",model: "openai/gpt-oss-120b",
+          model: "openai/gpt-oss-120b",
           messages: [
             {
               role: "system",
-              content: "Ты NEXUS AI. Отвечай простым и понятным русским языком. Пиши кратко: обычно 2–5 предложений. Не используй длинные списки и лишние объяснения. Если пользователь просит подробности — отвечай подробно. Не перечисляй все свои возможности без необходимости."
+              content:
+                "Ты NEXUS AI — дружелюбный ИИ-помощник. " +
+                "Отвечай простым и понятным русским языком. " +
+                "Обычно пиши 2–5 предложений. " +
+                "Не используй длинные списки и лишнюю воду. " +
+                "Если пользователь просит подробности — отвечай подробно."
             },
             ...history,
             { role: "user", content: question }
@@ -70,7 +131,8 @@ bot.on("message:text", async (ctx) => {
       throw new Error("Ошибка Groq API");
     }
 
-    const answer = data.choices?.[0]?.message?.content ||
+    const answer =
+      data.choices?.[0]?.message?.content ||
       "Не удалось получить ответ.";
 
     history.push(
@@ -78,17 +140,21 @@ bot.on("message:text", async (ctx) => {
       { role: "assistant", content: answer }
     );
 
-    while (history.length > 20) history.shift();
+    while (history.length > 20) {
+      history.shift();
+    }
 
     for (let i = 0; i < answer.length; i += 4000) {
       await ctx.reply(answer.slice(i, i + 4000));
     }
+
   } catch (error) {
     console.error(error);
     await ctx.reply("⚠️ Ошибка ИИ. Попробуй ещё раз.");
   }
 });
 
+// Webhook
 const handleUpdate = webhookCallback(bot, "http");
 
 const server = http.createServer(async (req, res) => {
@@ -102,6 +168,7 @@ const server = http.createServer(async (req, res) => {
       await handleUpdate(req, res);
     } catch (error) {
       console.error(error);
+
       if (!res.headersSent) {
         res.writeHead(500);
         res.end("Webhook error");
