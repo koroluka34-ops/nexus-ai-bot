@@ -355,7 +355,7 @@ function allCommandsText() {
 <code>/weather город</code> — получить текущую погоду.
 <code>/fx 100 USD EUR</code> — конвертировать валюту по справочному курсу.
 <code>/country страна</code> — узнать информацию о стране.
-<code>/joke</code> — получить случайную шутку.
+<code>/joke</code> — получить шутку на русском.\n<code>/jokelang ru|en</code> — выбрать язык шуток.
 
 ━━━━━━━━━━━━━━━━━━
 ✨ <b>ПОДСКАЗКА</b>
@@ -2178,12 +2178,11 @@ async function sendJoke(ctx, edit = false, forceTranslate = false) {
   if (forceTranslate || language === "ru") {
     output = await translateJoke(raw);
   }
-  const prefix = "😄 " + output + "\n\n< i >Источник: JokeAPI · Перевод: NEXUS AI</i>";
-  const cleanPrefix = prefix.replace("< i >", "<i>");
+  const message = "😄 " + output + "\n\nИсточник: JokeAPI · Перевод: NEXUS AI";
   if (edit && ctx.callbackQuery?.message) {
-    await ctx.editMessageText(cleanPrefix, { parse_mode: "HTML", reply_markup: jokeKeyboard() });
+    await ctx.editMessageText(message, { reply_markup: jokeKeyboard() });
   } else {
-    await ctx.reply(cleanPrefix, { parse_mode: "HTML", reply_markup: jokeKeyboard() });
+    await ctx.reply(message, { reply_markup: jokeKeyboard() });
   }
 }
 
