@@ -350,6 +350,18 @@ function allCommandsText() {
 <code>/skill 501 запрос</code> — запустить выбранный навык.
 
 ━━━━━━━━━━━━━━━━━━
+🎮 <b>NEXUS GAME AI — MINECRAFT</b>
+<code>/game</code> — инструкция по игровому ИИ.
+<code>/gameid</code> — показать Telegram ID для защиты управления.
+<code>/gameconnect</code> — подключить персонажа.
+<code>/gamestatus</code> — состояние персонажа.
+<code>/gameobserve</code> — описать окружение с помощью ИИ.
+<code>/gamefollow ник</code> — следовать за игроком.
+<code>/gamestart задача</code> — запустить автономный режим.
+<code>/gamestop</code> — остановить автономный режим.
+<code>/gamedisconnect</code> — отключить персонажа.
+
+━━━━━━━━━━━━━━━━━━
 🌐 <b>ВНЕШНИЕ API</b>
 <code>/api</code> — посмотреть подключённые API.
 <code>/weather город</code> — получить текущую погоду.
@@ -2422,6 +2434,7 @@ bot.command("status", async ctx => {
     "Голосовое распознавание: " + (GROQ_API_KEY ? "✅" : "❌") + "\n" +
     "Озвучивание: ✅ Edge TTS\n" +
     "Агент: ✅\n" +
+    "Minecraft Game AI: модуль загружен, подключение по команде /gameconnect\n" +
     "Сохранённых фактов: " + memory.facts.length + "\n" +
     "Голосовой режим: " + (voiceUsers.has(ctx.from.id) ? "🔊" : "🔇")
   );
