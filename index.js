@@ -265,6 +265,47 @@ function errorText(data) {
     JSON.stringify(data);
 }
 
+function allCommandsText() {
+  return (
+    "📚 ВСЕ КОМАНДЫ NEXUS AI\\n\\n" +
+    "🤖 ОСНОВНЫЕ\\n" +
+    "/start — запуск бота\\n" +
+    "/menu — открыть главное меню\\n" +
+    "/commands — показать все команды\\n" +
+    "/status — состояние функций\\n" +
+    "/reset — очистить историю диалога\\n" +
+    "/agent задача — ИИ-агент\\n\\n" +
+    "💬 ИИ И ТЕКСТ\\n" +
+    "Поиск — кнопка «🌐 Поиск» в меню\\n" +
+    "/translate язык текст — перевод\\n" +
+    "/summary — пересказ (ответом на текст)\\n" +
+    "/code — помощь с кодом\\n\\n" +
+    "🧠 ПАМЯТЬ\\n" +
+    "/remember текст — сохранить факт\\n" +
+    "/memory — посмотреть память\\n" +
+    "/forget — удалить историю и память\\n\\n" +
+    "🖼 ИЗОБРАЖЕНИЯ И МЕДИА\\n" +
+    "/image описание — создать изображение\\n" +
+    "/sticker описание — стикер из текста\\n" +
+    "/sticker — стикер из фото (ответом)\\n" +
+    "/enhance — улучшить фото (ответом)\\n" +
+    "/circle — видеокружок (ответом на фото/видео)\\n" +
+    "/video — статус ИИ-видео\\n\\n" +
+    "🎙 ГОЛОС\\n" +
+    "/voice — переключить голосовой режим\\n" +
+    "/voice_on — включить голосовые ответы\\n" +
+    "/voice_off — выключить голосовые ответы\\n" +
+    "/say текст — озвучить текст\\n" +
+    "/transcribe — расшифровать аудио (ответом)\\n\\n" +
+    "📄 ДОКУМЕНТЫ\\n" +
+    "/create docx текст — создать DOCX\\n" +
+    "/create pdf текст — создать PDF\\n" +
+    "/create xlsx текст — создать XLSX\\n" +
+    "/create pptx текст — создать PPTX\\n\\n" +
+    "Просто отправь сообщение боту, чтобы начать общение с ИИ."
+  );
+}
+
 function mainMenu() {
   return new InlineKeyboard()
     .text("💬 Общение", "menu_chat")
@@ -277,6 +318,8 @@ function mainMenu() {
     .text("🤖 ИИ-агент", "menu_agent")
     .row()
     .text("ℹ️ Возможности", "menu_features")
+    .text("📚 Все команды", "menu_commands")
+    .row()
     .text("🔄 Сброс истории", "menu_reset");
 }
 
@@ -1776,7 +1819,7 @@ bot.command("start", async ctx => {
     "🤖 ИИ-агент\n" +
     "🧠 Долговременная память\n" +
     "🎙 Голосовой диалог\n\n" +
-    "Просто напиши сообщение или выбери функцию.",
+    "Нажми «📚 Все команды», чтобы увидеть полный список команд.",
     { reply_markup: mainMenu() }
   );
 });
@@ -1785,6 +1828,10 @@ bot.command("menu", async ctx => {
   await ctx.reply("Меню NEXUS AI:", {
     reply_markup: mainMenu()
   });
+});
+
+bot.command("commands", async ctx => {
+  await ctx.reply(allCommandsText());
 });
 
 bot.command("reset", async ctx => {
@@ -1954,6 +2001,11 @@ bot.callbackQuery("menu_agent", async ctx => {
     "/agent нарисуй город будущего\n" +
     "/agent объясни ошибку в коде"
   );
+});
+
+bot.callbackQuery("menu_commands", async ctx => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(allCommandsText());
 });
 
 bot.callbackQuery("menu_features", async ctx => {
