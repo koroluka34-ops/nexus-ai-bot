@@ -13,68 +13,87 @@ if (!BOT_TOKEN || !GROQ_API_KEY || !WEBHOOK_URL) {
 
 const bot = new Bot(BOT_TOKEN);
 const histories = new Map();
+const searchModes = new Set();
 
 // Главное меню
 function mainMenu() {
   return new InlineKeyboard()
-    .text("💬 Начать общение", "menu_chat")
+    .text("💬 Общение", "menu_chat")
+    .row()
+    .text("🌐 Поиск в интернете", "menu_search")
     .row()
     .text("🧠 Возможности", "menu_features")
     .row()
     .text("🧹 Очистить память", "menu_reset");
 }
 
-// /start
+// Старт
 bot.command("start", async (ctx) => {
   await ctx.reply(
     "🚀 Добро пожаловать в NEXUS AI!\n\n" +
     "Твой персональный ИИ-помощник.\n" +
-    "Выбери нужное действие 👇",
+    "Выбери действие 👇",
     { reply_markup: mainMenu() }
   );
 });
 
-// /menu
+// Меню
 bot.command("menu", async (ctx) => {
   await ctx.reply(
-    "🏠 Главное меню NEXUS AI\n\nВыбери действие:",
+    "🏠 Главное меню NEXUS AI",
     { reply_markup: mainMenu() }
   );
 });
 
-// /reset
+// Очистка памяти
 bot.command("reset", async (ctx) => {
   histories.delete(ctx.from.id);
-  await ctx.reply("🧹 Память очищена!");
+  searchModes.delete(ctx.from.id);
+  await ctx.reply("🧹 История диалога очищена!");
 });
 
-// Кнопка: общение
+// Кнопка общения
 bot.callbackQuery("menu_chat", async (ctx) => {
+  searchModes.delete(ctx.from.id);
   await ctx.answerCallbackQuery();
-  await ctx.reply("💬 Отлично! Напиши мне свой вопрос.");
+  await ctx.reply("💬 Напиши мне любой вопрос!");
 });
 
-// Кнопка: возможности
+// Кнопка поиска
+bot.callbackQuery("menu_search", async (ctx) => {
+  searchModes.add(ctx.from.id);
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    "🌐 Режим поиска включён!\n\n" +
+    "Напиши, что нужно найти.\n" +
+    "Например: последние новости Minecraft."
+  );
+});
+
+// Возможности
 bot.callbackQuery("menu_features", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(
-    "🧠 Что умеет NEXUS AI?\n\n" +
-    "💬 Отвечать на вопросы\n" +
-    "📚 Объяснять сложные темы\n" +
-    "✍️ Писать и редактировать тексты\n" +
-    "💻 Помогать с программированием\n" +
-    "🌍 Переводить тексты\n" +
-    "🧮 Решать задачи\n\n" +
-    "Просто напиши, что тебе нужно!"
+    "🧠 Возможности NEXUS AI:\n\n" +
+    "💬 Ответы на вопросы\n" +
+    "🌐 Поиск в интернете\n" +
+    "📚 Объяснение сложных тем\n" +
+    "✍️ Создание текстов\n" +
+    "💻 Помощь с программированием\n" +
+    "🌍 Переводы\n" +
+    "🧮 Решение задач"
   );
 });
 
-// Кнопка: очистить память
+// Очистка через кнопку
 bot.callbackQuery("menu_reset", async (ctx) => {
   histories.delete(ctx.from.id);
+  searchModes.delete(ctx.from.id);
+
   await ctx.answerCallbackQuery({
     text: "Память очищена!"
   });
+
   await ctx.reply(
     "🧹 История диалога очищена!",
     { reply_markup: mainMenu() }
@@ -91,10 +110,50 @@ bot.on("message:text", async (ctx) => {
   }
 
   const history = histories.get(userId);
+  const useSearch = searchModes.has(userId);
+
+  // Режим поиска используется для одного запроса
+  searchModes.delete(userId);
 
   await ctx.replyWithChatAction("typing");
 
+  if (useSearch) {
+    await ctx.reply("🔎 Ищу информацию в интернете...");
+  }
+
   try {
+    const requestBody = {
+      model: "openai/gpt-oss-120b",
+
+      messages: [
+        {
+          role: "system",
+          content:
+            "Ты NEXUS AI — умный ИИ-помощник. " +
+            "Отвечай простым русским языком. " +
+            "Пиши кратко и понятно, обычно 2–5 предложений. " +
+            "При поиске используй свежую информацию из интернета. " +
+            "Указывай источники и ссылки, если они доступны. " +
+            "Не выдумывай факты."
+        },
+        ...history,
+        { role: "user", content: question }
+      ],
+
+      temperature: 0.7,
+      max_completion_tokens: 2048
+    };
+
+    // Подключаем настоящий интернет-поиск
+    if (useSearch) {
+      requestBody.tools = [
+        { type: "browser_search" }
+      ];
+
+      requestBody.tool_choice = "required";
+      requestBody.reasoning_effort = "low";
+    }
+
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -103,24 +162,7 @@ bot.on("message:text", async (ctx) => {
           Authorization: `Bearer ${GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            {
-              role: "system",
-              content:
-                "Ты NEXUS AI — дружелюбный ИИ-помощник. " +
-                "Отвечай простым и понятным русским языком. " +
-                "Обычно пиши 2–5 предложений. " +
-                "Не используй длинные списки и лишнюю воду. " +
-                "Если пользователь просит подробности — отвечай подробно."
-            },
-            ...history,
-            { role: "user", content: question }
-          ],
-          temperature: 0.7,
-          max_tokens: 1200
-        })
+        body: JSON.stringify(requestBody)
       }
     );
 
@@ -145,12 +187,16 @@ bot.on("message:text", async (ctx) => {
     }
 
     for (let i = 0; i < answer.length; i += 4000) {
-      await ctx.reply(answer.slice(i, i + 4000));
+      await ctx.reply(answer.slice(i, i + 4000), {
+        link_preview_options: { is_disabled: true }
+      });
     }
 
   } catch (error) {
     console.error(error);
-    await ctx.reply("⚠️ Ошибка ИИ. Попробуй ещё раз.");
+    await ctx.reply(
+      "⚠️ Не удалось получить ответ. Попробуй ещё раз."
+    );
   }
 });
 
@@ -159,7 +205,9 @@ const handleUpdate = webhookCallback(bot, "http");
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.writeHead(200, {
+      "Content-Type": "text/plain"
+    });
     return res.end("NEXUS AI is online!");
   }
 
