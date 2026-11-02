@@ -177,7 +177,6 @@ bot.on("message:text", async (ctx) => {
 
       requestBody.tool_choice = "required";
       requestBody.reasoning_effort = "low";
-      requestBody.citation_options = "enabled";
     }
 
     const response = await fetch(
