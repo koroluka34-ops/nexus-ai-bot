@@ -690,9 +690,20 @@ async function generateImage(prompt) {
 
 async function handleImage(ctx, prompt) {
   const userId = ctx.from.id;
+  const cleanPrompt = String(prompt || "").trim();
 
-  if (!prompt) {
-    await ctx.reply("/image кот в космосе");
+  if (!cleanPrompt) {
+    await ctx.reply("Опиши, что именно нарисовать. Например: «аватарка для Telegram с чёрным волком на неоновом фоне».");
+    return;
+  }
+
+  // Не придумываем случайный объект, если пользователь просит только аватарку.
+  const genericAvatarRequest =
+    /^(?:(?:мне|пожалуйста)\\s+)?(?:(?:красивую|крутая|крутую|стильную|новую|классную)\\s+)*(?:ав(?:у|атар(?:ку|ка)?)|фото|картинку)?\\s*(?:ав(?:у|атар(?:ку|ка)?))?\\s*(?:для\\s+(?:тг|телеграм(?:а)?|telegram)|в\\s+телеграм(?:е)?)?$/iu.test(cleanPrompt) ||
+    /^(?:ав(?:у|атар(?:ку|ка)?)|фото для профиля|аватарка для профиля)$/iu.test(cleanPrompt);
+
+  if (genericAvatarRequest) {
+    await ctx.reply("Какую именно аватарку сделать? Напиши, кого или что изобразить и какой стиль нужен. Например: «чёрный тигр, неоновые синие глаза, тёмный фон, реалистичный стиль».");
     return;
   }
 
@@ -706,7 +717,7 @@ async function handleImage(ctx, prompt) {
   const status = await ctx.reply("🎨 Создаю изображение...");
 
   try {
-    const image = await generateImage(prompt);
+    const image = await generateImage(cleanPrompt);
 
     await ctx.api.deleteMessage(
       ctx.chat.id,
