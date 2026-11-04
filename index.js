@@ -1115,17 +1115,24 @@ async function sendLongMessage(ctx, text) {
   }
 }
 
+function cleanMarkdownBold(text) {
+  return String(text || "")
+    .replace(/\*\*(.*?)\*\*/gs, "$1")
+    .replace(/__(.*?)__/gs, "$1");
+}
+
 async function deliverAnswer(ctx, userId, result) {
+  const answer = cleanMarkdownBold(result.answer);
   const sources = formatSources(result.annotations);
 
   await sendLongMessage(
     ctx,
-    result.answer + sources + "\n\n⚡ " + result.provider
+    answer + sources + "\n\n⚡ " + result.provider
   );
 
   if (voiceUsers.has(userId)) {
     try {
-      await sendSpeech(ctx, result.answer);
+      await sendSpeech(ctx, answer);
     } catch (error) {
       console.error("TTS:", error.message);
       await ctx.reply("⚠️ Не удалось озвучить ответ.");
