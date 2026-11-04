@@ -2163,17 +2163,91 @@ bot.command("remember", async ctx => {
 
 bot.command("memory", async ctx => {
   const memory = await loadMemory(ctx.from.id);
+  memory.memoryItems = Array.isArray(memory.memoryItems) ? memory.memoryItems : [];
+  const input = String(ctx.match || "").trim();
+  const parts = input.split(/\s+/);
+  const action = parts.shift() || "list";
+  const value = parts.join(" ").trim();
 
-  const facts = memory.facts.length
-    ? memory.facts.map((x, i) => `${i + 1}. ${x}`).join("\n")
-    : "Пока ничего не сохранено.";
+  if (action === "add") {
+    const fields = value.split("|");
+    const category = String(fields.shift() || "Общее").trim().slice(0, 40);
+    const content = fields.join("|").trim().slice(0, 1000);
+    if (!content) return ctx.reply("Формат: /memory add Категория | что сохранить");
+    memory.memoryItems = memory.memoryItems.filter(x => String(x.content).toLowerCase() !== content.toLowerCase());
+    const item = { id: crypto.randomBytes(4).toString("hex"), category, content, createdAt: new Date().toISOString() };
+    memory.memoryItems.push(item);
+    memory.memoryItems = memory.memoryItems.slice(-100);
+    if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить запись в Cloudflare KV.");
+    return ctx.reply("🧠 Сохранено в категории «" + category + "». ID: " + item.id);
+  }
 
+  if (action === "delete") {
+    if (!value) return ctx.reply("Формат: /memory delete ID");
+    const before = memory.memoryItems.length;
+    memory.memoryItems = memory.memoryItems.filter(x => x.id !== value);
+    if (memory.memoryItems.length === before) return ctx.reply("Запись с таким ID не найдена.");
+    if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить изменения.");
+    return ctx.reply("🗑 Запись удалена.");
+  }
+
+  if (action === "search") {
+    if (!value) return ctx.reply("Формат: /memory search ключевое слово");
+    const terms = value.toLocaleLowerCase("ru").split(/\s+/).filter(Boolean);
+    const found = memory.memoryItems.filter(item => terms.some(term =>
+      (String(item.category) + " " + String(item.content)).toLocaleLowerCase("ru").includes(term)
+    ));
+    const facts = memory.facts.filter(item => terms.some(term => String(item).toLocaleLowerCase("ru").includes(term)));
+    const lines = [
+      ...found.map(x => "[" + x.id + "] [" + x.category + "] " + x.content),
+      ...facts.map((x, i) => "[Факт " + (i + 1) + "] " + x)
+    ];
+    return ctx.reply(lines.length ? "🔎 Найдено:\n\n" + lines.slice(0, 20).join("\n") : "Совпадений не найдено.");
+  }
+
+  const lines = [
+    ...memory.memoryItems.map(x => "[" + x.id + "] [" + x.category + "] " + x.content),
+    ...memory.facts.map((x, i) => "[Факт " + (i + 1) + "] " + x)
+  ];
   await ctx.reply(
-    "🧠 Долговременная память NEXUS AI\n\n" +
-    facts +
-    "\n\nГолосовой режим: " +
-    (voiceUsers.has(ctx.from.id) ? "включён" : "выключен")
+    "🧠 ПАМЯТЬ NEXUS 2.0\n\n" +
+    (lines.length ? lines.slice(-35).join("\n") : "Пока ничего не сохранено.") +
+    "\n\nЗаписей: " + memory.memoryItems.length + " · Фактов: " + memory.facts.length +
+    "\n\n/memory add Категория | текст\n/memory search запрос\n/memory delete ID"
   );
+});;
+
+bot.command("minecraft", async ctx => {
+  const userId = ctx.from.id;
+  const prompt = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!prompt) {
+    return ctx.reply(
+      "⛏️ NEXUS MINECRAFT TOOLS\n\n" +
+      "Отправь вопрос или ответь командой на текст ошибки/лога.\n" +
+      "Примеры:\n/minecraft найди причину краша Fabric\n" +
+      "/minecraft проверь конфиг и найди ошибки\n" +
+      "/minecraft создай команду для LuckPerms"
+    );
+  }
+  if (busyUsers.has(userId)) return ctx.reply("⏳ Подожди завершения предыдущей задачи.");
+  busyUsers.add(userId);
+  const status = await ctx.reply("⛏️ Анализирую Minecraft-задачу...");
+  try {
+    const result = await askAI(
+      userId,
+      "Ты — технический помощник по Minecraft Java Edition, серверам и моддингу. " +
+      "Определи загрузчик (Vanilla/Fabric/Forge/NeoForge), версию игры, вероятную причину ошибки и безопасные шаги. " +
+      "Анализируй только предоставленный лог или конфиг. Не выдумывай совместимость модов и не утверждай, что проверил актуальные версии. " +
+      "Для команд и конфигов давай готовые блоки для копирования. Перед разрушительными действиями предупреди о резервной копии.\n\nЗАДАЧА:\n" + prompt,
+      false
+    );
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await deliverAnswer(ctx, userId, result);
+  } catch (error) {
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка Minecraft Tools: " + String(error.message).slice(0, 1200)).catch(() => {});
+  } finally {
+    busyUsers.delete(userId);
+  }
 });
 
 // ======================================================
@@ -3825,6 +3899,7 @@ async function start() {
     { command: "agent", description: "Обратиться к ИИ-агенту" },
     { command: "remember", description: "Сохранить факт в память" },
     { command: "memory", description: "Посмотреть сохранённую память" },
+    { command: "minecraft", description: "Анализ Minecraft-логов и конфигов" },
     { command: "forget", description: "Удалить данные из памяти" },
     { command: "research", description: "Провести расширенное исследование" },
     { command: "team", description: "Получить командный ответ нескольких ИИ" },
