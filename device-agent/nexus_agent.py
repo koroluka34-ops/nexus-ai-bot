@@ -258,7 +258,7 @@ def start_webrtc_stream(cfg, offer):
                     self.video_started = None
                     self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
-                    print("WebRTC режим низкой задержки: 640x360, до 20 FPS")
+                    print("WebRTC режим: 854x480, до 20 FPS")
 
                 async def next_timestamp(self):
                     # До 100 FPS: фиксированный шаг RTP timestamp, без очереди старых кадров.
@@ -279,7 +279,7 @@ def start_webrtc_stream(cfg, offer):
                         raw = await asyncio.to_thread(self.capture.grab, self.monitor)
                         shot = np.array(raw)[:, :, :3]
                         height, width = shot.shape[:2]
-                        scale = min(1.0, 640 / width, 360 / height)
+                        scale = min(1.0, 854 / width, 480 / height)
                         if scale < 1.0:
                             from PIL import Image
                             shot = np.array(Image.fromarray(shot[:, :, ::-1]).resize((int(width * scale), int(height * scale))))[:, :, ::-1]
