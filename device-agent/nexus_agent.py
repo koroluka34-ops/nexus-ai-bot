@@ -157,7 +157,8 @@ def start_webrtc_stream(cfg, offer):
                         self.frames += 1
                         if self.frames == 1 or self.frames % 15 == 0:
                             print("WebRTC кадр", self.frames, "|", shot.shape[1], "x", shot.shape[0], "| пиксели", int(shot.min()), "-", int(shot.max()))
-                        frame = VideoFrame.from_ndarray(shot, format="BGR")
+                        rgb = np.ascontiguousarray(shot[:, :, ::-1])
+                        frame = VideoFrame.from_ndarray(rgb, format="rgb24")
                         frame.pts = pts
                         frame.time_base = time_base
                         return frame
