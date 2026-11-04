@@ -757,24 +757,16 @@ async function askOpenRouter(messages) {
 
 // Reject research answers that contain explicit dates in the future.
 function hasFutureDatedClaims(value) {
-  // Normalize non-breaking spaces often used in generated Russian text.
   const text = String(value || "").replace(/[\u00a0\u202f]/g, " ");
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Kyiv",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
+    timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit"
   }).formatToParts(new Date());
   const part = type => Number(parts.find(item => item.type === type)?.value);
   const todayKey = part("year") * 10000 + part("month") * 100 + part("day");
 
   const isFuture = (year, month, day) => {
     const date = new Date(Date.UTC(year, month, day));
-    if (
-      date.getUTCFullYear() !== year ||
-      date.getUTCMonth() !== month ||
-      date.getUTCDate() !== day
-    ) return false;
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) return false;
     return year * 10000 + (month + 1) * 100 + day > todayKey;
   };
 
@@ -796,26 +788,25 @@ function hasFutureDatedClaims(value) {
   let match;
   const monthPattern = Object.keys(monthAliases).sort((a, b) => b.length - a.length).join("|");
   const russianDate = new RegExp(
-    "\\\\b(\\\\d{1,2})\\\\s+(" + monthPattern + ")\\\\.?\\\\s+(20\\\\d{2})\\\\b",
+    "\\b(\\d{1,2})\\s+(" + monthPattern + ")\\.?\\s+(20\\d{2})\\b",
     "giu"
   );
   while ((match = russianDate.exec(text))) {
     if (isFuture(Number(match[3]), monthAliases[match[2].toLowerCase()], Number(match[1]))) return true;
   }
 
-  const isoDate = /\\b(20\\d{2})-(\\d{2})-(\\d{2})\\b/g;
+  const isoDate = /\b(20\d{2})-(\d{2})-(\d{2})\b/g;
   while ((match = isoDate.exec(text))) {
     if (isFuture(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) return true;
   }
 
-  const dottedDate = /\\b(\\d{1,2})\\.(\\d{1,2})\\.(20\\d{2})\\b/g;
+  const dottedDate = /\b(\d{1,2})\.(\d{1,2})\.(20\d{2})\b/g;
   while ((match = dottedDate.exec(text))) {
     if (isFuture(Number(match[3]), Number(match[2]) - 1, Number(match[1]))) return true;
   }
 
-  // Also catch upcoming dates written without a year, e.g. "5 ноября".
   const yearlessDate = new RegExp(
-    "\\\\b(\\\\d{1,2})\\\\s+(" + monthPattern + ")\\\\.?\\\\b",
+    "\\b(\\d{1,2})\\s+(" + monthPattern + ")\\.?\\b",
     "giu"
   );
   while ((match = yearlessDate.exec(text))) {
