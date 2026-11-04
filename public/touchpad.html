@@ -64,7 +64,11 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
  const tg=window.Telegram?.WebApp,status=document.getElementById('status'),pad=document.getElementById('pad'),initData=tg?.initData||'',video=document.getElementById('liveVideo'),screenState=document.getElementById('screenState');
  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b1020');tg.setBackgroundColor('#0b1020');}
  let sensitivity=0.5;const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0,moveChannel=null;
- function sendMoveFast(dx,dy){if(moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){moveChannel.send(JSON.stringify({type:'move',dx,dy}));return true;}return false;}
+ function sendMoveFast(dx,dy){
+  // Отправляем движение через HTTP-очередь агента, чтобы оно было видно
+  // в логе как touch_move и обрабатывалось тем же путём, что и остальные команды.
+  return false;
+ }
  async function send(payload){
   if(!initData){status.textContent='Открой через кнопку Telegram';return;}
   try{const r=await fetch('/device/touchpad',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:JSON.stringify(payload),keepalive:true});if(!r.ok){let info={};try{info=await r.json();}catch{}status.textContent=r.status===401?'Нет доступа: '+(info.error||'unknown'):'Ошибка связи ('+r.status+')';return;}status.textContent='🟢 ПК управляется';return true;}
