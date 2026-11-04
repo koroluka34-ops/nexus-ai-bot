@@ -1006,47 +1006,94 @@ bot.command("image", async ctx => {
   );
 });
 
-// Короткий MP4 из ИИ-картинки с движением камеры (не полноценная text-to-video модель).
+// Настоящая text-to-video генерация через Pollinations.
+const POLLINATIONS_VIDEO_MODEL = process.env.POLLINATIONS_VIDEO_MODEL || "google/veo-3.1-fast";
+const POLLINATIONS_VIDEO_DURATION = Math.min(8, Math.max(4, Number(process.env.POLLINATIONS_VIDEO_DURATION) || 5));
+const videoWait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchGeneratedVideo(response) {
+  const type = String(response.headers.get("content-type") || "").toLowerCase();
+  if (!response.ok) {
+    const raw = Buffer.from(await response.arrayBuffer()).toString("utf8").slice(0, 900);
+    let message = raw;
+    try { message = errorText(JSON.parse(raw)); } catch {}
+    throw new Error(`Pollinations HTTP ${response.status}: ${message || response.statusText}`);
+  }
+  if (type.startsWith("video/") || type.includes("octet-stream")) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("Видео пустое или превышает 20 МБ.");
+    return bytes;
+  }
+  const data = await response.json().catch(() => null);
+  const url = data?.data?.[0]?.url || data?.url || data?.result_url;
+  const encoded = data?.data?.[0]?.b64_json || data?.b64_json;
+  if (encoded) {
+    const bytes = Buffer.from(encoded, "base64");
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("Видео пустое или превышает 20 МБ.");
+    return bytes;
+  }
+  if (url) {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") throw new Error("Провайдер вернул небезопасную ссылку.");
+    return fetchGeneratedVideo(await fetch(parsed, { signal: AbortSignal.timeout(120000) }));
+  }
+  throw new Error(errorText(data) || "Pollinations не вернул MP4.");
+}
+
+async function generatePollinationsVideo(prompt) {
+  if (!POLLINATIONS_API_KEY) throw new Error("Добавь POLLINATIONS_API_KEY в Render → Environment.");
+  const endpoint = "https://gen.pollinations.ai/video/" + encodeURIComponent(prompt) +
+    "?model=" + encodeURIComponent(POLLINATIONS_VIDEO_MODEL) + "&duration=" + POLLINATIONS_VIDEO_DURATION;
+  const response = await fetch(endpoint, {
+    headers: { Authorization: `Bearer ${POLLINATIONS_API_KEY}`, Prefer: "respond-async" },
+    signal: AbortSignal.timeout(45000)
+  });
+  if (response.status !== 202) return fetchGeneratedVideo(response);
+
+  const accepted = await response.json().catch(() => null);
+  if (!accepted?.id) throw new Error("Pollinations не вернул ID задачи.");
+  for (let attempt = 0; attempt < 54; attempt++) {
+    await videoWait(5000);
+    const check = await fetch("https://gen.pollinations.ai/v1/jobs/" + encodeURIComponent(accepted.id), {
+      headers: { Authorization: `Bearer ${POLLINATIONS_API_KEY}` },
+      signal: AbortSignal.timeout(20000)
+    });
+    const job = await check.json().catch(() => null);
+    if (!check.ok) throw new Error(`Ошибка проверки задачи HTTP ${check.status}: ${errorText(job)}`);
+    if (job?.status === "failed") throw new Error(job?.error?.message || job?.error || "Модель не смогла создать видео.");
+    if (job?.status === "succeeded" || job?.status === "completed") {
+      const result = await fetch("https://gen.pollinations.ai/v1/jobs/" + encodeURIComponent(accepted.id) + "/result", {
+        headers: { Authorization: `Bearer ${POLLINATIONS_API_KEY}` },
+        signal: AbortSignal.timeout(120000)
+      });
+      return fetchGeneratedVideo(result);
+    }
+  }
+  throw new Error("Генерация длится слишком долго. Попробуй ещё раз позже.");
+}
+
 async function handleVideoPrompt(ctx, prompt) {
   const userId = ctx.from.id;
   if (!prompt) {
-    await ctx.reply("Напиши, какое видео создать. Например: создай видео футуристического города ночью");
+    await ctx.reply("🎬 <b>ИИ-генерация видео</b>\n\nНапиши описание сцены.\nПример: <code>/video кинематографичный полёт над футуристическим городом ночью</code>", { parse_mode: "HTML" });
     return;
   }
-  if (busyUsers.has(userId)) {
-    await ctx.reply("⏳ Подожди предыдущую задачу.");
-    return;
-  }
+  if (busyUsers.has(userId)) { await ctx.reply("⏳ Подожди предыдущую задачу."); return; }
   busyUsers.add(userId);
-  const status = await ctx.reply("🎬 Создаю изображение и собираю короткое видео...");
-  let imagePath;
+  const status = await ctx.reply("🎬 <b>NEXUS AI создаёт настоящее ИИ-видео.</b>\n⏳ Это может занять несколько минут.", { parse_mode: "HTML" });
   let videoPath;
   try {
-    const image = await enqueueGeneration(userId, () => generateImage(prompt));
-    imagePath = await mediaTempPath("jpg");
+    const bytes = await enqueueGeneration(userId, () => generatePollinationsVideo(prompt));
     videoPath = await mediaTempPath("mp4");
-    await fs.writeFile(imagePath, image);
-    await runFfmpeg([
-      "-y", "-loop", "1", "-i", imagePath,
-      "-vf",
-      "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720," +
-      "zoompan=z='min(zoom+0.0015,1.12)':d=120:s=1280x720:fps=24,format=yuv420p",
-      "-t", "5", "-an", "-c:v", "libx264", "-preset", "veryfast",
-      "-movflags", "+faststart", videoPath
-    ]);
-    const stat = await fs.stat(videoPath);
-    if (!stat.size || stat.size > 49 * 1024 * 1024) throw new Error("Видео слишком большое для Telegram.");
+    await fs.writeFile(videoPath, bytes);
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
-    await ctx.replyWithVideo(
-      new InputFile(videoPath, "nexus-video.mp4"),
-      { caption: "🎬 Готово! Короткое анимированное видео по твоему описанию. Оно создано из ИИ-изображения с движением камеры." }
-    );
+    await ctx.replyWithVideo(new InputFile(videoPath, "nexus-ai-video.mp4"), {
+      caption: "🎬 <b>NEXUS AI — видео готово!</b>\nМодель: <code>" + POLLINATIONS_VIDEO_MODEL + "</code>\nДлительность: " + POLLINATIONS_VIDEO_DURATION + " сек.",
+      parse_mode: "HTML"
+    });
   } catch (error) {
-    await ctx.api.editMessageText(ctx.chat.id, status.message_id,
-      "❌ Не удалось создать видео: " + String(error.message).slice(0, 1400)
-    ).catch(() => {});
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось создать ИИ-видео:\n" + String(error.message).slice(0, 1400)).catch(() => {});
   } finally {
-    if (imagePath) await fs.unlink(imagePath).catch(() => {});
     if (videoPath) await fs.unlink(videoPath).catch(() => {});
     busyUsers.delete(userId);
   }
@@ -3540,6 +3587,7 @@ bot.callbackQuery("menu_features", async ctx => {
     "📝 OCR распознавание текста /ocr\n" +
     "🤖 AI-команда /team\n" +
     "🖼 Генерация картинок\n" +
+    "🎬 Настоящая ИИ-генерация видео через Pollinations\n" +
     "📸 Анализ фото\n" +
     "📄 Чтение PDF/DOCX/TXT и кода\n" +
     "📝 Создание DOCX/PDF/XLSX/PPTX\n" +
@@ -3562,7 +3610,7 @@ bot.callbackQuery("menu_features", async ctx => {
     "/create — создать документ\n" +
     "/agent — выполнить задачу\n" +
     "/overdrive — запустить команду четырёх ИИ\n" +
-    "/video — статус бесплатной генерации видео\n" +
+    "/video — создать настоящее ИИ-видео по описанию\n" +
     "/sticker — создать стикер\n" +
     "/circle — сделать видеокружок\n" +
     "/translate — перевод текста\n" +
@@ -3762,7 +3810,7 @@ async function start() {
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
     { command: "circle", description: "Сделать видеосообщение-кружок" },
-    { command: "video", description: "Создать короткое видео из картинки" },
+    { command: "video", description: "Создать настоящее ИИ-видео по описанию" },
     { command: "overdrive", description: "Запустить команду ИИ-агентов" },
     { command: "agent", description: "Обратиться к ИИ-агенту" },
     { command: "remember", description: "Сохранить факт в память" },
