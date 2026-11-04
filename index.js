@@ -253,6 +253,40 @@ function premiumStatusText(memory) {
     (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
 }
 
+
+// Shared generation queue: Premium jobs are picked before Free jobs.
+const generationQueue = [];
+let generationRunning = false;
+
+async function enqueueGeneration(userId, task) {
+  const memory = await loadMemory(userId);
+  const tier = currentPlan(memory);
+  const priority = PREMIUM_PLANS[tier].priority;
+  return new Promise((resolve, reject) => {
+    generationQueue.push({ userId, priority, createdAt: Date.now(), task, resolve, reject });
+    generationQueue.sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt);
+    drainGenerationQueue();
+  });
+}
+
+async function drainGenerationQueue() {
+  if (generationRunning) return;
+  generationRunning = true;
+  try {
+    while (generationQueue.length) {
+      const job = generationQueue.shift();
+      try {
+        job.resolve(await job.task());
+      } catch (error) {
+        job.reject(error);
+      }
+    }
+  } finally {
+    generationRunning = false;
+    if (generationQueue.length) drainGenerationQueue();
+  }
+}
+
 async function addLongTermFact(userId, fact) {
   const memory = await loadMemory(userId);
 
@@ -830,7 +864,7 @@ async function handleImage(ctx, prompt) {
   const status = await ctx.reply("🎨 Создаю изображение...");
 
   try {
-    const image = await generateImage(cleanPrompt);
+    const image = await enqueueGeneration(userId, () => generateImage(cleanPrompt));
 
     await ctx.api.deleteMessage(
       ctx.chat.id,
@@ -877,7 +911,7 @@ async function handleVideoPrompt(ctx, prompt) {
   let imagePath;
   let videoPath;
   try {
-    const image = await generateImage(prompt);
+    const image = await enqueueGeneration(userId, () => generateImage(prompt));
     imagePath = await mediaTempPath("jpg");
     videoPath = await mediaTempPath("mp4");
     await fs.writeFile(imagePath, image);
