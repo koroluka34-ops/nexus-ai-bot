@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-cursor-toggle"
+AGENT_VERSION = "2026.11.05-roblox-scancode"
 import base64
 import json
 import os
@@ -69,6 +69,7 @@ def _send_windows_input(kind, code, down=True):
 
     INPUT_MOUSE, INPUT_KEYBOARD = 0, 1
     KEYEVENTF_KEYUP = 0x0002
+    KEYEVENTF_SCANCODE = 0x0008
     MOUSEEVENTF_MOVE = 0x0001
     mouse_flags = {"left": (0x0002, 0x0004), "right": (0x0008, 0x0010)}
     key_codes = {
@@ -90,8 +91,14 @@ def _send_windows_input(kind, code, down=True):
         vk = key_codes.get(key, ord(key.upper()) if len(key) == 1 and key.isalnum() else 0)
         if not vk:
             raise ValueError("Недопустимая клавиша: " + key)
+        # Игры вроде Roblox могут игнорировать обычные VK-события.
+        # Отправляем физические scan-code события через SendInput.
+        scan = ctypes.windll.user32.MapVirtualKeyW(vk, 0)
+        if not scan:
+            raise ValueError("Не удалось определить scan-code для клавиши: " + key)
         item.type = INPUT_KEYBOARD
-        item.union.ki = KEYBDINPUT(vk, 0, 0 if down else KEYEVENTF_KEYUP, 0, 0)
+        flags = KEYEVENTF_SCANCODE | (0 if down else KEYEVENTF_KEYUP)
+        item.union.ki = KEYBDINPUT(0, scan, flags, 0, 0)
     else:
         raise ValueError("Неизвестный тип ввода")
     send_input = ctypes.windll.user32.SendInput
@@ -368,8 +375,10 @@ def start_webrtc_stream(cfg, offer):
                             if state == "down":
                                 if key not in held_keys:
                                     _send_windows_input("key", key, True); held_keys.add(key)
+                                    print("Игровая клавиша нажата:", key)
                             elif key in held_keys:
                                 _send_windows_input("key", key, False); held_keys.discard(key)
+                                print("Игровая клавиша отпущена:", key)
                             return
                         if kind in ("game-mouse", "game-click"):
                             button = str(data.get("button", "left"))
