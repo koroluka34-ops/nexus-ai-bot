@@ -39,6 +39,65 @@ def request(cfg, path, payload=None):
     with urllib.request.urlopen(req, timeout=35) as response:
         return json.loads(response.read().decode("utf-8"))
 
+def _send_windows_input(kind, code, down=True):
+    """Send real relative mouse / key / button input through Win32 SendInput."""
+    import ctypes
+    from ctypes import wintypes
+
+    ULONG_PTR = ctypes.c_size_t
+
+    class MOUSEINPUT(ctypes.Structure):
+        _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
+                    ("mouseData", wintypes.DWORD), ("dwFlags", wintypes.DWORD),
+                    ("time", wintypes.DWORD), ("dwExtraInfo", ULONG_PTR)]
+
+    class KEYBDINPUT(ctypes.Structure):
+        _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                    ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                    ("dwExtraInfo", ULONG_PTR)]
+
+    class HARDWAREINPUT(ctypes.Structure):
+        _fields_ = [("uMsg", wintypes.DWORD), ("wParamL", wintypes.WORD),
+                    ("wParamH", wintypes.WORD)]
+
+    class INPUTUNION(ctypes.Union):
+        _fields_ = [("mi", MOUSEINPUT), ("ki", KEYBDINPUT), ("hi", HARDWAREINPUT)]
+
+    class INPUT(ctypes.Structure):
+        _fields_ = [("type", wintypes.DWORD), ("union", INPUTUNION)]
+
+    INPUT_MOUSE, INPUT_KEYBOARD = 0, 1
+    KEYEVENTF_KEYUP = 0x0002
+    MOUSEEVENTF_MOVE = 0x0001
+    mouse_flags = {"left": (0x0002, 0x0004), "right": (0x0008, 0x0010)}
+    key_codes = {
+        "space": 0x20, "shift": 0x10, "ctrl": 0x11, "alt": 0x12,
+        "escape": 0x1B, "tab": 0x09, "enter": 0x0D,
+    }
+
+    item = INPUT()
+    if kind == "move":
+        item.type = INPUT_MOUSE
+        item.union.mi = MOUSEINPUT(int(code[0]), int(code[1]), 0, MOUSEEVENTF_MOVE, 0, 0)
+    elif kind == "mouse":
+        if code not in mouse_flags:
+            raise ValueError("Недопустимая кнопка мыши")
+        item.type = INPUT_MOUSE
+        item.union.mi = MOUSEINPUT(0, 0, 0, mouse_flags[code][0 if down else 1], 0, 0)
+    elif kind == "key":
+        key = str(code).lower()
+        vk = key_codes.get(key, ord(key.upper()) if len(key) == 1 and key.isalnum() else 0)
+        if not vk:
+            raise ValueError("Недопустимая клавиша: " + key)
+        item.type = INPUT_KEYBOARD
+        item.union.ki = KEYBDINPUT(vk, 0, 0 if down else KEYEVENTF_KEYUP, 0, 0)
+    else:
+        raise ValueError("Неизвестный тип ввода")
+    sent = ctypes.windll.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT))
+    if sent != 1:
+        raise OSError("Windows отклонила игровой ввод через SendInput")
+
+
 def execute(command):
     action, args = command["action"], command.get("args", {})
     if action == "screenshot":
@@ -111,38 +170,26 @@ def execute(command):
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0
         if action == "touch_move":
-            # Use the Windows cursor API directly. PyAutoGUI's tween/interpolation
-            # path can raise ZeroDivisionError for very short touchpad movements.
-            import ctypes
-            from ctypes import wintypes
-            class POINT(ctypes.Structure):
-                _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+            # Игровая камера должна получать относительное движение мыши.
+            # SetCursorPos лишь двигает курсор Windows и часто не вращает камеру в играх.
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
             if abs(dx) > 500 or abs(dy) > 500:
                 raise ValueError("Слишком большое движение тачпада")
-            point = POINT()
-            user32 = ctypes.windll.user32
-            if not user32.GetCursorPos(ctypes.byref(point)):
-                raise OSError("Windows не вернула позицию курсора")
-            width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-            nx = max(0, min(width - 1, point.x + dx))
-            ny = max(0, min(height - 1, point.y + dy))
-            if not user32.SetCursorPos(nx, ny):
-                raise OSError("Windows не смогла переместить курсор")
-            return {"result": "Курсор перемещён тачпадом."}
+            _send_windows_input("move", (dx, dy))
+            return {"result": "Относительное движение мыши отправлено."}
         if action in ("key_down", "key_up"):
             key = str(args.get("key", "")).lower()
             allowed_game_keys = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter","grave"}
             if key not in allowed_game_keys:
                 raise ValueError("Игровая клавиша не разрешена")
-            (pyautogui.keyDown if action == "key_down" else pyautogui.keyUp)(key)
+            _send_windows_input("key", key, action == "key_down")
             return {"result": ("Удерживается: " if action == "key_down" else "Отпущена: ") + key}
         if action in ("mouse_down", "mouse_up"):
             button = args.get("button", "left")
             if button not in ("left", "right"):
                 raise ValueError("Игровая кнопка мыши не разрешена")
-            (pyautogui.mouseDown if action == "mouse_down" else pyautogui.mouseUp)(button=button)
-            return {"result": "Кнопка мыши обновлена."}
+            _send_windows_input("mouse", button, action == "mouse_down")
+            return {"result": "Игровая кнопка мыши обновлена."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
             width, height = pyautogui.size()
@@ -299,15 +346,7 @@ def start_webrtc_stream(cfg, offer):
                             dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
                             if abs(dx) > 500 or abs(dy) > 500:
                                 return
-                            import ctypes
-                            from ctypes import wintypes
-                            class CursorPoint(ctypes.Structure):
-                                _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
-                            point = CursorPoint()
-                            user32 = ctypes.windll.user32
-                            if user32.GetCursorPos(ctypes.byref(point)):
-                                width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-                                user32.SetCursorPos(max(0, min(width - 1, point.x + dx)), max(0, min(height - 1, point.y + dy)))
+                            _send_windows_input("move", (dx, dy))
                             return
                         import pyautogui
                         pyautogui.PAUSE = 0
@@ -318,21 +357,22 @@ def start_webrtc_stream(cfg, offer):
                                 return
                             if state == "down":
                                 if key not in held_keys:
-                                    pyautogui.keyDown(key); held_keys.add(key)
+                                    _send_windows_input("key", key, True); held_keys.add(key)
                             elif key in held_keys:
-                                pyautogui.keyUp(key); held_keys.discard(key)
+                                _send_windows_input("key", key, False); held_keys.discard(key)
                             return
                         if kind in ("game-mouse", "game-click"):
                             button = str(data.get("button", "left"))
                             if button not in ("left", "right"):
                                 return
                             if kind == "game-click":
-                                pyautogui.click(button=button)
+                                _send_windows_input("mouse", button, True)
+                                _send_windows_input("mouse", button, False)
                             elif data.get("state") == "down":
                                 if button not in held_buttons:
-                                    pyautogui.mouseDown(button=button); held_buttons.add(button)
+                                    _send_windows_input("mouse", button, True); held_buttons.add(button)
                             elif data.get("state") == "up" and button in held_buttons:
-                                pyautogui.mouseUp(button=button); held_buttons.discard(button)
+                                _send_windows_input("mouse", button, False); held_buttons.discard(button)
                     except Exception as control_exc:
                         print("Ошибка быстрого управления:", repr(control_exc))
 
