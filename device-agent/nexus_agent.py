@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-touchpad-cursor9"
+AGENT_VERSION = "2026.11.04-touchpad-dc10"
 import base64
 import json
 import os
@@ -217,6 +217,33 @@ def start_webrtc_stream(cfg, offer):
             async def on_connection_state():
                 print("WebRTC connection:", pc.connectionState, "| ICE:", pc.iceConnectionState)
             pc.addTrack(ScreenVideoTrack())
+
+            @pc.on("datachannel")
+            def on_datachannel(channel):
+                print("WebRTC канал управления открыт:", channel.label)
+                @channel.on("message")
+                def on_control_message(message):
+                    try:
+                        if isinstance(message, bytes):
+                            message = message.decode("utf-8")
+                        data = json.loads(message)
+                        if data.get("type") != "move":
+                            return
+                        dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
+                        if abs(dx) > 500 or abs(dy) > 500:
+                            return
+                        import ctypes
+                        from ctypes import wintypes
+                        class CursorPoint(ctypes.Structure):
+                            _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+                        point = CursorPoint()
+                        user32 = ctypes.windll.user32
+                        if user32.GetCursorPos(ctypes.byref(point)):
+                            width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+                            user32.SetCursorPos(max(0, min(width - 1, point.x + dx)), max(0, min(height - 1, point.y + dy)))
+                    except Exception as control_exc:
+                        print("Ошибка быстрого управления:", repr(control_exc))
+
             await pc.setRemoteDescription(RTCSessionDescription(sdp=offer["sdp"], type=offer["type"]))
             answer = await pc.createAnswer()
             await pc.setLocalDescription(answer)
