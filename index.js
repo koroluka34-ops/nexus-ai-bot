@@ -755,6 +755,22 @@ async function askOpenRouter(messages) {
   };
 }
 
+// Reject research answers that contain explicit dates in the future.
+function hasFutureDatedClaims(value) {
+  const text = String(value || "");
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).split("-").map(Number);
+  const today = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59);
+  const months = { "января":0,"февраля":1,"марта":2,"апреля":3,"мая":4,"июня":5,"июля":6,"августа":7,"сентября":8,"октября":9,"ноября":10,"декабря":11 };
+  const future = (y, m, d) => new Date(y, m, d, 23, 59, 59) > today;
+  let match;
+  const ru = /\\b(\\d{1,2})\\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\\s+(20\\d{2})\\b/giu;
+  while ((match = ru.exec(text))) if (future(Number(match[3]), months[match[2].toLowerCase()], Number(match[1]))) return true;
+  const iso = /\\b(20\\d{2})-(\\d{2})-(\\d{2})\\b/g;
+  while ((match = iso.exec(text))) if (future(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) return true;
+  const dotted = /\\b(\\d{1,2})\\.(\\d{1,2})\\.(20\\d{2})\\b/g;
+  while ((match = dotted.exec(text))) if (future(Number(match[3]), Number(match[2]) - 1, Number(match[1]))) return true;
+  return false;
+}
 // ======================================================
 // SEARCH SOURCES
 // ======================================================
@@ -2529,11 +2545,12 @@ bot.command("research", async ctx => {
     // Не показываем исследование, если браузер не вернул реальные URL.
     // Текст модели без источников может содержать выдуманные новости.
     if (uniqueSourceUrls.length < 2) {
-      await ctx.reply(
-        "⚠️ Groq не передал минимум две реальные ссылки на найденные материалы. " +
-        "Я не буду показывать сгенерированный текст: в нём могут быть выдуманные новости. " +
-        "Попробуй позже. Если проблема повторяется, нужен отдельный поисковый API."
-      );
+      await ctx.reply("⚠️ Поиск не вернул минимум две проверяемые ссылки. Не буду выдавать неподтверждённый текст за исследование.");
+      return;
+    }
+
+    if (hasFutureDatedClaims(result.answer)) {
+      await ctx.reply("⚠️ Исследование отклонено: в ответе обнаружены даты из будущего. Это может быть выдуманная информация.");
       return;
     }
 
