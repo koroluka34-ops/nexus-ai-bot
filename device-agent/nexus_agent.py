@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-webrtc1"
+AGENT_VERSION = "2026.11.04-webrtc2"
 import base64
 import json
 import os
@@ -131,11 +131,11 @@ def start_webrtc_stream(cfg, offer):
     import threading
     def worker():
         async def run():
-            from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer, MediaStreamTrack
+            from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer, VideoStreamTrack
             from av import VideoFrame
             import mss
             import numpy as np
-            class ScreenVideoTrack(MediaStreamTrack):
+            class ScreenVideoTrack(VideoStreamTrack):
                 kind = "video"
                 def __init__(self):
                     super().__init__()
@@ -144,6 +144,11 @@ def start_webrtc_stream(cfg, offer):
                 async def recv(self):
                     pts, time_base = await self.next_timestamp()
                     shot = np.array(self.capture.grab(self.monitor))[:, :, :3]
+                    height, width = shot.shape[:2]
+                    scale = min(1.0, 1280 / width, 720 / height)
+                    if scale < 1.0:
+                        from PIL import Image
+                        shot = np.array(Image.fromarray(shot).resize((int(width * scale), int(height * scale))))
                     frame = VideoFrame.from_ndarray(shot, format="BGR")
                     frame.pts = pts
                     frame.time_base = time_base
