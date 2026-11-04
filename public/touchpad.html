@@ -7,20 +7,20 @@
 :root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0b1020;color:#f8fafc}
 *{box-sizing:border-box}body{margin:0;padding:14px;min-height:100vh;display:flex;flex-direction:column;gap:12px;overscroll-behavior:none}
 header{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:18px}#status{font-size:12px;color:#94a3b8;font-weight:500}
-.screen-wrap{border:1px solid #334155;border-radius:16px;background:#111827;padding:8px;overflow:hidden}.screen-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cbd5e1;margin:0 2px 7px}.screen-head span{color:#94a3b8}#screen{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#020617;border-radius:10px}.pad{flex:1;min-height:48vh;border:1px solid #334155;border-radius:22px;background:linear-gradient(145deg,#18243a,#101827);display:flex;align-items:center;justify-content:center;text-align:center;touch-action:none;user-select:none;-webkit-user-select:none}
+.screen-wrap{border:1px solid #334155;border-radius:16px;background:#111827;padding:8px;overflow:hidden}.screen-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cbd5e1;margin:0 2px 7px}.screen-head span{color:#94a3b8}#liveVideo{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#020617;border-radius:10px}.pad{flex:1;min-height:48vh;border:1px solid #334155;border-radius:22px;background:linear-gradient(145deg,#18243a,#101827);display:flex;align-items:center;justify-content:center;text-align:center;touch-action:none;user-select:none;-webkit-user-select:none}
 .pad strong{display:block;font-size:20px;margin-bottom:8px}.pad span{color:#94a3b8;font-size:13px}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{border:1px solid #334155;background:#1e293b;color:#fff;border-radius:15px;padding:17px 10px;font-size:16px;font-weight:650;touch-action:manipulation}
 button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}
 </style></head><body>
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
-<section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><img id="screen" alt="Трансляция экрана ПК" /></section>
+<section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
 <div class="pad" id="pad"><div><strong>Води пальцем здесь</strong><span>Один палец — курсор · два пальца — прокрутка<br>Тап — левый клик</span></div></div>
 <div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div>
 <div class="small">Удерживай палец и перемещай его для перетаскивания</div>
 <script>
 (()=>{
- const tg=window.Telegram?.WebApp,status=document.getElementById('status'),pad=document.getElementById('pad'),initData=tg?.initData||'',screen=document.getElementById('screen'),screenState=document.getElementById('screenState');
+ const tg=window.Telegram?.WebApp,status=document.getElementById('status'),pad=document.getElementById('pad'),initData=tg?.initData||'',video=document.getElementById('liveVideo'),screenState=document.getElementById('screenState');
  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b1020');tg.setBackgroundColor('#0b1020');}
  const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0;
  async function send(payload){
@@ -31,7 +31,23 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
  async function drainMoves(){if(sendingMove)return;sendingMove=true;while(pendingMoveX||pendingMoveY){const dx=Math.max(-400,Math.min(400,Math.round(pendingMoveX))),dy=Math.max(-400,Math.min(400,Math.round(pendingMoveY)));if(!dx&&!dy)break;pendingMoveX-=dx;pendingMoveY-=dy;const ok=await send({type:'move',dx,dy});if(!ok){pendingMoveX=0;pendingMoveY=0;break;}}sendingMove=false;}
  function flush(){raf=0;if(moveX||moveY){pendingMoveX+=moveX*1.5;pendingMoveY+=moveY*1.5;moveX=0;moveY=0;drainMoves();}}
  function queueMove(dx,dy){moveX+=dx;moveY+=dy;if(!raf)raf=requestAnimationFrame(flush);}
- async function refreshScreen(){try{const r=await fetch('/device/screen',{headers:{'X-Telegram-Init-Data':initData},cache:'no-store'});if(!r.ok)throw new Error();const data=await r.json();if(data.image){screen.src='data:image/jpeg;base64,'+data.image;screenState.textContent='🟢 Прямой эфир';}else{screenState.textContent='Ожидание изображения…';}}catch{screenState.textContent='Нет сигнала';}}setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});refreshScreen();setInterval(refreshScreen,900);
+ async function startLiveVideo(){
+ if(!initData||!window.RTCPeerConnection){screenState.textContent='Видео недоступно';return;}
+ const sessionId=crypto.randomUUID();
+ const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+ pc.addTransceiver('video',{direction:'recvonly'});
+ pc.ontrack=e=>{video.srcObject=e.streams[0];video.play().catch(()=>{});screenState.textContent='🟢 Живое видео';};
+ pc.onconnectionstatechange=()=>{if(['failed','disconnected','closed'].includes(pc.connectionState))screenState.textContent='Связь с видео потеряна';};
+ try{
+  const offer=await pc.createOffer();await pc.setLocalDescription(offer);
+  if(pc.iceGatheringState!=='complete')await new Promise(resolve=>{const timer=setTimeout(resolve,8000);pc.addEventListener('icegatheringstatechange',()=>{if(pc.iceGatheringState==='complete'){clearTimeout(timer);resolve();}});});
+  let r=await fetch('/device/webrtc/offer',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:JSON.stringify({sessionId,sdp:pc.localDescription.sdp,type:pc.localDescription.type})});
+  if(!r.ok)throw new Error('offer '+r.status);screenState.textContent='Подключение видео…';
+  for(let i=0;i<40;i++){await new Promise(resolve=>setTimeout(resolve,500));r=await fetch('/device/webrtc/answer?sessionId='+encodeURIComponent(sessionId),{headers:{'X-Telegram-Init-Data':initData},cache:'no-store'});if(r.ok){const data=await r.json();if(data.answer){await pc.setRemoteDescription(data.answer);return;}}}
+  throw new Error('тайм-аут ответа ПК');
+ }catch(err){screenState.textContent='Ошибка видео: '+err.message;pc.close();}
+}
+setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiveVideo();
  pad.addEventListener('pointerdown',e=>{e.preventDefault();pad.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){primary=e.pointerId;start={x:e.clientX,y:e.clientY};moved=false;}else{start=null;}});
  pad.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;e.preventDefault();const prev=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size>=2){const dy=e.clientY-prev.y;if(Math.abs(dy)>1)send({type:'scroll',direction:dy>0?-1:1,amount:Math.max(1,Math.min(3,Math.round(Math.abs(dy)/24)))});return;}if(e.pointerId===primary){const dx=e.clientX-prev.x,dy=e.clientY-prev.y;if(Math.abs(e.clientX-start.x)+Math.abs(e.clientY-start.y)>7)moved=true;queueMove(dx,dy);}});
  function endPointer(e){if(!pointers.has(e.pointerId))return;const wasSingle=pointers.size===1&&e.pointerId===primary;pointers.delete(e.pointerId);if(wasSingle&&start&&!moved)send({type:'click',button:'left'});if(!pointers.size){primary=null;start=null;}}
