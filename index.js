@@ -4001,9 +4001,10 @@ bot.on("message:text", async ctx => {
   if (adultArtPendingUsers.has(userId)) {
     adultArtPendingUsers.delete(userId);
     const adultArtPrompt =
-      "Create a tasteful, non-explicit glamour or romantic editorial image of clearly adult fictional characters only. " +
-      "Keep the result fully clothed or covered by opaque elegant clothing. No nudity, no visible intimate body parts, no sexual activity, no pornographic framing, and no real or identifiable people. " +
-      "User's visual concept: " + addressedQuestion;
+      "Create a tasteful, sensual, non-explicit adult glamour or boudoir editorial photograph. All characters must be clearly 25+ fictional adults. " +
+      "Allow elegant lingerie, satin robes, swimwear, fitted dresses, tasteful cleavage, artistic silhouettes, intimate cinematic lighting, confident fashion poses, and romantic atmosphere. " +
+      "Keep the image non-explicit: no visible genitals, no exposed nipples, no sexual acts, no masturbation, no pornographic close-ups, no coercion, and no real or identifiable people. " +
+      "Do not make the subject look underage. User's visual concept: " + addressedQuestion;
     await handleImage(ctx, adultArtPrompt);
     return;
   }
