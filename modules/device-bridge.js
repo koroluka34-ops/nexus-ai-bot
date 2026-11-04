@@ -4,6 +4,8 @@ const crypto = require("node:crypto");
 const { InputFile, InlineKeyboard } = require("grammy");
 
 const TOKEN = String(process.env.PC_AGENT_TOKEN || "");
+const BOT_TOKEN = String(process.env.BOT_TOKEN || "");
+const touchpad = { activeUntil: 0, dx: 0, dy: 0, events: [] };
 const OWNER_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
 const queue = [];
 const pending = new Map();
@@ -41,8 +43,15 @@ function installDeviceBridge(bot) {
     const input = String(ctx.match || "").trim();
     const [verb, ...rest] = input.split(/\s+/);
     const arg = rest.join(" ").trim();
+    if (verb === "touchpad") {
+      if (ctx.chat.type !== "private") return ctx.reply("Открой личный чат с ботом и отправь /pc touchpad.");
+      const base = String(process.env.RENDER_EXTERNAL_URL || "https://nexus-ai-bot-kt4w.onrender.com").replace(/\/$/, "");
+      const keyboard = new InlineKeyboard().webApp("🖱 Открыть тачпад", base + "/touchpad");
+      return ctx.reply("🖥 Сенсорное управление ПК\nВоди пальцем по панели — курсор будет двигаться на компьютере. Один тап — клик, два пальца — прокрутка.", { reply_markup: keyboard });
+    }
     if (!verb || verb === "help") {
-      return ctx.reply("🖥 NEXUS PC\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n/pc mouse drag 100 100 500 400 — перетащить мышь\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n/pc key f5 — функциональные клавиши F1–F12\n/pc hotkey ctrl+c — сочетание клавиш\n/pc hotkey alt+tab — переключить окно\n/pc hotkey win+d — показать рабочий стол\n/pc hotkey win+e — открыть Проводник\n/pc hotkey ctrl+shift+esc — Диспетчер задач\n/pc hotkey alt+f4 — закрыть активное окно\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
+      return ctx.reply("🖥 NEXUS PC\n/pc touchpad — открыть сенсорную мышь в Telegram
+/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n/pc mouse drag 100 100 500 400 — перетащить мышь\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n/pc key f5 — функциональные клавиши F1–F12\n/pc hotkey ctrl+c — сочетание клавиш\n/pc hotkey alt+tab — переключить окно\n/pc hotkey win+d — показать рабочий стол\n/pc hotkey win+e — открыть Проводник\n/pc hotkey ctrl+shift+esc — Диспетчер задач\n/pc hotkey alt+f4 — закрыть активное окно\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
     }
     if (verb === "status") {
       const d = devices.get("windows-main");
@@ -147,9 +156,56 @@ function installDeviceBridge(bot) {
   });
 }
 
+function verifyTelegramWebApp(initData) {
+  if (!BOT_TOKEN || !OWNER_ID || !initData || initData.length > 8192) return false;
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get("hash");
+    const authDate = Number(params.get("auth_date") || 0);
+    const user = JSON.parse(params.get("user") || "{}");
+    if (!hash || !/^\d+$/.test(String(authDate)) || Date.now()/1000 - authDate > 86400 || authDate > Date.now()/1000 + 60) return false;
+    params.delete("hash");
+    const check = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k + "=" + v).join("\n");
+    const secret = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+    const expected = crypto.createHmac("sha256", secret).update(check).digest();
+    const supplied = Buffer.from(hash, "hex");
+    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return false;
+    return String(user.id) === OWNER_ID;
+  } catch { return false; }
+}
 async function handleDeviceHttp(req, res) {
   const url = new URL(req.url, "http://localhost");
   if (!url.pathname.startsWith("/device/")) return false;
+  if (req.method === "POST" && url.pathname === "/device/touchpad") {
+    if (!verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""))) {
+      sendJson(res, 401, { error: "telegram_auth_failed" }); return true;
+    }
+    let body = "";
+    req.on("data", chunk => { body += chunk; if (body.length > 4096) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const data = JSON.parse(body || "{}");
+        touchpad.activeUntil = Date.now() + 5000;
+        if (data.type === "move") {
+          const dx = Number(data.dx), dy = Number(data.dy);
+          if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 120 || Math.abs(dy) > 120) return sendJson(res, 400, { error: "invalid_delta" });
+          touchpad.dx = Math.max(-500, Math.min(500, touchpad.dx + dx));
+          touchpad.dy = Math.max(-500, Math.min(500, touchpad.dy + dy));
+        } else if (data.type === "click") {
+          const button = data.button === "right" ? "right" : "left";
+          if (touchpad.events.length < 12) touchpad.events.push({ action: "mouse_click", args: { button } });
+        } else if (data.type === "scroll") {
+          const amount = Math.max(1, Math.min(5, Math.round(Math.abs(Number(data.amount) || 1))));
+          const direction = Number(data.direction) < 0 ? "down" : "up";
+          if (touchpad.events.length < 12) touchpad.events.push({ action: "mouse_scroll", args: { direction, amount } });
+        } else if (data.type !== "heartbeat") {
+          return sendJson(res, 400, { error: "unknown_touch_action" });
+        }
+        sendJson(res, 200, { ok: true });
+      } catch { sendJson(res, 400, { error: "bad_json" }); }
+    });
+    return true;
+  }
   if (!auth(req)) { sendJson(res, 401, { error: "unauthorized" }); return true; }
   if (req.method === "GET" && url.pathname === "/device/poll") {
     const now = Date.now();
@@ -160,8 +216,17 @@ async function handleDeviceHttp(req, res) {
       const msg = "⌛ Команда отменена: истекло время ожидания ПК.";
       deviceBot.api.sendMessage(expired.chatId, msg).catch(() => {});
     }
-    const item = queue.shift();
-    sendJson(res, 200, { ok: true, command: item ? { id: item.id, action: item.action, args: item.args } : null, pollAfterMs: 1800 });
+    let command = null;
+    if (touchpad.activeUntil > now) {
+      if (touchpad.events.length) command = touchpad.events.shift();
+      else if (touchpad.dx || touchpad.dy) {
+        command = { action: "touch_move", args: { dx: touchpad.dx, dy: touchpad.dy } };
+        touchpad.dx = 0; touchpad.dy = 0;
+      }
+    }
+    const item = command ? null : queue.shift();
+    if (!command && item) command = { id: item.id, action: item.action, args: item.args };
+    sendJson(res, 200, { ok: true, command, touchpadActive: touchpad.activeUntil > now, pollAfterMs: touchpad.activeUntil > now ? 80 : 1800 });
     return true;
   }
   if (req.method === "POST" && url.pathname === "/device/result") {
