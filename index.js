@@ -120,7 +120,8 @@ async function loadMemory(userId) {
   const empty = {
     facts: [],
     summary: "",
-    voiceEnabled: false
+    voiceEnabled: false,
+    reminders: []
   };
 
   if (!kvConfigured()) {
@@ -151,7 +152,8 @@ async function loadMemory(userId) {
     const memory = {
       facts: Array.isArray(data.facts) ? data.facts : [],
       summary: String(data.summary || ""),
-      voiceEnabled: Boolean(data.voiceEnabled)
+      voiceEnabled: Boolean(data.voiceEnabled),
+      reminders: Array.isArray(data.reminders) ? data.reminders : []
     };
 
     longMemory.set(userId, memory);
@@ -283,6 +285,8 @@ function allCommandsText() {
 <code>/status</code> — проверить состояние сервисов.
 <code>/reset</code> — очистить текущую историю диалога.
 <code>/agent задача</code> — поручить ИИ выполнить задачу.
+<code>/research тема</code> — глубокое исследование с веб-поиском и источниками.
+<code>/team задача</code> — запустить команду из нескольких ИИ.
 <code>/overdrive задача</code> — три ИИ анализируют задачу, четвёртый выносит вердикт.
 
 ━━━━━━━━━━━━━━━━━━
@@ -311,6 +315,9 @@ function allCommandsText() {
 🧠 <b>ПАМЯТЬ</b>
 <code>/remember текст</code> — сохранить факт о себе.
 <code>/memory</code> — посмотреть сохранённые факты.
+<code>/remind дата-время текст</code> — создать напоминание с часовым поясом.
+<code>/reminders</code> — список напоминаний.
+<code>/cancelreminder ID</code> — отменить напоминание.
 <code>/forget</code> — удалить память и историю.
 
 ━━━━━━━━━━━━━━━━━━
@@ -319,6 +326,7 @@ function allCommandsText() {
 <code>/sticker описание</code> — создать стикер по тексту.
 <code>/sticker</code> — сделать стикер из фото (ответом на фото).
 <code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
+<code>/ocr</code> — извлечь весь текст с фото или скриншота (ответом на фото).
 <code>/circle</code> — сделать видеокружок из фото или видео.
 <code>/video</code> — посмотреть информацию о генерации ИИ-видео.
 
@@ -1875,6 +1883,117 @@ bot.command("memory", async ctx => {
   );
 });
 
+// ======================================================
+// RESEARCH, OCR AND REMINDERS
+// ======================================================
+
+bot.command("research", async ctx => {
+  const userId = ctx.from.id;
+  const query = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!query) return ctx.reply("Напиши тему для исследования. Например: /research сравни современные бесплатные ИИ-модели.");
+  if (busyUsers.has(userId)) return ctx.reply("⏳ Подожди предыдущую задачу.");
+  busyUsers.add(userId);
+  const status = await ctx.reply("🔎 Провожу исследование и ищу источники...");
+  try {
+    const result = await askAI(userId, "Проведи подробное исследование темы. Используй актуальный веб-поиск, проверь факты по нескольким источникам, отдели подтверждённые сведения от предположений, укажи даты и ссылки. Структурируй вывод: краткий итог, подробности, сравнение/данные и вывод. Тема: " + query, true);
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await deliverAnswer(ctx, userId, result);
+  } catch (error) {
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Исследование не удалось: " + String(error.message).slice(0, 1600)).catch(() => {});
+  } finally { busyUsers.delete(userId); }
+});
+
+bot.command("team", async ctx => {
+  if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Подожди предыдущую задачу.");
+  busyUsers.add(ctx.from.id);
+  try { await runOverdrive(ctx, String(ctx.match || "").trim()); }
+  catch (error) { await ctx.reply("❌ Ошибка AI-команды: " + String(error.message).slice(0, 1200)); }
+  finally { busyUsers.delete(ctx.from.id); }
+});
+
+bot.command("ocr", async ctx => {
+  const userId = ctx.from.id;
+  const photo = ctx.message.reply_to_message?.photo?.at(-1);
+  if (!photo) return ctx.reply("Ответь командой /ocr на фотографию или скриншот.");
+  if (busyUsers.has(userId)) return ctx.reply("⏳ Подожди предыдущую задачу.");
+  busyUsers.add(userId);
+  const status = await ctx.reply("🔍 Распознаю текст на изображении...");
+  try {
+    const buffer = await downloadTelegramFile(ctx, photo.file_id, MAX_IMAGE_BYTES);
+    const answer = await analyzeImageWithGroq(userId,
+      "Извлеки ВЕСЬ видимый текст с изображения максимально дословно. Сохрани порядок строк, числа, даты и пунктуацию. Не пересказывай и не исправляй исходный текст. Если часть неразборчива, пометь её как [неразборчиво]. Если текста нет, прямо скажи об этом.",
+      buffer, "image/jpeg");
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await sendLongMessage(ctx, "📝 РАСПОЗНАННЫЙ ТЕКСТ\n\n" + answer);
+  } catch (error) {
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ OCR не удался: " + String(error.message).slice(0, 1400)).catch(() => {});
+  } finally { busyUsers.delete(userId); }
+});
+
+function reminderHelp() {
+  return "⏰ Напоминание задаётся с часовым поясом в формате ISO 8601:\n/remind 2026-11-04T18:30+02:00 Проверить проект\n/reminders — список\n/cancelreminder ID — отменить.\n\nНа бесплатном Render бот может засыпать, поэтому доставка просроченного напоминания произойдёт при следующем пробуждении сервиса, а не гарантированно ровно в минуту.";
+}
+
+bot.command("remind", async ctx => {
+  const input = String(ctx.match || "").trim();
+  const match = input.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2}))\s+([\s\S]+)$/);
+  if (!match) return ctx.reply(reminderHelp());
+  const dueAt = Date.parse(match[1]);
+  const message = match[2].trim();
+  if (!Number.isFinite(dueAt) || dueAt <= Date.now()) return ctx.reply("❌ Укажи дату и время в будущем с часовым поясом.");
+  const memory = await loadMemory(ctx.from.id);
+  memory.reminders = Array.isArray(memory.reminders) ? memory.reminders : [];
+  if (memory.reminders.length >= 20) return ctx.reply("Достигнут лимит: 20 активных напоминаний.");
+  const id = crypto.randomUUID().slice(0, 8);
+  memory.reminders.push({ id, dueAt, message: message.slice(0, 700), chatId: ctx.chat.id });
+  const saved = await saveMemory(ctx.from.id);
+  if (!saved) {
+    memory.reminders = memory.reminders.filter(x => x.id !== id);
+    return ctx.reply("❌ Не удалось сохранить напоминание. Проверь Cloudflare KV.");
+  }
+  await ctx.reply("⏰ Напоминание сохранено.\nID: " + id + "\nКогда: " + new Date(dueAt).toLocaleString("ru-RU") + "\nТекст: " + message);
+});
+
+bot.command("reminders", async ctx => {
+  const memory = await loadMemory(ctx.from.id);
+  const items = (memory.reminders || []).filter(x => x.dueAt > Date.now());
+  if (!items.length) return ctx.reply("Активных напоминаний нет.\n" + reminderHelp());
+  await ctx.reply("⏰ ТВОИ НАПОМИНАНИЯ\n\n" + items.map(x => x.id + " · " + new Date(x.dueAt).toLocaleString("ru-RU") + "\n" + x.message).join("\n\n"));
+});
+
+bot.command("cancelreminder", async ctx => {
+  const id = String(ctx.match || "").trim();
+  if (!id) return ctx.reply("Укажи ID: /cancelreminder 12345678");
+  const memory = await loadMemory(ctx.from.id);
+  const before = (memory.reminders || []).length;
+  memory.reminders = (memory.reminders || []).filter(x => x.id !== id);
+  if (memory.reminders.length === before) return ctx.reply("Напоминание с таким ID не найдено.");
+  const saved = await saveMemory(ctx.from.id);
+  await ctx.reply(saved ? "🗑 Напоминание отменено." : "❌ Не удалось сохранить изменение в Cloudflare KV.");
+});
+
+async function deliverDueReminders(userId) {
+  const memory = await loadMemory(userId);
+  const now = Date.now();
+  const due = (memory.reminders || []).filter(x => Number(x.dueAt) <= now);
+  if (!due.length) return;
+  memory.reminders = (memory.reminders || []).filter(x => Number(x.dueAt) > now);
+  if (!await saveMemory(userId)) return;
+  for (const item of due) {
+    try {
+      await bot.api.sendMessage(item.chatId, "⏰ НАПОМИНАНИЕ\n\n" + item.message);
+    } catch (error) {
+      console.error("Reminder delivery:", error.message);
+    }
+  }
+}
+
+setInterval(() => {
+  for (const userId of longMemory.keys()) {
+    deliverDueReminders(userId).catch(error => console.error("Reminder scheduler:", error.message));
+  }
+}, 30000).unref?.();
+
 bot.command("forget", async ctx => {
   histories.delete(ctx.from.id);
   voiceUsers.delete(ctx.from.id);
@@ -2696,6 +2815,10 @@ bot.callbackQuery("menu_features", async ctx => {
     "✨ Возможности NEXUS AI\n\n" +
     "💬 Общение с Groq и OpenRouter\n" +
     "🌐 Поиск информации с доступными ссылками\n" +
+    "🔎 Глубокое исследование /research\n" +
+    "⏰ Напоминания /remind /reminders\n" +
+    "📝 OCR распознавание текста /ocr\n" +
+    "🤖 AI-команда /team\n" +
     "🖼 Генерация картинок\n" +
     "📸 Анализ фото\n" +
     "📄 Чтение PDF/DOCX/TXT и кода\n" +
