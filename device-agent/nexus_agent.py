@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-touchpad-smooth5"
+AGENT_VERSION = "2026.11.04-touchpad-smooth6"
 import base64
 import json
 import os
@@ -66,6 +66,7 @@ def execute(command):
         import pyperclip
         pyautogui.FAILSAFE = True
         pyperclip.copy(text)
+        time.sleep(0.06)  # Дать Windows обновить буфер обмена перед вставкой.
         pyautogui.hotkey("ctrl", "v")
         return {"result": "Текст вставлен в активное окно."}
     if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "touch_move", "key_press", "hotkey"):
@@ -79,7 +80,7 @@ def execute(command):
             if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
             # A tiny interpolation smooths the cursor without adding noticeable lag.
             pyautogui.MINIMUM_DURATION = 0.01
-            pyautogui.moveRel(dx, dy, duration=0.015)
+            pyautogui.moveRel(dx, dy, duration=0.045)
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
