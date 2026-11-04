@@ -79,31 +79,14 @@ function removeBotMention(text) {
   const botUsername = bot.botInfo?.username;
   let cleaned = String(text || "");
   if (botUsername) {
-    const escapedUsername = botUsername.replace(/[.*+?^\x24{}()|[\]\\]/g, "\\function isAddressedToBot(ctx, text = "") {
-  if (!isGroupChat(ctx)) return true;
-  const botUsername = bot.botInfo?.username;
-  const usernameMention = botUsername
-    ? String(text).toLowerCase().includes("@" + botUsername.toLowerCase())
-    : false;
-  const nameMention = /\bnexus(?:\s+ai)?\b/i.test(text);
-  const repliedToBot = ctx.message?.reply_to_message?.from?.id === bot.botInfo?.id;
-  return usernameMention || nameMention || repliedToBot;
-}
-
-function removeBotMention(text) {
-  const botUsername = bot.botInfo?.username;
-  let cleaned = String(text || "");
-  if (botUsername) cleaned = cleaned.split("@" + botUsername).join(" ");
-  return cleaned.replace(/\bnexus(?:\s+ai)?\b[:,]?/ig, " ").replace(/\s+/g, " ").trim();
-}");
-    cleaned = cleaned.replace(new RegExp("@" + escapedUsername, "ig"), " ");
+    // Telegram usernames contain only letters, digits and underscores.
+    cleaned = cleaned.replace(new RegExp("@" + botUsername, "ig"), " ");
   }
   return cleaned
-    .replace(/(?:^|[^\p{L}\p{N}_])(?:nexus(?:\s+ai)?|бот)(?=$|[^\p{L}\p{N}_])[:,]?/giu, " ")
-    .replace(/\s+/g, " ")
+    .replace(/(?:^|[^\\p{L}\\p{N}_])(?:nexus(?:\\s+ai)?|бот)(?=$|[^\\p{L}\\p{N}_])[:,]?/giu, " ")
+    .replace(/\\s+/g, " ")
     .trim();
 }
-
 const MAX_HISTORY = 10;
 const MAX_OUTPUT = 1200;
 const MAX_IMAGE_BYTES = 14 * 1024 * 1024;
