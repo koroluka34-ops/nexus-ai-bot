@@ -95,8 +95,22 @@ def execute(command):
                 raise ValueError("Прокрутка: направление up/down, шаги 1–10")
             pyautogui.scroll(amount if direction == "up" else -amount)
             return {"result": f"Прокрутка {direction}: {amount}."}
+        if action == "mouse_drag":
+            x1, y1, x2, y2 = (int(args.get(k, -1)) for k in ("x1","y1","x2","y2"))
+            width, height = pyautogui.size()
+            if not all(0 <= x < width and 0 <= y < height for x,y in ((x1,y1),(x2,y2))):
+                raise ValueError(f"Координаты вне экрана {width}x{height}")
+            pyautogui.moveTo(x1, y1, duration=0.1)
+            pyautogui.dragTo(x2, y2, duration=0.5, button="left")
+            return {"result": f"Перетаскивание: {x1},{y1} → {x2},{y2}."}
+        if action == "hotkey":
+            combo = str(args.get("combo", ""))
+            allowed_combos = {"ctrl+c","ctrl+v","ctrl+x","ctrl+z","ctrl+y","ctrl+a","ctrl+s","ctrl+f","ctrl+p","ctrl+w","ctrl+t","ctrl+tab","ctrl+shift+tab","alt+tab","alt+f4","win+d","win+e","ctrl+shift+esc"}
+            if combo not in allowed_combos: raise ValueError("Сочетание клавиш не разрешено")
+            pyautogui.hotkey(*combo.split("+"))
+            return {"result": f"Нажато сочетание: {combo}."}
         key = args.get("key", "")
-        allowed_keys = {"enter", "esc", "tab", "space", "backspace", "delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown"}
+        allowed_keys = {"enter", "esc", "tab", "space", "backspace", "delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown"} | {f"f{i}" for i in range(1,13)}
         if key not in allowed_keys: raise ValueError("Клавиша не разрешена")
         pyautogui.press(key)
         return {"result": f"Нажата клавиша: {key}."}
