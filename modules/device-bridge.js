@@ -252,6 +252,11 @@ async function handleDeviceHttp(req, res) {
           const amount = Math.max(1, Math.min(5, Math.round(Math.abs(Number(data.amount) || 1))));
           const direction = Number(data.direction) < 0 ? "down" : "up";
           if (touchpad.events.length < 12) touchpad.events.push({ action: "mouse_scroll", args: { direction, amount } });
+        } else if (data.type === "text") {
+          const value = safeText(data.text, 1000);
+          if (!value.trim()) return sendJson(res, 400, { error: "empty_text" });
+          if (touchpad.events.length < 12) touchpad.events.push({ action: "type_text", args: { text: value } });
+          else return sendJson(res, 429, { error: "touchpad_queue_full" });
         } else if (data.type !== "heartbeat") {
           return sendJson(res, 400, { error: "unknown_touch_action" });
         }
