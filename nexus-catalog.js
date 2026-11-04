@@ -49,14 +49,25 @@ const SKILLS = DOMAINS.flatMap((domain, di) => TASKS.map((task, ti) => ({
 function getSkill(id) { return SKILLS.find(x => x.id === Number(id)); }
 function searchSkills(query, limit = 15) {
   const terms = String(query || "").toLocaleLowerCase("ru")
-    .split(/[\\s,.;:!?/|+-]+/u).filter(Boolean).slice(0, 10);
+    .split(/[\s,.;:!?]+/u).filter(Boolean).slice(0, 10);
   if (!terms.length) return [];
+  const aliases = {
+    python: "программирование", javascript: "программирование", js: "программирование",
+    typescript: "программирование", java: "программирование", csharp: "программирование",
+    node: "telegram-боты", nodejs: "telegram-боты", telegram: "telegram-боты",
+    bot: "telegram-боты", бот: "telegram-боты", майнкрафт: "игры и геймдизайн",
+    minecraft: "игры и геймдизайн", fabric: "игры и геймдизайн", forge: "игры и геймдизайн",
+    linux: "системное администрирование", windows: "системное администрирование",
+    сервер: "системное администрирование", server: "системное администрирование",
+    docker: "системное администрирование", nginx: "системное администрирование"
+  };
+  const searchTerms = terms.flatMap(term => aliases[term] ? [term, aliases[term]] : [term]);
   return SKILLS.map(skill => {
     const domain = skill.domain.toLocaleLowerCase("ru");
     const task = skill.task.toLocaleLowerCase("ru");
     const searchable = (domain + " " + task + " " + skill.instruction).toLocaleLowerCase("ru");
     let score = 0;
-    for (const term of terms) {
+    for (const term of searchTerms) {
       if (domain.includes(term)) score += 10;
       if (task.includes(term)) score += 5;
       if (!domain.includes(term) && !task.includes(term) && searchable.includes(term)) score += 1;
