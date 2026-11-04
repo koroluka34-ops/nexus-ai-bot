@@ -54,48 +54,6 @@ const MAX_IMAGE_BYTES = 14 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 18 * 1024 * 1024;
 const MAX_MEMORY_CHARS = 8000;
 
-// Премиум-эмодзи из набора пользователя — случайный значок в ответах NEXUS.
-const PREMIUM_CUSTOM_EMOJI_IDS = [
-  "5327994801423935198",
-  "5327772528276433468",
-  "5330197024430118581",
-  "5330403311709346103",
-  "5330380625692087194",
-  "5330402534320266945",
-  "5327988419102536023",
-  "5330126376513067488",
-  "5328306689064066460",
-  "5330458892881121176",
-  "5328240572337513589",
-  "5330445831885574041",
-  "5327870560904963813",
-  "5330372443779389127",
-  "5330130602760883752",
-  "5330176782249254424"
-];
-
-let PREMIUM_CUSTOM_EMOJIS = [];
-
-async function loadPremiumCustomEmojis() {
-  try {
-    const stickers = await bot.api.getCustomEmojiStickers(PREMIUM_CUSTOM_EMOJI_IDS);
-    PREMIUM_CUSTOM_EMOJIS = (stickers || [])
-      .filter(sticker => sticker.custom_emoji_id && sticker.emoji)
-      .map(sticker => ({
-        id: String(sticker.custom_emoji_id),
-        emoji: sticker.emoji
-      }));
-
-    console.log("Premium custom emojis loaded:", PREMIUM_CUSTOM_EMOJIS.length);
-  } catch (error) {
-    PREMIUM_CUSTOM_EMOJIS = [];
-    console.error("Premium custom emojis unavailable:", error.message);
-  }
-}
-
-function premiumEmojiEntity() {
-  if (!PREMIUM_CUSTOM_EMOJIS.length) return null;
-
   const item = PREMIUM_CUSTOM_EMOJIS[
     Math.floor(Math.random() * PREMIUM_CUSTOM_EMOJIS.length)
   ];
@@ -1356,25 +1314,12 @@ async function sendSpeech(ctx, text) {
 
 async function sendLongMessage(ctx, text) {
   const maxLength = 3900;
-  let firstChunk = true;
 
   for (let i = 0; i < text.length; i += maxLength) {
     const chunk = text.slice(i, i + maxLength);
-    const options = { link_preview_options: { is_disabled: true } };
-    if (firstChunk && chunk.length) {
-      const premium = premiumEmojiEntity();
-
-      if (premium) {
-        options.entities = [premium.entity];
-        await ctx.reply(premium.emoji + " " + chunk, options);
-      } else {
-        await ctx.reply("⭐ " + chunk, options);
-      }
-
-      firstChunk = false;
-    } else {
-      await ctx.reply(chunk, options);
-    }
+    await ctx.reply(chunk, {
+      link_preview_options: { is_disabled: true }
+    });
   }
 }
 
@@ -3281,7 +3226,6 @@ bot.on("message:text", async ctx => {
 
 async function start() {
   await bot.init();
-  await loadPremiumCustomEmojis();
 
   const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url === "/") {
