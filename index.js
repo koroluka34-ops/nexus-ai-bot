@@ -1070,7 +1070,7 @@ bot.command("intim", async ctx => {
   adultArtPendingUsers.delete(ctx.from.id);
   await ctx.reply(
     "🔞 <b>NEXUS — INTIM</b>\n\n" +
-    "Чувственные фотосессии только с вымышленными совершеннолетними персонажами. Полная нагота и откровенные сексуальные действия не поддерживаются.\n\n" +
+    "Чувственные boudoir- и glamour-фотосессии вымышленных взрослых персонажей: красивое непрозрачное бельё, шёлковые халаты, соблазнительные позы и мягкий свет. Полная нагота и сексуальные действия не поддерживаются.\n\n" +
     "Подтверди, что тебе уже исполнилось 18 лет.",
     {
       parse_mode: "HTML",
@@ -1086,7 +1086,7 @@ bot.callbackQuery("adult_art_confirm", async ctx => {
   adultArtPendingUsers.add(ctx.from.id);
   await ctx.answerCallbackQuery({ text: "Подтверждение принято" });
   await ctx.reply(
-    "✅ Опиши взрослого вымышленного персонажа и стиль. Например: «совершеннолетняя модель в эффектном вечернем образе, чувственная поза, роскошный интерьер, мягкий кинематографичный свет»."
+    "✅ Опиши взрослого вымышленного персонажа и стиль. Например: «вымышленная модель 25 лет, элегантный чёрный комплект непрозрачного белья, шёлковый халат, чувственная поза в роскошном номере отеля, мягкий тёплый кинематографичный свет, глянцевая фотосессия»."
   );
 });
 
@@ -4054,8 +4054,8 @@ bot.on("message:text", async ctx => {
   if (adultArtPendingUsers.has(userId)) {
     adultArtPendingUsers.delete(userId);
     const adultArtPrompt =
-      "Sensual, non-explicit glamour editorial photograph of a clearly adult 25+ fictional person, stylish revealing but non-transparent fashion outfit, tasteful intimate editorial mood, confident elegant pose, luxurious setting, soft cinematic studio lighting, realistic skin texture, premium magazine photography. " +
-      "Fictional adult person only; no explicit nudity, no visible genitals, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
+      "Photorealistic sensual boudoir and glamour editorial of a clearly adult 25+ fictional woman, elegant tasteful opaque lingerie set or silk robe, alluring but non-explicit pose, sophisticated intimate atmosphere, luxurious bedroom or hotel suite, soft warm cinematic lighting, natural realistic skin texture, high-end fashion magazine photography, detailed composition. " +
+      "Fictional adult character only; lingerie remains opaque and covers intimate areas; no nudity, no visible genitals, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
       "User's visual concept: " + addressedQuestion;
     await handleAdultImage(ctx, adultArtPrompt);
     return;
