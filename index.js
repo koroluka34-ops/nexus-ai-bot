@@ -53,6 +53,9 @@ const bot = new Bot(BOT_TOKEN);
 const { installSecurityMonitor } = require("./modules/security-monitor");
 installSecurityMonitor(bot);
 
+const { installOpsSuite } = require("./modules/ops-suite");
+installOpsSuite(bot, askAI);
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
