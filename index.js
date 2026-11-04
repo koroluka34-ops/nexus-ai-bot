@@ -102,7 +102,6 @@ const busyUsers = new Set();
 const searchUsers = new Set();
 const voiceUsers = new Set();
 const imagePendingUsers = new Set();
-const adultArtPendingUsers = new Set();
 
 // ======================================================
 // SYSTEM PROMPT
@@ -506,7 +505,6 @@ function allCommandsText() {
 ━━━━━━━━━━━━━━━━━━
 🎨 <b>ИЗОБРАЖЕНИЯ И МЕДИА</b>
 <code>/image описание</code> — создать изображение по описанию.
-<code>/art18</code>, <code>/intim</code> — чувственная фотосессия взрослых вымышленных персонажей (нужно подтвердить 18+).
 <code>/sticker описание</code> — создать стикер по тексту.
 <code>/sticker</code> — сделать стикер из фото (ответом на фото).
 <code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
@@ -955,37 +953,6 @@ async function generateImage(prompt) {
   return buffer;
 }
 
-async function handleAdultImage(ctx, prompt) {
-  const userId = ctx.from.id;
-  const cleanPrompt = String(prompt || "").trim();
-  if (!cleanPrompt) {
-    await ctx.reply("Напиши описание вымышленной совершеннолетней модели.");
-    return;
-  }
-  if (busyUsers.has(userId)) {
-    await ctx.reply("⏳ Подожди предыдущий запрос.");
-    return;
-  }
-
-  busyUsers.add(userId);
-  const status = await ctx.reply("🔞 Создаю художественное изображение...");
-  try {
-    const image = await enqueueGeneration(userId, () => generateImage(cleanPrompt));
-    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
-    await ctx.replyWithPhoto(new InputFile(image, "nexus-art18.png"), {
-      caption: "🖼 Готово! Только вымышленные совершеннолетние персонажи."
-    });
-  } catch (error) {
-    await ctx.api.editMessageText(
-      ctx.chat.id,
-      status.message_id,
-      "❌ " + String(error.message).slice(0, 1800)
-    ).catch(() => {});
-  } finally {
-    busyUsers.delete(userId);
-  }
-}
-
 async function handleImage(ctx, prompt) {
   const userId = ctx.from.id;
   const cleanPrompt = String(prompt || "").trim();
@@ -1039,61 +1006,11 @@ async function handleImage(ctx, prompt) {
 
 bot.command("image", async ctx => {
   imagePendingUsers.delete(ctx.from.id);
-  adultArtPendingUsers.delete(ctx.from.id);
 
   await handleImage(
     ctx,
     String(ctx.match || "").trim()
   );
-});
-
-// Отдельный режим чувственного, но не откровенного художественного изображения.
-// Команда не создаёт наготу, половые органы, сексуальные действия или изображения реальных людей.
-bot.command("art18", async ctx => {
-  adultArtPendingUsers.delete(ctx.from.id);
-  await ctx.reply(
-    "🔞 <b>NEXUS — ADULT ART</b>\n\n" +
-    "Режим для пользователей 18+. Создаёт чувственные гламурные фотосессии вымышленных взрослых персонажей: выразительные позы, стильные открытые образы и кинематографичный свет. Полная нагота и откровенные сексуальные действия не поддерживаются.\n\n" +
-    "Подтверди, что тебе уже исполнилось 18 лет.",
-    {
-      parse_mode: "HTML",
-      reply_markup: new InlineKeyboard()
-        .text("Мне есть 18 — продолжить", "adult_art_confirm")
-        .row()
-        .text("Отмена", "adult_art_cancel")
-    }
-  );
-});
-
-// /intim — age-gated alias for adult glamour image generation.
-bot.command("intim", async ctx => {
-  adultArtPendingUsers.delete(ctx.from.id);
-  await ctx.reply(
-    "🔞 <b>NEXUS — INTIM</b>\n\n" +
-    "Художественные boudoir-фотосессии вымышленных взрослых персонажей: открытые плечи и спина, изящные позы, шёлковые простыни и мягкий кинематографичный свет. Интимные зоны остаются полностью закрыты непрозрачной тканью.\n\n" +
-    "Подтверди, что тебе уже исполнилось 18 лет.",
-    {
-      parse_mode: "HTML",
-      reply_markup: new InlineKeyboard()
-        .text("Мне есть 18 — продолжить", "adult_art_confirm")
-        .row()
-        .text("Отмена", "adult_art_cancel")
-    }
-  );
-});
-
-bot.callbackQuery("adult_art_confirm", async ctx => {
-  adultArtPendingUsers.add(ctx.from.id);
-  await ctx.answerCallbackQuery({ text: "Подтверждение принято" });
-  await ctx.reply(
-    "✅ Опиши взрослого вымышленного персонажа и стиль. Например: «вымышленная модель 25 лет, элегантный чёрный комплект непрозрачного белья, шёлковый халат, чувственная поза в роскошном номере отеля, мягкий тёплый кинематографичный свет, глянцевая фотосессия»."
-  );
-});
-
-bot.callbackQuery("adult_art_cancel", async ctx => {
-  adultArtPendingUsers.delete(ctx.from.id);
-  await ctx.answerCallbackQuery({ text: "Отменено" });
-  await ctx.reply("Режим ADULT ART отменён.");
 });
 
 // Настоящая text-to-video генерация через Pollinations.
@@ -4051,16 +3968,6 @@ bot.on("message:text", async ctx => {
   }
   const addressedQuestion = ctx.message.text.trim();
 
-  if (adultArtPendingUsers.has(userId)) {
-    adultArtPendingUsers.delete(userId);
-    const adultArtPrompt =
-      "Photorealistic fine-art boudoir editorial of a clearly adult 25+ fictional woman, artistic implied-nudity aesthetic with bare shoulders, back and legs, elegant pose, intimate cinematic atmosphere in a luxurious bedroom or hotel suite. Use carefully draped opaque silk sheets and tasteful framing to fully cover breasts, nipples and pelvic area; optional soft artistic blur only over the fabric-covered silhouette, never expose intimate anatomy. Warm soft lighting, natural realistic skin texture, high-end fine-art magazine photography, detailed composition. " +
-      "Fictional adult character only; intimate areas remain fully covered by opaque fabric and are not visible; no explicit nudity, no visible nipples or genitals, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
-      "User's visual concept: " + addressedQuestion;
-    await handleAdultImage(ctx, adultArtPrompt);
-    return;
-  }
-
   if (imagePendingUsers.has(userId)) {
     imagePendingUsers.delete(userId);
     await handleImage(ctx, addressedQuestion);
@@ -4152,8 +4059,6 @@ async function start() {
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
     { command: "image", description: "Создать изображение по описанию" },
-    { command: "art18", description: "Чувственный художественный арт (18+)" },
-    { command: "intim", description: "Чувственная фотосессия (18+)" },
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
     { command: "circle", description: "Сделать видеосообщение-кружок" },
