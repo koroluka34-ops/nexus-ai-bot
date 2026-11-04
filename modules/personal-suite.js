@@ -11,9 +11,9 @@ let loadPromise = null;
 let saveChain = Promise.resolve();
 
 function ready() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
-function url() {
+function url(key = KEY) {
   return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +
-    "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) + "/values/" + encodeURIComponent(KEY);
+    "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) + "/values/" + encodeURIComponent(key);
 }
 async function load() {
   if (loadPromise) return loadPromise;
@@ -45,6 +45,46 @@ async function save() {
   try { await saveChain; return true; }
   catch (e) { console.error("NEXUS personal suite save:", e.message); saveChain = Promise.resolve(); return false; }
 }
+function installKVCheck(bot) {
+  bot.command("kvcheck", async ctx => {
+    if (!ready()) return ctx.reply("❌ Cloudflare KV не настроен: проверь CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN и CLOUDFLARE_KV_NAMESPACE_ID в Render.");
+    const probeUrl = url(KEY + ":probe:" + crypto.randomUUID());
+    const headers = { Authorization: "Bearer " + TOKEN };
+    try {
+      const write = await fetch(probeUrl + "?expiration_ttl=120", {
+        method: "PUT",
+        headers: { ...headers, "Content-Type": "text/plain" },
+        body: "NEXUS-KV-PROBE",
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!write.ok) {
+        const detail = write.status === 401
+          ? "Токен Cloudflare отклонён (401). Замени CLOUDFLARE_API_TOKEN в Render."
+          : write.status === 403
+            ? "У токена нет прав на запись в Workers KV (403). Нужны права чтения и записи."
+            : "Cloudflare KV вернул HTTP " + write.status + ".";
+        return ctx.reply("❌ KV ПРОВЕРКА НЕ ПРОШЛА\n" + detail);
+      }
+      const read = await fetch(probeUrl, {
+        headers: headers, signal: AbortSignal.timeout(8000)
+      });
+      const value = read.ok ? await read.text() : "";
+      const deleted = await fetch(probeUrl, {
+        method: "DELETE", headers: headers, signal: AbortSignal.timeout(8000)
+      }).catch(() => null);
+      if (!read.ok || value !== "NEXUS-KV-PROBE") {
+        return ctx.reply("⚠️ KV записал тестовый ключ, но чтение не прошло. HTTP " + read.status + ". Тестовый ключ автоматически истечёт через 120 секунд.");
+      }
+      if (!deleted || !deleted.ok) {
+        return ctx.reply("⚠️ KV читает и записывает, но тестовый ключ не удалось удалить. Он истечёт через 120 секунд.");
+      }
+      return ctx.reply("✅ Cloudflare KV полностью работает: запись, чтение и удаление проверены. Заметки и задачи смогут сохраняться между перезапусками.");
+    } catch (error) {
+      return ctx.reply("❌ Ошибка проверки Cloudflare KV: " + String(error.message).slice(0, 300));
+    }
+  });
+}
+
 function user(id) {
   const key = String(id);
   if (!state.users[key]) state.users[key] = { notes: [], tasks: [] };
@@ -180,4 +220,4 @@ function installPersonalSuite(bot) {
   });
 }
 
-module.exports = { installPersonalSuite };
+module.exports = { installPersonalSuite, installKVCheck };
