@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-gaming-controls"
+AGENT_VERSION = "2026.11.04-gamepad-v2"
 import base64
 import json
 import os
@@ -207,7 +207,7 @@ def start_webrtc_stream(cfg, offer):
                     self.video_started = None
                     self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
-                    print("WebRTC режим низкой задержки: 960x540, до 30 FPS")
+                    print("WebRTC режим низкой задержки: 640x360, до 20 FPS")
 
                 async def next_timestamp(self):
                     # До 100 FPS: фиксированный шаг RTP timestamp, без очереди старых кадров.
@@ -216,7 +216,7 @@ def start_webrtc_stream(cfg, offer):
                         self.video_started = time.monotonic()
                         self.video_pts = 0
                     else:
-                        self.video_pts += 3000  # 90000 / 30 FPS; не создаём поток из лишних кадров
+                        self.video_pts += 4500  # 90000 / 20 FPS; уменьшаем нагрузку и задержку
                         target = self.video_started + self.video_pts / 90000
                         await asyncio.sleep(max(0, target - time.monotonic()))
                     return self.video_pts, fractions.Fraction(1, 90000)
@@ -228,7 +228,7 @@ def start_webrtc_stream(cfg, offer):
                         raw = await asyncio.to_thread(self.capture.grab, self.monitor)
                         shot = np.array(raw)[:, :, :3]
                         height, width = shot.shape[:2]
-                        scale = min(1.0, 960 / width, 540 / height)
+                        scale = min(1.0, 640 / width, 360 / height)
                         if scale < 1.0:
                             from PIL import Image
                             shot = np.array(Image.fromarray(shot[:, :, ::-1]).resize((int(width * scale), int(height * scale))))[:, :, ::-1]
@@ -284,6 +284,7 @@ def start_webrtc_stream(cfg, offer):
                 print("WebRTC connection:", pc.connectionState, "| ICE:", pc.iceConnectionState)
             pc.addTrack(ScreenVideoTrack())
 
+            held_keys, held_buttons = set(), set()
             @pc.on("datachannel")
             def on_datachannel(channel):
                 print("WebRTC канал управления открыт:", channel.label)
@@ -293,20 +294,45 @@ def start_webrtc_stream(cfg, offer):
                         if isinstance(message, bytes):
                             message = message.decode("utf-8")
                         data = json.loads(message)
-                        if data.get("type") != "move":
+                        kind = data.get("type")
+                        if kind == "move":
+                            dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
+                            if abs(dx) > 500 or abs(dy) > 500:
+                                return
+                            import ctypes
+                            from ctypes import wintypes
+                            class CursorPoint(ctypes.Structure):
+                                _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+                            point = CursorPoint()
+                            user32 = ctypes.windll.user32
+                            if user32.GetCursorPos(ctypes.byref(point)):
+                                width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+                                user32.SetCursorPos(max(0, min(width - 1, point.x + dx)), max(0, min(height - 1, point.y + dy)))
                             return
-                        dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
-                        if abs(dx) > 500 or abs(dy) > 500:
+                        import pyautogui
+                        pyautogui.PAUSE = 0
+                        if kind == "game-key":
+                            key, state = str(data.get("key", "")).lower(), data.get("state")
+                            allowed = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
+                            if key not in allowed or state not in ("down", "up"):
+                                return
+                            if state == "down":
+                                if key not in held_keys:
+                                    pyautogui.keyDown(key); held_keys.add(key)
+                            elif key in held_keys:
+                                pyautogui.keyUp(key); held_keys.discard(key)
                             return
-                        import ctypes
-                        from ctypes import wintypes
-                        class CursorPoint(ctypes.Structure):
-                            _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
-                        point = CursorPoint()
-                        user32 = ctypes.windll.user32
-                        if user32.GetCursorPos(ctypes.byref(point)):
-                            width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-                            user32.SetCursorPos(max(0, min(width - 1, point.x + dx)), max(0, min(height - 1, point.y + dy)))
+                        if kind in ("game-mouse", "game-click"):
+                            button = str(data.get("button", "left"))
+                            if button not in ("left", "right"):
+                                return
+                            if kind == "game-click":
+                                pyautogui.click(button=button)
+                            elif data.get("state") == "down":
+                                if button not in held_buttons:
+                                    pyautogui.mouseDown(button=button); held_buttons.add(button)
+                            elif data.get("state") == "up" and button in held_buttons:
+                                pyautogui.mouseUp(button=button); held_buttons.discard(button)
                     except Exception as control_exc:
                         print("Ошибка быстрого управления:", repr(control_exc))
 
@@ -323,6 +349,15 @@ def start_webrtc_stream(cfg, offer):
                         if pc.connectionState == "disconnected":
                             break
             finally:
+                try:
+                    import pyautogui
+                    for key in list(held_keys):
+                        try: pyautogui.keyUp(key)
+                        except Exception: pass
+                    for button in list(held_buttons):
+                        try: pyautogui.mouseUp(button=button)
+                        except Exception: pass
+                except Exception: pass
                 await pc.close()
                 print("Видеотрансляция остановлена.")
         try:
