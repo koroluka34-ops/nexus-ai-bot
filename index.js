@@ -3106,6 +3106,27 @@ bot.on("message:voice", async ctx => {
 // TEXT HANDLER
 // ======================================================
 
+// Показываем custom_emoji_id премиум-эмодзи, которые пользователь отправляет боту.
+bot.on("message", async (ctx, next) => {
+  const message = ctx.message;
+  const entities = [
+    ...(message.entities || []),
+    ...(message.caption_entities || [])
+  ];
+  const customEmojis = entities.filter(entity => entity.type === "custom_emoji");
+
+  if (customEmojis.length) {
+    const uniqueIds = [...new Set(customEmojis.map(entity => entity.custom_emoji_id))];
+    await ctx.reply(
+      "💎 <b>ID премиум-эмодзи:</b>\\n" +
+      uniqueIds.map(id => "<code>" + id + "</code>").join("\\n"),
+      { parse_mode: "HTML", reply_parameters: { message_id: message.message_id } }
+    );
+  }
+
+  await next();
+});
+
 bot.on("message:text", async ctx => {
   const userId = ctx.from.id;
   const question = ctx.message.text.trim();
