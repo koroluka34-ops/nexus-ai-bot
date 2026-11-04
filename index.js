@@ -102,6 +102,7 @@ const busyUsers = new Set();
 const searchUsers = new Set();
 const voiceUsers = new Set();
 const imagePendingUsers = new Set();
+const adultArtPendingUsers = new Set();
 
 // ======================================================
 // SYSTEM PROMPT
@@ -505,6 +506,7 @@ function allCommandsText() {
 ━━━━━━━━━━━━━━━━━━
 🎨 <b>ИЗОБРАЖЕНИЯ И МЕДИА</b>
 <code>/image описание</code> — создать изображение по описанию.
+<code>/art18</code> — создать чувственный, но не откровенный арт с вымышленными совершеннолетними персонажами (нужно подтвердить 18+).
 <code>/sticker описание</code> — создать стикер по тексту.
 <code>/sticker</code> — сделать стикер из фото (ответом на фото).
 <code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
@@ -1001,11 +1003,44 @@ async function handleImage(ctx, prompt) {
 
 bot.command("image", async ctx => {
   imagePendingUsers.delete(ctx.from.id);
+  adultArtPendingUsers.delete(ctx.from.id);
 
   await handleImage(
     ctx,
     String(ctx.match || "").trim()
   );
+});
+
+// Отдельный режим чувственного, но не откровенного художественного изображения.
+// Команда не создаёт наготу, половые органы, сексуальные действия или изображения реальных людей.
+bot.command("art18", async ctx => {
+  adultArtPendingUsers.delete(ctx.from.id);
+  await ctx.reply(
+    "🔞 <b>NEXUS — ADULT ART</b>\n\n" +
+    "Режим предназначен только для совершеннолетних. Он создаёт чувственные гламурные/романтические изображения вымышленных взрослых персонажей, но не порнографию: без наготы, интимных частей тела и сексуальных действий.\n\n" +
+    "Подтверди, что тебе уже исполнилось 18 лет.",
+    {
+      parse_mode: "HTML",
+      reply_markup: new InlineKeyboard()
+        .text("Мне есть 18 — продолжить", "adult_art_confirm")
+        .row()
+        .text("Отмена", "adult_art_cancel")
+    }
+  );
+});
+
+bot.callbackQuery("adult_art_confirm", async ctx => {
+  adultArtPendingUsers.add(ctx.from.id);
+  await ctx.answerCallbackQuery({ text: "Подтверждение принято" });
+  await ctx.reply(
+    "✅ Напиши описание вымышленного совершеннолетнего персонажа и стиль изображения. Например: «взрослая модель в элегантном вечернем платье, мягкий кинематографичный свет, гламурная фотосессия»."
+  );
+});
+
+bot.callbackQuery("adult_art_cancel", async ctx => {
+  adultArtPendingUsers.delete(ctx.from.id);
+  await ctx.answerCallbackQuery({ text: "Отменено" });
+  await ctx.reply("Режим ADULT ART отменён.");
 });
 
 // Настоящая text-to-video генерация через Pollinations.
@@ -3963,6 +3998,16 @@ bot.on("message:text", async ctx => {
   }
   const addressedQuestion = ctx.message.text.trim();
 
+  if (adultArtPendingUsers.has(userId)) {
+    adultArtPendingUsers.delete(userId);
+    const adultArtPrompt =
+      "Create a tasteful, non-explicit glamour or romantic editorial image of clearly adult fictional characters only. " +
+      "Keep the result fully clothed or covered by opaque elegant clothing. No nudity, no visible intimate body parts, no sexual activity, no pornographic framing, and no real or identifiable people. " +
+      "User's visual concept: " + addressedQuestion;
+    await handleImage(ctx, adultArtPrompt);
+    return;
+  }
+
   if (imagePendingUsers.has(userId)) {
     imagePendingUsers.delete(userId);
     await handleImage(ctx, addressedQuestion);
@@ -4054,6 +4099,7 @@ async function start() {
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
     { command: "image", description: "Создать изображение по описанию" },
+    { command: "art18", description: "Чувственный неоткровенный арт (18+)" },
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
     { command: "circle", description: "Сделать видеосообщение-кружок" },
