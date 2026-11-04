@@ -55,6 +55,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
    <button data-game-mouse="left" class="action">ЛКМ · Атака</button><button data-game-mouse="right" class="action">ПКМ · Использовать</button>
    <button data-game-key="r" class="action">R</button>
    <button type="button" id="gameF11Button" class="action">⛶ F11</button>
+   <button type="button" id="cursorToggleButton" class="action">🙈 Скрыть курсор</button>
   </div>
  </div>
 </section>
@@ -151,8 +152,17 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  document.getElementById('left').addEventListener('click',()=>sendRealtime({type:'game-click',button:'left'},{type:'click',button:'left'}));
  document.getElementById('right').addEventListener('click',()=>sendRealtime({type:'game-click',button:'right'},{type:'click',button:'right'}));
  const gameButton=document.getElementById('gameButton'),gamePanel=document.getElementById('gamePanel'),gamePicker=document.getElementById('gamePicker');const sensitivityInput=document.getElementById('sensitivity'),sensitivityValue=document.getElementById('sensitivityValue');sensitivityInput.addEventListener('input',()=>{sensitivity=Number(sensitivityInput.value)/100;sensitivityValue.textContent=sensitivityInput.value+'%';});
+ let remoteCursorVisible=true;
+ const cursorToggleButton=document.getElementById('cursorToggleButton');
+ function setRemoteCursorVisible(visible){
+  remoteCursorVisible=!!visible;
+  cursorToggleButton.textContent=remoteCursorVisible?'🙈 Скрыть курсор':'👁 Показать курсор';
+  if(moveChannel&&moveChannel.readyState==='open')moveChannel.send(JSON.stringify({type:'cursor-visibility',visible:remoteCursorVisible}));
+ }
+ cursorToggleButton.addEventListener('click',()=>setRemoteCursorVisible(!remoteCursorVisible));
  async function enterGameMode(game){
   document.body.dataset.game=game;
+  setRemoteCursorVisible(game!=='roblox');
   gamePicker.classList.remove('open');document.body.classList.add('game-mode');gamePanel.classList.add('open');
   gameButton.textContent='✕';keyboardPanel.classList.remove('open');
   try{if(tg?.requestFullscreen)await tg.requestFullscreen();}catch{}
