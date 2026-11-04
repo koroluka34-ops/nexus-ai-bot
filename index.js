@@ -893,6 +893,7 @@ async function generateImage(prompt) {
     } catch (pollinationsError) {
       console.warn("Pollinations image failed; trying Cloudflare Workers AI:", pollinationsError.message);
       // Continue to Cloudflare fallback below.
+    }
   }
 
   if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
