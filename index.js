@@ -4391,6 +4391,12 @@ async function start() {
   }
 
   const server = http.createServer((req, res) => {
+    if (req.method === "GET" && req.url === "/touchpad") {
+      fs.readFile(path.join(__dirname, "public", "touchpad.html"))
+        .then(page => { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }); res.end(page); })
+        .catch(error => { console.error("Touchpad page:", error.message); res.writeHead(404); res.end("Touchpad not found"); });
+      return;
+    }
     if (req.url.startsWith("/device/")) {
       handleDeviceHttp(req, res).catch(error => {
         console.error("Device bridge:", error.message);
