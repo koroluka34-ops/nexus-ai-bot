@@ -1,6 +1,8 @@
 "use strict";
 
 const dns = require("node:dns/promises");
+const { URL } = require("node:url");
+const { InputFile } = require("grammy");
 
 function validDomain(value) {
   const d = String(value || "").trim().toLowerCase().replace(/\.$/, "");
@@ -121,7 +123,11 @@ function installUtilitySuite(bot) {
     const kind=value===null?"null":Array.isArray(value)?"массив":typeof value;
     const count=value&&typeof value==="object"?Object.keys(value).length:0;
     const safe=pretty.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    if (pretty.length>3500) return ctx.reply("✅ JSON корректен. Тип: "+kind+". Объём: "+pretty.length+" символов. Слишком большой вывод для одного сообщения; уменьши JSON или пришли его частями.");
+    if (pretty.length>3500) {
+      return ctx.replyWithDocument(new InputFile(Buffer.from(pretty,"utf8"),"formatted.json"), {
+        caption: "✅ JSON корректен. Тип: "+kind+". Отформатированный JSON-файл."
+      });
+    }
     return ctx.reply("✅ JSON корректен · тип: "+kind+(count?" · элементов верхнего уровня: "+count:"")+"\n\n<pre>"+safe+"</pre>",{parse_mode:"HTML"});
   });
 
