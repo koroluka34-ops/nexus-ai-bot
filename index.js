@@ -107,6 +107,16 @@ const imagePendingUsers = new Set();
 // SYSTEM PROMPT
 // ======================================================
 
+const PERSONALITIES = {
+  default: "Оставайся естественным, дружелюбным и сбалансированным.",
+  bold: "Общайся дерзко, уверенно и с лёгкой провокацией. Не переходи на оскорбления и не унижай пользователя.",
+  funny: "Будь весёлым, остроумным и живым. Уместно шути, но не превращай каждый ответ в стендап.",
+  genius: "Общайся как эрудированный стратег: замечай детали, объясняй точно и глубоко, но не усложняй простое.",
+  cold: "Будь сдержанным, лаконичным и хладнокровным. Минимум эмодзи и лишних эмоций, максимум ясности.",
+  dark: "Используй мрачноватый, загадочный юмор и атмосферные формулировки. Без угроз, жестокости и поощрения вреда.",
+  kind: "Будь особенно тёплым, заботливым и поддерживающим, не сюсюкай и не давай ложных обещаний."
+};
+
 const SYSTEM_PROMPT = `
 Ты NEXUS AI — разговорный ИИ-помощник. Твоя цель — вести диалог так, как хороший ChatGPT: понимать контекст, отвечать по делу, естественно и без шаблонов. Ты работаешь на модели Groq, не называй себя ChatGPT и не утверждай, что являешься моделью OpenAI.
 
@@ -205,7 +215,8 @@ async function loadMemory(userId) {
     gifts: [], lastFreeGift: "", knowledgeBase: [],
     premium: { tier: "free", expiresAt: 0 },
     usage: { day: "", text: 0, images: 0, videos: 0 },
-    selectedModel: "auto"
+    selectedModel: "auto",
+    personality: "default"
   };
 
   if (!kvConfigured()) {
@@ -244,7 +255,8 @@ async function loadMemory(userId) {
       knowledgeBase: Array.isArray(data.knowledgeBase) ? data.knowledgeBase.slice(0, 8) : [],
       premium: data.premium && typeof data.premium === "object" ? data.premium : { tier: "free", expiresAt: 0 },
       usage: data.usage && typeof data.usage === "object" ? data.usage : { day: "", text: 0, images: 0, videos: 0 },
-      selectedModel: String(data.selectedModel || "openai/gpt-oss-120b")
+      selectedModel: String(data.selectedModel || "openai/gpt-oss-120b"),
+      personality: ["default", "bold", "funny", "genius", "cold", "dark", "kind"].includes(data.personality) ? data.personality : "default"
     };
 
     longMemory.set(userId, memory);
@@ -456,7 +468,7 @@ function allCommandsText() {
 <code>/start</code> — запустить бота.
 <code>/menu</code> — открыть главное меню.
 <code>/commands</code> — показать все команды.
-<code>/status</code> — проверить состояние сервисов.
+<code>/status</code> — проверить состояние сервисов.\n<code>/personality</code> — выбрать характер NEXUS AI.
 <code>/reset</code> — очистить текущую историю диалога.
 <code>/groupmode on|off</code> — общий контекст ИИ в группе.
 <code>/kb</code> — база знаний из твоих документов.
@@ -784,7 +796,7 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     {
       role: "system",
       content:
-        SYSTEM_PROMPT + researchRules +
+        SYSTEM_PROMPT + "\n\nТЕКУЩИЙ ХАРАКТЕР NEXUS AI:\n" + (PERSONALITIES[memory.personality] || PERSONALITIES.default) + researchRules +
         (memoryText
           ? "\\n\\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\\n" + memoryText
           : "")
@@ -1003,6 +1015,30 @@ async function handleImage(ctx, prompt) {
     busyUsers.delete(userId);
   }
 }
+
+bot.command("personality", async ctx => {
+  const memory = await loadMemory(ctx.from.id);
+  const keyboard = new InlineKeyboard()
+    .text("🤖 Стандартный", "personality:default").row()
+    .text("😎 Дерзкий", "personality:bold")
+    .text("😂 Весёлый", "personality:funny").row()
+    .text("🧠 Гений", "personality:genius")
+    .text("🥶 Холодный", "personality:cold").row()
+    .text("😈 Тёмный", "personality:dark")
+    .text("❤️ Добрый", "personality:kind");
+  const names = { default: "🤖 Стандартный", bold: "😎 Дерзкий", funny: "😂 Весёлый", genius: "🧠 Гений", cold: "🥶 Холодный", dark: "😈 Тёмный", kind: "❤️ Добрый" };
+  await ctx.reply("🎭 <b>Характер NEXUS AI</b>\n\nСейчас выбран: <b>" + (names[memory.personality] || names.default) + "</b>\n\nВыбери, как мне общаться с тобой:", { parse_mode: "HTML", reply_markup: keyboard });
+});
+
+bot.callbackQuery(/^personality:(default|bold|funny|genius|cold|dark|kind)$/, async ctx => {
+  const selected = ctx.match[1];
+  const memory = await loadMemory(ctx.from.id);
+  memory.personality = selected;
+  const saved = await saveMemory(ctx.from.id);
+  const names = { default: "🤖 Стандартный", bold: "😎 Дерзкий", funny: "😂 Весёлый", genius: "🧠 Гений", cold: "🥶 Холодный", dark: "😈 Тёмный", kind: "❤️ Добрый" };
+  await ctx.answerCallbackQuery({ text: saved ? "Характер изменён!" : "Не удалось сохранить характер" });
+  await ctx.editMessageText("✅ Характер NEXUS AI изменён: <b>" + names[selected] + "</b>\n\nТеперь я буду общаться с тобой в этом стиле. Изменить его можно командой /personality.", { parse_mode: "HTML" }).catch(() => {});
+});
 
 bot.command("image", async ctx => {
   imagePendingUsers.delete(ctx.from.id);
@@ -4058,6 +4094,7 @@ async function start() {
     { command: "start", description: "Запустить бота и открыть приветствие" },
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
+    { command: "personality", description: "Выбрать характер NEXUS AI" },
     { command: "image", description: "Создать изображение по описанию" },
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
