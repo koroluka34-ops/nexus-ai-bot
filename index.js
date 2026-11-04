@@ -35,6 +35,7 @@ const PREMIUM_ADMIN_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || 
 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY;
 const CLOUDFLARE_KV_NAMESPACE_ID =
   process.env.CLOUDFLARE_KV_NAMESPACE_ID;
 
@@ -860,11 +861,35 @@ async function translateImagePrompt(prompt) {
 }
 
 async function generateImage(prompt) {
-  if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
-    throw new Error("Cloudflare не настроен.");
+  const englishPrompt = await translateImagePrompt(prompt);
+
+  // Pollinations is the preferred provider when its server-side key is configured.
+  if (POLLINATIONS_API_KEY) {
+    const pollinationsUrl =
+      "https://gen.pollinations.ai/image/" +
+      encodeURIComponent(englishPrompt) +
+      "?model=black-forest-labs%2Fflux.1-schnell&width=1024&height=1024&nologo=true";
+
+    const pollinationsResponse = await fetch(pollinationsUrl, {
+      headers: { Authorization: `Bearer ${POLLINATIONS_API_KEY}` },
+      signal: AbortSignal.timeout(120000)
+    });
+    const pollinationsImage = Buffer.from(await pollinationsResponse.arrayBuffer());
+
+    if (!pollinationsResponse.ok) {
+      throw new Error(
+        `Pollinations HTTP ${pollinationsResponse.status}: ${pollinationsImage.toString("utf8").slice(0, 500)}`
+      );
+    }
+    if (!isImageBuffer(pollinationsImage)) {
+      throw new Error("Pollinations вернул некорректное изображение.");
+    }
+    return pollinationsImage;
   }
 
-  const englishPrompt = await translateImagePrompt(prompt);
+  if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+    throw new Error("Генерация не настроена: добавь POLLINATIONS_API_KEY или настрой Cloudflare AI.");
+  }
 
   const url =
     "https://api.cloudflare.com/client/v4/accounts/" +
@@ -887,6 +912,11 @@ async function generateImage(prompt) {
   const raw = Buffer.from(await response.arrayBuffer());
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        "Cloudflare отклонил API-токен (401). Создай новый токен с правом Account → Workers AI → Read и обнови CLOUDFLARE_API_TOKEN в Render. Либо добавь POLLINATIONS_API_KEY."
+      );
+    }
     throw new Error(
       `Cloudflare HTTP ${response.status}: ${raw.toString("utf8").slice(0, 1000)}`
     );
@@ -895,7 +925,6 @@ async function generateImage(prompt) {
   if (isImageBuffer(raw)) return raw;
 
   let data;
-
   try {
     data = JSON.parse(raw.toString("utf8"));
   } catch {
@@ -907,19 +936,13 @@ async function generateImage(prompt) {
     data?.result?.image_base64 ||
     data?.result?.data?.[0]?.b64_json;
 
-  if (!base64) {
-    throw new Error(errorText(data));
-  }
+  if (!base64) throw new Error(errorText(data));
 
   const buffer = Buffer.from(
     base64.replace(/^data:image\/[^;]+;base64,/i, ""),
     "base64"
   );
-
-  if (!isImageBuffer(buffer)) {
-    throw new Error("Получено некорректное изображение.");
-  }
-
+  if (!isImageBuffer(buffer)) throw new Error("Получено некорректное изображение.");
   return buffer;
 }
 
