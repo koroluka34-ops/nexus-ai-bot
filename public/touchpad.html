@@ -27,7 +27,7 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
   try{const r=await fetch('/device/touchpad',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:JSON.stringify(payload),keepalive:true});if(!r.ok){let info={};try{info=await r.json();}catch{}status.textContent=r.status===401?'Нет доступа: '+(info.error||'unknown'):'Ошибка связи ('+r.status+')';return;}status.textContent='🟢 ПК управляется';}
   catch{status.textContent='Нет связи с сервером';}
  }
- function flush(){raf=0;if(moveX||moveY){const dx=moveX,dy=moveY;moveX=0;moveY=0;send({type:'move',dx:Math.round(dx*2.1),dy:Math.round(dy*2.1)});}}
+ function flush(){raf=0;if(moveX||moveY){const dx=moveX,dy=moveY;moveX=0;moveY=0;send({type:'move',dx:Math.round(dx*4.0),dy:Math.round(dy*4.0)});}}
  function queueMove(dx,dy){moveX+=dx;moveY+=dy;if(!raf)raf=requestAnimationFrame(flush);}
  setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});
  pad.addEventListener('pointerdown',e=>{e.preventDefault();pad.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){primary=e.pointerId;start={x:e.clientX,y:e.clientY};moved=false;}else{start=null;}});
