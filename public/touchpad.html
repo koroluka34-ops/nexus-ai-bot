@@ -54,6 +54,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
    <button data-game-key="q" class="action">Q · Выбросить</button><button data-game-key="f" class="action">F · Рука</button>
    <button data-game-mouse="left" class="action">ЛКМ · Атака</button><button data-game-mouse="right" class="action">ПКМ · Использовать</button>
    <button data-game-key="r" class="action">R</button>
+   <button type="button" id="gameF11Button" class="action">⛶ F11</button>
   </div>
  </div>
 </section>
@@ -195,6 +196,7 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  joystick.addEventListener('pointercancel',resetJoystick);joystick.addEventListener('lostpointercapture',resetJoystick);
  window.addEventListener('blur',resetJoystick);document.addEventListener('visibilitychange',()=>{if(document.hidden)resetJoystick();});
  gamePanel.querySelectorAll('[data-game-key]').forEach(el=>bindGameHold(el,{type:'game-key',key:el.dataset.gameKey}));
+ document.getElementById('gameF11Button').addEventListener('click',()=>send({type:'key',key:'f11'}));
  gamePanel.querySelectorAll('[data-game-mouse]').forEach(el=>bindGameHold(el,{type:'game-mouse',button:el.dataset.gameMouse}));
  const keyboardButton=document.getElementById('keyboardButton'),keyboardPanel=document.getElementById('keyboardPanel'),keyboardText=document.getElementById('keyboardText');
  keyboardButton.addEventListener('click',()=>{keyboardPanel.classList.toggle('open');if(keyboardPanel.classList.contains('open'))keyboardText.focus();});
