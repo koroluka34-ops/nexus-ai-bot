@@ -42,7 +42,7 @@ function installDeviceBridge(bot) {
     const [verb, ...rest] = input.split(/\s+/);
     const arg = rest.join(" ").trim();
     if (!verb || verb === "help") {
-      return ctx.reply("🖥 NEXUS PC\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
+      return ctx.reply("🖥 NEXUS PC\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n/pc mouse drag 100 100 500 400 — перетащить мышь\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n/pc key f5 — функциональные клавиши F1–F12\n/pc hotkey ctrl+c — сочетание клавиш\n/pc hotkey alt+tab — переключить окно\n/pc hotkey win+d — показать рабочий стол\n/pc hotkey win+e — открыть Проводник\n/pc hotkey ctrl+shift+esc — Диспетчер задач\n/pc hotkey alt+f4 — закрыть активное окно\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
     }
     if (verb === "status") {
       const d = devices.get("windows-main");
@@ -85,12 +85,22 @@ function installDeviceBridge(bot) {
         const amount = parts[1] === undefined ? 3 : Number(parts[1]);
         if (!["up", "down"].includes(direction) || parts.length > 2 || !Number.isInteger(amount) || amount < 1 || amount > 10) return ctx.reply("Формат: /pc mouse scroll up 3 (1–10)");
         args.direction = direction; args.amount = amount; action = "mouse_scroll";
-      } else return ctx.reply("Команды мыши: move X Y, click [left|right|middle], double, scroll up/down [1–10].");
+      } else if (op === "drag") {
+        if (parts.length !== 4 || !parts.every(v => /^\d{1,5}$/.test(v))) return ctx.reply("Формат: /pc mouse drag X1 Y1 X2 Y2");
+        [args.x1, args.y1, args.x2, args.y2] = parts.map(Number);
+        if ([args.x1,args.y1,args.x2,args.y2].some(v => v > 10000)) return ctx.reply("Координаты слишком большие.");
+        action = "mouse_drag";
+      } else return ctx.reply("Команды мыши: move X Y, click [left|right|middle], double, scroll up/down [1–10], drag X1 Y1 X2 Y2.");
     } else if (verb === "key") {
       const key = arg.toLowerCase();
-      const allowed = ["enter", "esc", "tab", "space", "backspace", "delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown"];
-      if (!allowed.includes(key)) return ctx.reply("Разрешённые клавиши: enter, esc, tab, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown.");
+      const allowed = ["enter", "esc", "tab", "space", "backspace", "delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", ...Array.from({length:12},(_,i)=>"f"+(i+1))];
+      if (!allowed.includes(key)) return ctx.reply("Клавиши: enter, esc, tab, space, backspace, delete, стрелки, home/end, pageup/pagedown, F1–F12.");
       args.key = key; action = "key_press";
+    } else if (verb === "hotkey") {
+      const combo = arg.toLowerCase().replace(/\s+/g, "");
+      const allowed = ["ctrl+c","ctrl+v","ctrl+x","ctrl+z","ctrl+y","ctrl+a","ctrl+s","ctrl+f","ctrl+p","ctrl+w","ctrl+t","ctrl+tab","ctrl+shift+tab","alt+tab","alt+f4","win+d","win+e","ctrl+shift+esc"];
+      if (!allowed.includes(combo)) return ctx.reply("Сочетание не разрешено. Доступно: ctrl+c/v/x/z/y/a/s/f/p/w/t, ctrl+tab, ctrl+shift+tab, alt+tab, alt+f4, win+d/e, ctrl+shift+esc.");
+      args.combo = combo; action = "hotkey";
     } else return ctx.reply("Неизвестная команда. Напиши /pc help.");
     const id = crypto.randomUUID();
     pending.set(id, { action, args, userId: String(ctx.from.id), chatId: ctx.chat.id });
