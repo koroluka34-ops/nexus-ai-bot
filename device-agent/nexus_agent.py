@@ -132,7 +132,7 @@ def execute(command):
             return {"result": "Курсор перемещён тачпадом."}
         if action in ("key_down", "key_up"):
             key = str(args.get("key", "")).lower()
-            allowed_game_keys = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
+            allowed_game_keys = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter","grave"}
             if key not in allowed_game_keys:
                 raise ValueError("Игровая клавиша не разрешена")
             (pyautogui.keyDown if action == "key_down" else pyautogui.keyUp)(key)
