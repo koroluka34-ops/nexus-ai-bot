@@ -412,8 +412,8 @@ async function askGroq(messages, searchMode = false) {
   const body = {
     model: "openai/gpt-oss-120b",
     messages,
-    max_completion_tokens: MAX_OUTPUT,
-    temperature: 1,
+    max_completion_tokens: searchMode ? Math.max(MAX_OUTPUT, 1800) : MAX_OUTPUT,
+    temperature: searchMode ? 0.2 : 0.7,
     stream: false
   };
 
@@ -552,20 +552,36 @@ async function askAI(userId, question, searchMode = false) {
     ...memory.facts
   ].filter(Boolean).join("\n");
 
+  const kyivDate = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Kyiv", day: "2-digit", month: "long", year: "numeric"
+  }).format(new Date());
+
+  const researchRules = searchMode
+    ? "\\n\\nСТРОГИЕ ПРАВИЛА ПОИСКА И ФАКТОВ:\\n" +
+      "- Сегодняшняя дата: " + kyivDate + ". Не используй будущие даты и не выдавай прогнозы за свершившиеся события.\\n" +
+      "- Сначала реально выполни веб-поиск. Используй только сведения, которые нашёл в результатах поиска.\\n" +
+      "- Не придумывай новости, имена, цифры, исследования, компании, цитаты, заголовки и ссылки.\\n" +
+      "- Если не можешь подтвердить факт, не включай его в список новостей. Если источники противоречат друг другу — прямо укажи это.\\n" +
+      "- Не создавай псевдо-ссылки и ссылки вида [0†L12-L21]. Цитируй только реальные URL, которые вернул поиск.\\n" +
+      "- Пиши простым понятным русским языком. Объясняй термины в скобках. Не используй сложные таблицы без необходимости.\\n" +
+      "- Для запроса о последних новостях: максимум 5 важных событий, дата каждого события, 1-2 предложения о сути и почему это важно.\\n" +
+      "- Если свежих подтверждённых новостей мало, так и скажи. Не заполняй ответ выдуманными пунктами."
+    : "";
+
   const messages = [
     {
       role: "system",
       content:
-        SYSTEM_PROMPT +
+        SYSTEM_PROMPT + researchRules +
         (memoryText
-          ? "\n\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\n" + memoryText
+          ? "\\n\\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\\n" + memoryText
           : "")
     },
-    ...getHistory(userId),
+    ...(searchMode ? [] : getHistory(userId)),
     {
       role: "user",
       content: searchMode
-        ? "Найди актуальную информацию в интернете. Не выдумывай источники. " + question
+        ? "Сделай поиск по теме и подготовь проверенный, понятный отчёт. Не ссылайся на сведения, которых нет в найденных источниках. Запрос: " + question
         : question
     }
   ];
@@ -1897,6 +1913,9 @@ bot.command("research", async ctx => {
   try {
     const result = await askAI(userId, "Проведи подробное исследование темы. Используй актуальный веб-поиск, проверь факты по нескольким источникам, отдели подтверждённые сведения от предположений, укажи даты и ссылки. Структурируй вывод: краткий итог, подробности, сравнение/данные и вывод. Тема: " + query, true);
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    if (!Array.isArray(result.annotations) || result.annotations.length === 0) {
+      result.answer = "⚠️ Поиск не вернул проверяемые ссылки. Поэтому я не буду выдавать этот текст за подтверждённые новости. Попробуй повторить запрос чуть позже.\\n\\n" + result.answer;
+    }
     await deliverAnswer(ctx, userId, result);
   } catch (error) {
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Исследование не удалось: " + String(error.message).slice(0, 1600)).catch(() => {});
