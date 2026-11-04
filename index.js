@@ -2766,7 +2766,7 @@ bot.command("model", async ctx => {
 
 bot.command("premiumgrant", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Только администратор. Настрой ADMIN_ID в Render.");
-  const m = String(ctx.match || "").trim().match(/^(\\d+)\\s+(plus|ultra|free)\\s+(\\d+)$/i);
+  const m = String(ctx.match || "").trim().match(/^(\d+)\s+(plus|ultra|free)\s+(\d+)$/i);
   if (!m) return ctx.reply("Формат: /premiumgrant TELEGRAM_ID plus|ultra|free ДНИ");
   const targetId = Number(m[1]), tier = m[2].toLowerCase(), days = Math.min(3650, Number(m[3]));
   const memory = await loadMemory(targetId);
