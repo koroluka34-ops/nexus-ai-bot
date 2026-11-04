@@ -50,6 +50,9 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+const { installSecurityMonitor } = require("./modules/security-monitor");
+installSecurityMonitor(bot);
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
@@ -492,7 +495,7 @@ function allCommandsText() {
 <code>/start</code> — запустить бота.
 <code>/menu</code> — открыть главное меню.
 <code>/commands</code> — показать все команды.
-<code>/status</code> — проверить состояние сервисов.\n<code>/personality</code> — выбрать характер NEXUS AI.
+<code>/status</code> — проверить состояние сервисов.\n<code>/antiscam on|off</code> — защита группы от фишинга и скама.\n<code>/checksite URL</code> — разовая проверка сайта.\n<code>/watch URL</code>, <code>/watches</code>, <code>/unwatch ID</code> — мониторинг сайтов.\n<code>/personality</code> — выбрать характер NEXUS AI.
 <code>/reset</code> — очистить текущую историю диалога.
 <code>/groupmode on|off</code> — общий контекст ИИ в группе.
 <code>/kb</code> — база знаний из твоих документов.
