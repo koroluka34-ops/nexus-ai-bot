@@ -254,7 +254,7 @@ async function handleDeviceHttp(req, res) {
       if (!res.writableEnded) sendJson(res, 200, { ok: true, command: null, touchpadActive: touchpad.activeUntil > Date.now(), pollAfterMs: 0 });
     }, 20000);
     pollWaiters.add(waiter);
-    req.on("close", () => { clearTimeout(waiter.timer); pollWaiters.delete(waiter); });
+    res.on("close", () => { clearTimeout(waiter.timer); pollWaiters.delete(waiter); });
     return true;
   }
   if (req.method === "POST" && url.pathname === "/device/result") {
