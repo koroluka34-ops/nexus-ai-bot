@@ -3823,15 +3823,16 @@ async function start() {
   ];
 
   try {
-    await bot.api.setMyCommands(fullCommands, {
-      scope: { type: "all_private_chats" },
-      language_code: "ru"
-    });
-    await bot.api.setMyCommands(fullCommands, {
-      scope: { type: "all_group_chats" },
-      language_code: "ru"
-    });
-    console.log(`Telegram full command menu registered (RU): ${fullCommands.length} commands.`);
+    // Default command sets are essential: Telegram clients may use a language other than Russian.
+    // Register both default and Russian-localized lists for private chats and groups.
+    for (const scope of [
+      { type: "all_private_chats" },
+      { type: "all_group_chats" }
+    ]) {
+      await bot.api.setMyCommands(fullCommands, { scope });
+      await bot.api.setMyCommands(fullCommands, { scope, language_code: "ru" });
+    }
+    console.log(`Telegram full command menus registered (default + RU): ${fullCommands.length} commands.`);
   } catch (error) {
     console.error("Command menu registration:", error.message);
   }
