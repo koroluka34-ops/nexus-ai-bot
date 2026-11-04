@@ -205,7 +205,7 @@ async function loadMemory(userId) {
     gifts: [], lastFreeGift: "", knowledgeBase: [],
     premium: { tier: "free", expiresAt: 0 },
     usage: { day: "", text: 0, images: 0, videos: 0 },
-    selectedModel: "openai/gpt-oss-120b"
+    selectedModel: "auto"
   };
 
   if (!kvConfigured()) {
@@ -3008,10 +3008,11 @@ bot.command("model", async ctx => {
   const mode = String(ctx.match || "").trim().toLowerCase();
   if (!mode || mode === "status") {
     const active = memory.selectedModel || "auto";
+    const label = active === "auto" || active === "openai/gpt-oss-120b" ? "🤖 Автоматический выбор" : active === "gpt" ? "GPT-OSS 120B" : "Qwen 3.8 27B";
     return ctx.reply(
-      "🧠 УПРАВЛЕНИЕ ИИ-МОДЕЛЯМИ\\n\\n" +
-      "Режим: " + (active === "auto" ? "🤖 Автоматический выбор" : active === "gpt" ? "GPT-OSS 120B" : "Qwen 3.8 27B") + "\\n\\n" +
-      "Доступно всем бесплатно:\\n/model auto — ИИ сам выбирает модель\\n/model gpt — универсальные задачи\\n/model qwen — код, техника и анализ"
+      "🧠 УПРАВЛЕНИЕ ИИ-МОДЕЛЯМИ\n\n" +
+      "Режим: " + label + "\n\n" +
+      "Доступно всем бесплатно:\n/model auto — ИИ сам выбирает модель\n/model gpt — универсальные задачи\n/model qwen — код, техника и анализ"
     );
   }
   if (!["auto", "gpt", "qwen"].includes(mode)) {
@@ -3020,7 +3021,7 @@ bot.command("model", async ctx => {
   memory.selectedModel = mode;
   if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить выбор модели. Проверь Cloudflare KV.");
   await ctx.reply("✅ Режим моделей сохранён: " + (mode === "auto" ? "автоматический выбор" : mode.toUpperCase()));
-});
+});;
 
 bot.command("premiumgrant", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Только администратор. Настрой ADMIN_ID в Render.");
