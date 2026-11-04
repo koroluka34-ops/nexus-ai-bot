@@ -1785,14 +1785,14 @@ async function runAgent(ctx, task) {
     return;
   }
 
-  if (/\\b(создай|сделай|сгенерируй)\\b/i.test(lower) && /\\b(видео|ролик)\\b/i.test(lower)) {
-    const prompt = task.replace(/^(?:создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:видео|ролик)\\s*/i, "").trim();
+  if (/\b(создай|сделай|сгенерируй)\b/i.test(lower) && /\b(видео|ролик)\b/i.test(lower)) {
+    const prompt = task.replace(/^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:видео|ролик)\\s*/i, "").trim();
     await handleVideoPrompt(ctx, prompt);
     return;
   }
 
   if (/нарисуй|создай|сделай|сгенерируй/i.test(lower) && /фото|фотограф|картин|изображ/i.test(lower)) {
-    const prompt = task.replace(/^(?:нарисуй|создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:фото|фотографию|картинку|изображение)\\s*/i, "").trim();
+    const prompt = task.replace(/^(?:нарисуй|создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:фото|фотографию|картинку|изображение)\\s*/i, "").trim();
     await handleImage(ctx, prompt);
     return;
   }
@@ -2791,7 +2791,7 @@ bot.on("message:text", async ctx => {
   }
 
   const videoRequest = question.match(
-    /^(?:создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:видео|ролик)\\s*[:,-]?\\s*([\\s\\S]*)$/i
+    /^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:видео|ролик)\s*[:,-]?\s*([\s\S]*)$/i
   );
   if (videoRequest) {
     await handleVideoPrompt(ctx, videoRequest[1].trim());
@@ -2799,7 +2799,7 @@ bot.on("message:text", async ctx => {
   }
 
   const imageRequest = question.match(
-    /^(?:нарисуй|создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:фото|фотографию|картинку|изображение)\\s*[:,-]?\\s*([\\s\\S]+)$/i
+    /^(?:нарисуй|создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:фото|фотографию|картинку|изображение)\s*[:,-]?\s*([\s\S]+)$/i
   );
   if (imageRequest) {
     await handleImage(ctx, imageRequest[1].trim());
@@ -2807,7 +2807,7 @@ bot.on("message:text", async ctx => {
   }
 
   const fileRequest = question.match(
-    /^(?:создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:файл|документ|док|текстовый\\s+файл|таблицу|презентацию)(?:\\s+(docx|pdf|xlsx|pptx|txt))?\\s*[:,-]?\\s*([\\s\\S]*)$/i
+    /^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:файл|документ|док|текстовый\\s+файл|таблицу|презентацию)(?:\s+(docx|pdf|xlsx|pptx|txt))?\s*[:,-]?\s*([\s\S]*)$/i
   );
   if (fileRequest) {
     const format = (fileRequest[1] || "").toLowerCase() ||
