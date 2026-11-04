@@ -11,20 +11,23 @@ header{display:flex;justify-content:space-between;align-items:center;font-weight
 .pad strong{display:block;font-size:20px;margin-bottom:8px}.pad span{color:#94a3b8;font-size:13px}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{border:1px solid #334155;background:#1e293b;color:#fff;border-radius:15px;padding:17px 10px;font-size:16px;font-weight:650;touch-action:manipulation}
-button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}.keyboard-row{display:flex;justify-content:flex-end}.keyboard-button{padding:9px 13px;font-size:19px;border-radius:12px}.keyboard-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:8px}.keyboard-panel.open{display:grid}.keyboard-panel textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#fff;padding:10px;font:16px system-ui}.keyboard-panel button{padding:12px}.key-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.key-actions button{padding:12px 4px;font-size:14px}.key-actions .wide{grid-column:span 2}.game-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:9px}.game-panel.open{display:grid}.game-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.game-grid button{min-height:54px;padding:10px 4px;font-size:17px;touch-action:none;user-select:none}.game-grid .empty{visibility:hidden}.game-grid .action{font-size:13px;min-height:44px}
+button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}.keyboard-row{display:flex;justify-content:flex-end}.keyboard-button{padding:9px 13px;font-size:19px;border-radius:12px}.keyboard-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:8px}.keyboard-panel.open{display:grid}.keyboard-panel textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#fff;padding:10px;font:16px system-ui}.keyboard-panel button{padding:12px}.key-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.key-actions button{padding:12px 4px;font-size:14px}.key-actions .wide{grid-column:span 2}.game-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:9px}.game-panel.open{display:grid}.game-layout{display:grid;grid-template-columns:136px minmax(0,1fr);gap:10px;align-items:center}.joystick-wrap{display:grid;justify-items:center;gap:7px}.joystick{width:128px;height:128px;border:2px solid #64748b;border-radius:50%;background:radial-gradient(circle,#334155 0 4px,#1e293b 5px 42%,#0f172a 72%);position:relative;touch-action:none;user-select:none}.joystick:before,.joystick:after{content:'';position:absolute;background:#475569;opacity:.55}.joystick:before{width:1px;height:100%;left:50%;top:0}.joystick:after{height:1px;width:100%;top:50%;left:0}.joystick-knob{position:absolute;width:48px;height:48px;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:linear-gradient(145deg,#94a3b8,#475569);border:2px solid #cbd5e1;box-shadow:0 3px 10px #0009;pointer-events:none;z-index:1}.game-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.game-grid button{min-height:48px;padding:8px 3px;font-size:14px;touch-action:none;user-select:none}.game-grid .action{font-size:12px;min-height:42px}.joystick-caption{font-size:11px;color:#94a3b8;text-align:center}@media(max-width:350px){.game-layout{grid-template-columns:112px minmax(0,1fr);gap:7px}.joystick{width:108px;height:108px}.joystick-knob{width:42px;height:42px}.game-grid{gap:5px}.game-grid button{font-size:12px}}
 </style></head><body>
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
 <section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
 <div class="pad" id="pad"><div><strong>Води пальцем здесь</strong><span>Один палец — курсор · два пальца — прокрутка<br>Тап — левый клик</span></div></div>
 <div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button></div></section>
 <section id="gamePanel" class="game-panel">
- <div class="small">Игровые кнопки: удерживай палец, чтобы удерживать клавишу. При отпускании клавиша отпускается.</div>
- <div class="game-grid">
-  <button class="empty" tabindex="-1"> </button><button data-game-key="w">W ▲</button><button class="empty" tabindex="-1"> </button>
-  <button data-game-key="a">A ◀</button><button data-game-key="s">S ▼</button><button data-game-key="d">D ▶</button>
-  <button data-game-key="space" class="action">ПРЫЖОК</button><button data-game-key="shift" class="action">SHIFT</button><button data-game-key="ctrl" class="action">CTRL</button>
-  <button data-game-key="e" class="action">E · Инвентарь</button><button data-game-key="q" class="action">Q · Выбросить</button><button data-game-key="f" class="action">F · Рука</button>
-  <button data-game-mouse="left" class="action">ЛКМ · Атака</button><button data-game-mouse="right" class="action">ПКМ · Использовать</button><button data-game-key="r" class="action">R</button>
+ <div class="small">Джойстик — движение во все стороны. Справа — игровые действия. Удерживай кнопку, чтобы держать клавишу.</div>
+ <div class="game-layout">
+  <div class="joystick-wrap"><div id="gameJoystick" class="joystick" aria-label="Игровой джойстик"><div id="joystickKnob" class="joystick-knob"></div></div><div class="joystick-caption">ДВИЖЕНИЕ</div></div>
+  <div class="game-grid">
+   <button data-game-key="space" class="action">ПРЫЖОК</button><button data-game-key="shift" class="action">SHIFT</button>
+   <button data-game-key="ctrl" class="action">CTRL</button><button data-game-key="e" class="action">E · Инвентарь</button>
+   <button data-game-key="q" class="action">Q · Выбросить</button><button data-game-key="f" class="action">F · Рука</button>
+   <button data-game-mouse="left" class="action">ЛКМ · Атака</button><button data-game-mouse="right" class="action">ПКМ · Использовать</button>
+   <button data-game-key="r" class="action">R</button>
+  </div>
  </div>
 </section>
 <div class="small">Удерживай палец и перемещай его для перетаскивания</div>
@@ -111,6 +114,32 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
   window.addEventListener('blur',release);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
  }
+ const joystick=document.getElementById('gameJoystick'),joystickKnob=document.getElementById('joystickKnob');
+ let joystickPointer=null,joystickKeys=new Set();
+ function updateJoystick(e){
+  const rect=joystick.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+  let dx=e.clientX-cx,dy=e.clientY-cy;const max=rect.width*.34,dist=Math.hypot(dx,dy);
+  if(dist>max){dx=dx/dist*max;dy=dy/dist*max;}
+  joystickKnob.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+  const nx=dx/max,ny=dy/max,next=new Set();
+  if(Math.hypot(nx,ny)>.22){
+   if(ny<-.32)next.add('w');if(ny>.32)next.add('s');
+   if(nx<-.32)next.add('a');if(nx>.32)next.add('d');
+  }
+  for(const key of joystickKeys)if(!next.has(key))send({type:'game-key',key,state:'up'});
+  for(const key of next)if(!joystickKeys.has(key))send({type:'game-key',key,state:'down'});
+  joystickKeys=next;
+ }
+ function resetJoystick(){
+  joystickPointer=null;joystickKnob.style.transform='translate(-50%,-50%)';
+  for(const key of joystickKeys)send({type:'game-key',key,state:'up'});
+  joystickKeys.clear();
+ }
+ joystick.addEventListener('pointerdown',e=>{e.preventDefault();if(joystickPointer!==null)return;joystickPointer=e.pointerId;try{joystick.setPointerCapture(e.pointerId);}catch{}updateJoystick(e);});
+ joystick.addEventListener('pointermove',e=>{if(e.pointerId===joystickPointer){e.preventDefault();updateJoystick(e);}});
+ joystick.addEventListener('pointerup',e=>{if(e.pointerId===joystickPointer)resetJoystick();});
+ joystick.addEventListener('pointercancel',resetJoystick);joystick.addEventListener('lostpointercapture',resetJoystick);
+ window.addEventListener('blur',resetJoystick);document.addEventListener('visibilitychange',()=>{if(document.hidden)resetJoystick();});
  gamePanel.querySelectorAll('[data-game-key]').forEach(el=>bindGameHold(el,{type:'game-key',key:el.dataset.gameKey}));
  gamePanel.querySelectorAll('[data-game-mouse]').forEach(el=>bindGameHold(el,{type:'game-mouse',button:el.dataset.gameMouse}));
  const keyboardButton=document.getElementById('keyboardButton'),keyboardPanel=document.getElementById('keyboardPanel'),keyboardText=document.getElementById('keyboardText');
