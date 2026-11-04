@@ -55,6 +55,32 @@ function isGroupChat(ctx) {
 
 function isAddressedToBot(ctx, text = "") {
   if (!isGroupChat(ctx)) return true;
+
+  const messageText = String(text || "");
+  const botUsername = bot.botInfo?.username;
+  const normalizedText = messageText.toLocaleLowerCase("ru");
+
+  // Разрешаем обращение по @username, имени NEXUS / NEXUS AI или слову «бот».
+  const usernameMention = Boolean(
+    botUsername && normalizedText.includes("@" + botUsername.toLocaleLowerCase("ru"))
+  );
+  const nameMention = /(?:^|[^\p{L}\p{N}_])(?:nexus(?:\s+ai)?|бот)(?=$|[^\p{L}\p{N}_])/iu.test(messageText);
+
+  // Reply засчитывается только если отвечают именно на сообщение этого бота.
+  const botId = bot.botInfo?.id;
+  const repliedToBot = Boolean(
+    botId && ctx.message?.reply_to_message?.from?.id === botId
+  );
+
+  return usernameMention || nameMention || repliedToBot;
+}
+
+function removeBotMention(text) {
+  const botUsername = bot.botInfo?.username;
+  let cleaned = String(text || "");
+  if (botUsername) {
+    const escapedUsername = botUsername.replace(/[.*+?^\x24{}()|[\]\\]/g, "\\function isAddressedToBot(ctx, text = "") {
+  if (!isGroupChat(ctx)) return true;
   const botUsername = bot.botInfo?.username;
   const usernameMention = botUsername
     ? String(text).toLowerCase().includes("@" + botUsername.toLowerCase())
@@ -69,6 +95,13 @@ function removeBotMention(text) {
   let cleaned = String(text || "");
   if (botUsername) cleaned = cleaned.split("@" + botUsername).join(" ");
   return cleaned.replace(/\bnexus(?:\s+ai)?\b[:,]?/ig, " ").replace(/\s+/g, " ").trim();
+}");
+    cleaned = cleaned.replace(new RegExp("@" + escapedUsername, "ig"), " ");
+  }
+  return cleaned
+    .replace(/(?:^|[^\p{L}\p{N}_])(?:nexus(?:\s+ai)?|бот)(?=$|[^\p{L}\p{N}_])[:,]?/giu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const MAX_HISTORY = 10;
