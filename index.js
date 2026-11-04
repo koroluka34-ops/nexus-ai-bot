@@ -31,6 +31,7 @@ const ffmpegPath = require("ffmpeg-static");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const PREMIUM_ADMIN_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
@@ -118,10 +119,10 @@ async function loadMemory(userId) {
   }
 
   const empty = {
-    facts: [],
-    summary: "",
-    voiceEnabled: false,
-    reminders: []
+    facts: [], summary: "", voiceEnabled: false, reminders: [],
+    premium: { tier: "free", expiresAt: 0 },
+    usage: { day: "", text: 0, images: 0, videos: 0 },
+    selectedModel: "openai/gpt-oss-120b"
   };
 
   if (!kvConfigured()) {
@@ -150,10 +151,14 @@ async function loadMemory(userId) {
     const data = JSON.parse(raw);
 
     const memory = {
+      ...data,
       facts: Array.isArray(data.facts) ? data.facts : [],
       summary: String(data.summary || ""),
       voiceEnabled: Boolean(data.voiceEnabled),
-      reminders: Array.isArray(data.reminders) ? data.reminders : []
+      reminders: Array.isArray(data.reminders) ? data.reminders : [],
+      premium: data.premium && typeof data.premium === "object" ? data.premium : { tier: "free", expiresAt: 0 },
+      usage: data.usage && typeof data.usage === "object" ? data.usage : { day: "", text: 0, images: 0, videos: 0 },
+      selectedModel: String(data.selectedModel || "openai/gpt-oss-120b")
     };
 
     longMemory.set(userId, memory);
@@ -196,6 +201,56 @@ async function saveMemory(userId) {
     console.error("KV SAVE:", error.message);
     return false;
   }
+}
+
+const PREMIUM_PLANS = {
+  free: { name: "Бесплатный", text: 30, images: 3, priority: 0 },
+  plus: { name: "NEXUS PLUS", text: 120, images: 15, priority: 1 },
+  ultra: { name: "NEXUS ULTRA", text: 300, images: 40, priority: 2 }
+};
+
+function currentPlan(memory) {
+  const p = memory.premium || {};
+  if (p.tier && p.tier !== "free" && (!p.expiresAt || Number(p.expiresAt) > Date.now()) && PREMIUM_PLANS[p.tier]) return p.tier;
+  return "free";
+}
+
+function resetDailyUsage(memory) {
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
+  if (!memory.usage || memory.usage.day !== day) memory.usage = { day, text: 0, images: 0, videos: 0 };
+  return memory.usage;
+}
+
+async function consumeQuota(userId, kind) {
+  const memory = await loadMemory(userId);
+  const tier = currentPlan(memory);
+  const plan = PREMIUM_PLANS[tier];
+  const usage = resetDailyUsage(memory);
+  const key = kind === "image" ? "images" : kind === "video" ? "videos" : "text";
+  const limit = kind === "image" ? plan.images : kind === "video" ? (tier === "free" ? 0 : tier === "plus" ? 3 : 10) : plan.text;
+  if (usage[key] >= limit) {
+    await saveMemory(userId);
+    return { ok: false, tier, limit, storageError: false };
+  }
+  usage[key]++;
+  if (!await saveMemory(userId)) {
+    usage[key]--;
+    return { ok: false, tier, limit, storageError: true };
+  }
+  return { ok: true, tier, limit };
+}
+
+function premiumStatusText(memory) {
+  const tier = currentPlan(memory), plan = PREMIUM_PLANS[tier], usage = resetDailyUsage(memory);
+  const videoLimit = tier === "free" ? 0 : tier === "plus" ? 3 : 10;
+  const model = tier === "free" ? "GPT-OSS 120B" : (memory.selectedModel || "qwen/qwen3.8-27b");
+  return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" +
+    "Запросы: " + usage.text + "/" + plan.text + " сегодня\n" +
+    "Изображения: " + usage.images + "/" + plan.images + " сегодня\n" +
+    "Видео: " + usage.videos + "/" + videoLimit + " сегодня\n" +
+    "Модель: <code>" + model + "</code>\n" +
+    "Приоритет генерации: " + (tier === "ultra" ? "высокий" : tier === "plus" ? "повышенный" : "обычный") +
+    (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
 }
 
 async function addLongTermFact(userId, fact) {
@@ -404,13 +459,13 @@ function mainMenu() {
 // GROQ
 // ======================================================
 
-async function askGroq(messages, searchMode = false) {
+async function askGroq(messages, searchMode = false, model = "openai/gpt-oss-120b") {
   if (!GROQ_API_KEY) {
     throw new Error("GROQ_API_KEY не настроен.");
   }
 
   const body = {
-    model: "openai/gpt-oss-120b",
+    model,
     messages,
     max_completion_tokens: searchMode ? Math.max(MAX_OUTPUT, 1800) : MAX_OUTPUT,
     temperature: searchMode ? 0.2 : 0.7,
@@ -569,6 +624,10 @@ function formatSources(annotations) {
 // ======================================================
 
 async function askAI(userId, question, searchMode = false) {
+  const quota = await consumeQuota(userId, "text");
+  if (!quota.ok) throw new Error(quota.storageError
+    ? "Не удалось сохранить дневной лимит в Cloudflare KV."
+    : "Дневной лимит тарифа " + PREMIUM_PLANS[quota.tier].name + " исчерпан. Обновится завтра по Киеву. /premium");
   const memory = await loadMemory(userId);
 
   const memoryText = [
@@ -613,7 +672,8 @@ async function askAI(userId, question, searchMode = false) {
   let result;
 
   try {
-    result = await askGroq(messages, searchMode);
+    const selectedModel = currentPlan(memory) === "free" ? "openai/gpt-oss-120b" : (memory.selectedModel || "qwen/qwen3.8-27b");
+    result = await askGroq(messages, searchMode, searchMode ? "openai/gpt-oss-120b" : selectedModel);
   } catch (error) {
     console.error("Groq:", error.message);
 
@@ -759,6 +819,11 @@ async function handleImage(ctx, prompt) {
     await ctx.reply("⏳ Подожди предыдущий запрос.");
     return;
   }
+
+  const quota = await consumeQuota(userId, "image");
+  if (!quota.ok) return ctx.reply(quota.storageError
+    ? "❌ Не удалось сохранить лимит в Cloudflare KV."
+    : "⛔ Дневной лимит изображений исчерпан. Обновится завтра. /premium");
 
   busyUsers.add(userId);
 
@@ -1670,11 +1735,11 @@ bot.command("circle", async ctx => {
 
 // Не выдаём анимацию за генерацию ИИ-видео и не подключаем платный API.
 bot.command("video", async ctx => {
-  await ctx.reply(
-    "🎬 Настоящая ИИ-генерация видео сейчас недоступна бесплатно через подключённые сервисы.\n\n" +
-    "Я не буду выдавать обычную анимацию картинки за ИИ-видео и не подключу платный API.\n" +
-    "Для бесплатной обработки своих роликов используй /circle."
-  );
+  const quota = await consumeQuota(ctx.from.id, "video");
+  if (!quota.ok) return ctx.reply(quota.storageError
+    ? "❌ Не удалось сохранить лимит в Cloudflare KV."
+    : "⛔ Видео доступно тарифам NEXUS PLUS и ULTRA. /premium");
+  await handleVideoPrompt(ctx, String(ctx.match || "").trim());
 });
 
 
@@ -2643,6 +2708,39 @@ bot.command("api", async ctx => {
 
 // BASIC COMMANDS
 // ======================================================
+
+bot.command("id", async ctx => {
+  await ctx.reply("Твой Telegram ID: <code>" + ctx.from.id + "</code>", { parse_mode: "HTML" });
+});
+
+bot.command("premium", async ctx => {
+  const memory = await loadMemory(ctx.from.id);
+  await ctx.reply(premiumStatusText(memory) + "\n\nДля активации тарифа обратись к администратору.", { parse_mode: "HTML" });
+});
+
+bot.command("model", async ctx => {
+  const memory = await loadMemory(ctx.from.id);
+  if (currentPlan(memory) === "free") return ctx.reply("Выбор модели доступен NEXUS PLUS и ULTRA. Сейчас GPT-OSS 120B. /premium");
+  const model = String(ctx.match || "").trim().toLowerCase();
+  if (!model) return ctx.reply("Доступно: /model gpt или /model qwen");
+  if (model === "gpt") memory.selectedModel = "openai/gpt-oss-120b";
+  else if (model === "qwen") memory.selectedModel = "qwen/qwen3.8-27b";
+  else return ctx.reply("Доступно: /model gpt или /model qwen");
+  if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить выбор модели.");
+  await ctx.reply("✅ Модель выбрана: " + memory.selectedModel);
+});
+
+bot.command("premiumgrant", async ctx => {
+  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Только администратор. Настрой ADMIN_ID в Render.");
+  const m = String(ctx.match || "").trim().match(/^(\\d+)\\s+(plus|ultra|free)\\s+(\\d+)$/i);
+  if (!m) return ctx.reply("Формат: /premiumgrant TELEGRAM_ID plus|ultra|free ДНИ");
+  const targetId = Number(m[1]), tier = m[2].toLowerCase(), days = Math.min(3650, Number(m[3]));
+  const memory = await loadMemory(targetId);
+  memory.premium = { tier, expiresAt: tier === "free" ? 0 : Date.now() + days * 86400000 };
+  if (!await saveMemory(targetId)) return ctx.reply("❌ Не удалось сохранить тариф в Cloudflare KV.");
+  await ctx.reply("✅ " + tier.toUpperCase() + " выдан пользователю " + targetId + (tier === "free" ? "." : " на " + days + " дней."));
+  if (tier !== "free") await bot.api.sendMessage(targetId, "💎 Тебе активирован NEXUS " + tier.toUpperCase() + " на " + days + " дней. /premium").catch(() => {});
+});
 
 bot.command("start", async ctx => {
   await loadMemory(ctx.from.id);
