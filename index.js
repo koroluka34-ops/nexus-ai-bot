@@ -3142,8 +3142,8 @@ bot.command("skillsearch", async ctx => {
   if (!found.length) return ctx.reply("По этому запросу навыки не найдены. Попробуй другие слова или открой /skills.");
   const rows = found.map(skill => skill.id + ". " + skill.domain + " — " + skill.task);
   return ctx.reply(
-    "🔎 НАЙДЕНО НАВЫКОВ: " + found.length + "\\n\\n" + rows.join("\\n") +
-    "\\n\\nЗапуск: /skill НОМЕР твой запрос",
+    "🔎 НАЙДЕНО НАВЫКОВ: " + found.length + "\n\n" + rows.join("\n") +
+    "\n\nЗапуск: /skill НОМЕР твой запрос",
     { disable_web_page_preview: true }
   );
 });
@@ -3151,8 +3151,8 @@ bot.command("skillsearch", async ctx => {
 bot.command("skillrandom", async ctx => {
   const skill = SKILLS[crypto.randomInt(SKILLS.length)];
   return ctx.reply(
-    "🎲 СЛУЧАЙНЫЙ НАВЫК\\n\\n" + skill.id + ". " + skill.domain + " — " + skill.task +
-    "\\n\\nЗапусти его: /skill " + skill.id + " опиши свою задачу"
+    "🎲 СЛУЧАЙНЫЙ НАВЫК\n\n" + skill.id + ". " + skill.domain + " — " + skill.task +
+    "\n\nЗапусти его: /skill " + skill.id + " опиши свою задачу"
   );
 });
 
@@ -3163,10 +3163,10 @@ bot.command("skillinfo", async ctx => {
   }
   const skill = getSkill(id);
   return ctx.reply(
-    "🧠 НАВЫК " + skill.id + "\\n\\nНаправление: " + skill.domain +
-    "\\nЗадача: " + skill.task +
-    "\\n\\nИнструкция: " + skill.instruction +
-    "\\n\\nЗапуск: /skill " + skill.id + " твой запрос"
+    "🧠 НАВЫК " + skill.id + "\n\nНаправление: " + skill.domain +
+    "\nЗадача: " + skill.task +
+    "\n\nИнструкция: " + skill.instruction +
+    "\n\nЗапуск: /skill " + skill.id + " твой запрос"
   );
 });
 
