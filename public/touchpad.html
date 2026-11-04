@@ -11,12 +11,22 @@ header{display:flex;justify-content:space-between;align-items:center;font-weight
 .pad strong{display:block;font-size:20px;margin-bottom:8px}.pad span{color:#94a3b8;font-size:13px}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{border:1px solid #334155;background:#1e293b;color:#fff;border-radius:15px;padding:17px 10px;font-size:16px;font-weight:650;touch-action:manipulation}
-button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}.keyboard-row{display:flex;justify-content:flex-end}.keyboard-button{padding:9px 13px;font-size:19px;border-radius:12px}.keyboard-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:8px}.keyboard-panel.open{display:grid}.keyboard-panel textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#fff;padding:10px;font:16px system-ui}.keyboard-panel button{padding:12px}.key-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.key-actions button{padding:12px 4px;font-size:14px}.key-actions .wide{grid-column:span 2}
+button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}.keyboard-row{display:flex;justify-content:flex-end}.keyboard-button{padding:9px 13px;font-size:19px;border-radius:12px}.keyboard-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:8px}.keyboard-panel.open{display:grid}.keyboard-panel textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#fff;padding:10px;font:16px system-ui}.keyboard-panel button{padding:12px}.key-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.key-actions button{padding:12px 4px;font-size:14px}.key-actions .wide{grid-column:span 2}.game-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:9px}.game-panel.open{display:grid}.game-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.game-grid button{min-height:54px;padding:10px 4px;font-size:17px;touch-action:none;user-select:none}.game-grid .empty{visibility:hidden}.game-grid .action{font-size:13px;min-height:44px}
 </style></head><body>
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
 <section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
 <div class="pad" id="pad"><div><strong>Води пальцем здесь</strong><span>Один палец — курсор · два пальца — прокрутка<br>Тап — левый клик</span></div></div>
-<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row"><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button></div></section>
+<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button></div></section>
+<section id="gamePanel" class="game-panel">
+ <div class="small">Игровые кнопки: удерживай палец, чтобы удерживать клавишу. При отпускании клавиша отпускается.</div>
+ <div class="game-grid">
+  <button class="empty" tabindex="-1"> </button><button data-game-key="w">W ▲</button><button class="empty" tabindex="-1"> </button>
+  <button data-game-key="a">A ◀</button><button data-game-key="s">S ▼</button><button data-game-key="d">D ▶</button>
+  <button data-game-key="space" class="action">ПРЫЖОК</button><button data-game-key="shift" class="action">SHIFT</button><button data-game-key="ctrl" class="action">CTRL</button>
+  <button data-game-key="e" class="action">E · Инвентарь</button><button data-game-key="q" class="action">Q · Выбросить</button><button data-game-key="f" class="action">F · Рука</button>
+  <button data-game-mouse="left" class="action">ЛКМ · Атака</button><button data-game-mouse="right" class="action">ПКМ · Использовать</button><button data-game-key="r" class="action">R</button>
+ </div>
+</section>
 <div class="small">Удерживай палец и перемещай его для перетаскивания</div>
 <script>
 (()=>{
@@ -63,6 +73,20 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  pad.addEventListener('pointerup',endPointer);pad.addEventListener('pointercancel',endPointer);
  document.getElementById('left').addEventListener('click',()=>send({type:'click',button:'left'}));
  document.getElementById('right').addEventListener('click',()=>send({type:'click',button:'right'}));
+ const gameButton=document.getElementById('gameButton'),gamePanel=document.getElementById('gamePanel');
+ gameButton.addEventListener('click',()=>{gamePanel.classList.toggle('open');if(gamePanel.classList.contains('open'))keyboardPanel.classList.remove('open');});
+ function bindGameHold(el,payload){
+  let held=false;
+  const release=()=>{if(!held)return;held=false;send({...payload,state:'up'});};
+  el.addEventListener('pointerdown',e=>{e.preventDefault();if(held)return;held=true;try{el.setPointerCapture(e.pointerId);}catch{}send({...payload,state:'down'});});
+  el.addEventListener('pointerup',e=>{e.preventDefault();release();});
+  el.addEventListener('pointercancel',release);
+  el.addEventListener('lostpointercapture',release);
+  window.addEventListener('blur',release);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)release();});
+ }
+ gamePanel.querySelectorAll('[data-game-key]').forEach(el=>bindGameHold(el,{type:'game-key',key:el.dataset.gameKey}));
+ gamePanel.querySelectorAll('[data-game-mouse]').forEach(el=>bindGameHold(el,{type:'game-mouse',button:el.dataset.gameMouse}));
  const keyboardButton=document.getElementById('keyboardButton'),keyboardPanel=document.getElementById('keyboardPanel'),keyboardText=document.getElementById('keyboardText');
  keyboardButton.addEventListener('click',()=>{keyboardPanel.classList.toggle('open');if(keyboardPanel.classList.contains('open'))keyboardText.focus();});
  async function sendKeyboardText(){const value=keyboardText.value;if(!value.trim())return;const button=document.getElementById('sendText');button.disabled=true;button.textContent='Отправка…';const ok=await send({type:'text',text:value});button.disabled=false;button.textContent='⌨ Вставить текст в ПК';if(ok){keyboardText.value='';status.textContent='🟢 Текст вставлен в активное окно ПК';}}
