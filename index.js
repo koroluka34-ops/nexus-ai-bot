@@ -54,21 +54,6 @@ const MAX_IMAGE_BYTES = 14 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 18 * 1024 * 1024;
 const MAX_MEMORY_CHARS = 8000;
 
-  const item = PREMIUM_CUSTOM_EMOJIS[
-    Math.floor(Math.random() * PREMIUM_CUSTOM_EMOJIS.length)
-  ];
-
-  return {
-    emoji: item.emoji,
-    entity: {
-      type: "custom_emoji",
-      offset: 0,
-      length: item.emoji.length,
-      custom_emoji_id: item.id
-    }
-  };
-}
-
 const histories = new Map();
 const longMemory = new Map();
 
@@ -135,6 +120,7 @@ async function loadMemory(userId) {
 
   const empty = {
     facts: [], summary: "", voiceEnabled: false, reminders: [],
+    gifts: [], lastFreeGift: "",
     premium: { tier: "free", expiresAt: 0 },
     usage: { day: "", text: 0, images: 0, videos: 0 },
     selectedModel: "openai/gpt-oss-120b"
@@ -171,6 +157,8 @@ async function loadMemory(userId) {
       summary: String(data.summary || ""),
       voiceEnabled: Boolean(data.voiceEnabled),
       reminders: Array.isArray(data.reminders) ? data.reminders : [],
+      gifts: Array.isArray(data.gifts) ? data.gifts : [],
+      lastFreeGift: String(data.lastFreeGift || ""),
       premium: data.premium && typeof data.premium === "object" ? data.premium : { tier: "free", expiresAt: 0 },
       usage: data.usage && typeof data.usage === "object" ? data.usage : { day: "", text: 0, images: 0, videos: 0 },
       selectedModel: String(data.selectedModel || "openai/gpt-oss-120b")
@@ -2744,6 +2732,90 @@ bot.command("api", async ctx => {
 
 bot.command("id", async ctx => {
   await ctx.reply("Твой Telegram ID: <code>" + ctx.from.id + "</code>", { parse_mode: "HTML" });
+});
+
+// Бесплатные виртуальные подарки NEXUS (не Telegram Gifts, Stars не нужны).
+const FREE_GIFTS = [
+  { name: "Звёздный кот", icon: "🐱", rarity: "Обычный", note: "Маленький хранитель удачи" },
+  { name: "Космический кристалл", icon: "💎", rarity: "Редкий", note: "Кристалл энергии NEXUS" },
+  { name: "Золотая корона", icon: "👑", rarity: "Эпический", note: "Для настоящего лидера" },
+  { name: "Сердце галактики", icon: "💖", rarity: "Редкий", note: "Тёплый подарок из космоса" },
+  { name: "Мини-ракета", icon: "🚀", rarity: "Обычный", note: "Пусть все планы взлетают" },
+  { name: "Дракон удачи", icon: "🐉", rarity: "Легендарный", note: "Очень редкий символ удачи" },
+  { name: "Сияющая звезда", icon: "🌟", rarity: "Эпический", note: "Твой личный знак NEXUS" }
+];
+
+function kyivDayKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
+}
+
+bot.command("gift", async ctx => {
+  const userId = String(ctx.from.id);
+  const memory = await loadMemory(userId);
+  const today = kyivDayKey();
+
+  if (memory.lastFreeGift === today) {
+    return ctx.reply("🎁 Сегодня ты уже получил подарок!\nЗагляни завтра или посмотри коллекцию: /mygifts");
+  }
+
+  const gift = FREE_GIFTS[Math.floor(Math.random() * FREE_GIFTS.length)];
+  memory.gifts = Array.isArray(memory.gifts) ? memory.gifts : [];
+  memory.gifts.push({ ...gift, receivedAt: new Date().toISOString(), from: "NEXUS AI" });
+  memory.lastFreeGift = today;
+
+  if (!await saveMemory(userId)) {
+    memory.gifts.pop();
+    memory.lastFreeGift = "";
+    return ctx.reply("❌ Не удалось сохранить подарок. Попробуй позже.");
+  }
+
+  await ctx.reply(
+    "🎁 ТЕБЕ ПОДАРОК ОТ NEXUS AI!\n\n" +
+    gift.icon + " " + gift.name + "\n" +
+    "Редкость: " + gift.rarity + "\n" +
+    gift.note + "\n\n" +
+    "Подарок добавлен в твою коллекцию. /mygifts"
+  );
+});
+
+bot.command("mygifts", async ctx => {
+  const memory = await loadMemory(String(ctx.from.id));
+  const gifts = Array.isArray(memory.gifts) ? memory.gifts : [];
+  if (!gifts.length) {
+    return ctx.reply("🎁 Твоя коллекция пока пуста. Получи первый бесплатный подарок: /gift");
+  }
+
+  const counts = new Map();
+  for (const gift of gifts) {
+    const key = gift.name || "Неизвестный подарок";
+    counts.set(key, { icon: gift.icon || "🎁", count: (counts.get(key)?.count || 0) + 1, rarity: gift.rarity || "Обычный" });
+  }
+  const lines = [...counts.entries()].map(([name, item]) =>
+    item.icon + " " + name + " ×" + item.count + " — " + item.rarity
+  );
+  await ctx.reply("🎁 ТВОЯ КОЛЛЕКЦИЯ NEXUS\n\n" + lines.join("\n") +
+    "\n\nВсего подарков: " + gifts.length + "\nНовый подарок доступен раз в день: /gift");
+});
+
+bot.command("giftgrant", async ctx => {
+  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
+    return ctx.reply("⛔ Эта команда доступна только администратору.");
+  }
+  const match = String(ctx.match || "").trim().match(/^(\\d+)\\s+(\\d+)$/);
+  if (!match) return ctx.reply("Формат: /giftgrant TELEGRAM_ID НОМЕР_ПОДАРКА\nНомера: 1–" + FREE_GIFTS.length);
+  const targetId = match[1];
+  const index = Number(match[2]) - 1;
+  if (!FREE_GIFTS[index]) return ctx.reply("❌ Нет подарка с таким номером.");
+  const memory = await loadMemory(targetId);
+  memory.gifts = Array.isArray(memory.gifts) ? memory.gifts : [];
+  const gift = FREE_GIFTS[index];
+  memory.gifts.push({ ...gift, receivedAt: new Date().toISOString(), from: "Администратор NEXUS" });
+  if (!await saveMemory(targetId)) {
+    memory.gifts.pop();
+    return ctx.reply("❌ Не удалось сохранить подарок в Cloudflare KV.");
+  }
+  await ctx.reply("✅ Подарок " + gift.icon + " " + gift.name + " выдан пользователю " + targetId + ".");
+  await bot.api.sendMessage(targetId, "🎁 Администратор NEXUS подарил тебе: " + gift.icon + " " + gift.name + "!\n/mygifts").catch(() => {});
 });
 
 bot.command("premium", async ctx => {
