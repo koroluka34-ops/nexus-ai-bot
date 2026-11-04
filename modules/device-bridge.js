@@ -113,7 +113,9 @@ function installDeviceBridge(bot) {
       mouse_click: "нажать " + args.button + " кнопкой мыши",
       mouse_double: "сделать двойной щелчок (" + args.button + ")",
       mouse_scroll: "прокрутить " + args.direction + " на " + args.amount,
-      key_press: "нажать клавишу " + args.key
+      mouse_drag: "перетащить мышь из " + args.x1 + "," + args.y1 + " в " + args.x2 + "," + args.y2,
+      key_press: "нажать клавишу " + args.key,
+      hotkey: "нажать сочетание " + args.combo
     };
     const label = labels[action] || action;
     const keyboard = new InlineKeyboard().text("✅ Подтвердить", "pc_yes:" + id).text("Отмена", "pc_no:" + id);
