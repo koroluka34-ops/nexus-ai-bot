@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-webrtc-debug1"
+AGENT_VERSION = "2026.11.04-webrtc-rgb2"
 import base64
 import json
 import os
