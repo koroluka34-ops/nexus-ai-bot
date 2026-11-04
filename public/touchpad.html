@@ -51,11 +51,37 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
  moveChannel.onclose=()=>{status.textContent='Видео подключено · резервное управление';};
  moveChannel.onerror=()=>{status.textContent='Ошибка канала управления';};
  pc.addTransceiver('video',{direction:'recvonly'});
- pc.ontrack=e=>{video.srcObject=e.streams[0];video.play().catch(()=>{});screenState.textContent='Поток получен, ждём кадры…';};
- pc.oniceconnectionstatechange=()=>{screenState.textContent='ICE: '+pc.iceConnectionState+' / '+pc.connectionState;};
- video.onloadedmetadata=()=>{screenState.textContent='Видео: '+video.videoWidth+'×'+video.videoHeight;};
- video.onplaying=()=>{screenState.textContent='🟢 Видео воспроизводится';};
- video.onerror=()=>{screenState.textContent='Ошибка декодирования видео';};
+ let renderedFrames=0,frameWatchStarted=false;
+ function watchVideoFrames(){
+  if(frameWatchStarted||!video.requestVideoFrameCallback)return;
+  frameWatchStarted=true;
+  const onFrame=()=>{
+   renderedFrames++;
+   if(renderedFrames===1)screenState.textContent='🟢 Первый видеокадр отображён';
+   else if(renderedFrames%30===0)screenState.textContent='🟢 Видео идёт · кадров: '+renderedFrames;
+   video.requestVideoFrameCallback(onFrame);
+  };
+  video.requestVideoFrameCallback(onFrame);
+ }
+ async function playVideo(){
+  try{await video.play();watchVideoFrames();}
+  catch(err){screenState.textContent='Нажми на область видео для запуска ('+(err?.name||'ошибка')+')';}
+ }
+ pc.ontrack=e=>{
+  const track=e.track;
+  const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([track]);
+  video.srcObject=stream;
+  screenState.textContent='Видеодорожка получена · '+track.readyState;
+  track.onunmute=()=>{screenState.textContent='Видеодорожка активна · запускаю…';playVideo();};
+  track.onmute=()=>{screenState.textContent='Видеодорожка временно без сигнала';};
+  playVideo();
+ };
+ pc.oniceconnectionstatechange=()=>{if(!renderedFrames)screenState.textContent='ICE: '+pc.iceConnectionState+' / '+pc.connectionState;};
+ video.onloadedmetadata=()=>{if(!renderedFrames)screenState.textContent='Поток: '+video.videoWidth+'×'+video.videoHeight+' · готов к воспроизведению';playVideo();};
+ video.onplaying=()=>{watchVideoFrames();if(!renderedFrames)screenState.textContent='Воспроизведение запущено · ждём первый кадр…';};
+ video.onwaiting=()=>{if(!renderedFrames)screenState.textContent='Видеопоток подключён, ожидание кадра…';};
+ video.onerror=()=>{screenState.textContent='Ошибка декодирования видео · код '+(video.error?.code||'неизвестен');};
+ video.addEventListener('click',playVideo);
  pc.onconnectionstatechange=()=>{if(['failed','disconnected','closed'].includes(pc.connectionState))screenState.textContent='Связь с видео потеряна';};
  try{
   const offer=await pc.createOffer();await pc.setLocalDescription(offer);
