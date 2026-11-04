@@ -62,8 +62,10 @@ def execute(command):
         text = str(args.get("text", ""))
         if len(text) > 1000: raise ValueError("Text too long")
         import pyautogui
-        pyautogui.write(text, interval=0.01)
-        return {"result": "Текст напечатан в активном окне."}
+        import pyperclip
+        pyperclip.copy(text)
+        pyautogui.hotkey("ctrl", "v")
+        return {"result": "Текст вставлен в активное окно."}
     raise ValueError("Unknown action")
 
 def main():
