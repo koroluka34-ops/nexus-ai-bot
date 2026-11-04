@@ -59,8 +59,9 @@ installOpsSuite(bot, askAI);
 const { installCommunitySuite } = require("./modules/community-suite");
 installCommunitySuite(bot);
 
-const { installPersonalSuite } = require("./modules/personal-suite");
+const { installPersonalSuite, installKVCheck } = require("./modules/personal-suite");
 installPersonalSuite(bot);
+installKVCheck(bot);
 
 const { installUtilitySuite } = require("./modules/utility-suite");
 installUtilitySuite(bot);
@@ -606,6 +607,7 @@ function allCommandsText() {
 
 ━━━━━━━━━━━━━━━━━━
 🧰 <b>РАБОЧИЕ УТИЛИТЫ NEXUS</b>
+<code>/kvcheck</code> — проверить реальные права и работу Cloudflare KV.
 <code>/note add текст</code> — создать личную заметку.
 <code>/note list|get ID|find слово|del ID</code> — управлять заметками.
 <code>/todo add задача</code> — добавить личную задачу.
@@ -4310,6 +4312,7 @@ async function start() {
     { command: "skillsearch", description: "Найти ИИ-навык по теме" },
     { command: "skillrandom", description: "Выбрать случайный ИИ-навык" },
     { command: "skillinfo", description: "Подробности выбранного ИИ-навыка" },
+    { command: "kvcheck", description: "Проверить чтение и запись Cloudflare KV" },
     { command: "note", description: "Личные заметки с сохранением" },
     { command: "todo", description: "Список задач и отметка выполнения" },
     { command: "poll", description: "Создать Telegram-опрос" },
