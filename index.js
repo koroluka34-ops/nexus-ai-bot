@@ -59,7 +59,7 @@ function isAddressedToBot(ctx, text = "") {
   const usernameMention = botUsername
     ? String(text).toLowerCase().includes("@" + botUsername.toLowerCase())
     : false;
-  const nameMention = /\\bnexus(?:\\s+ai)?\\b/i.test(text);
+  const nameMention = /\bnexus(?:\s+ai)?\b/i.test(text);
   const repliedToBot = ctx.message?.reply_to_message?.from?.id === bot.botInfo?.id;
   return usernameMention || nameMention || repliedToBot;
 }
@@ -68,7 +68,7 @@ function removeBotMention(text) {
   const botUsername = bot.botInfo?.username;
   let cleaned = String(text || "");
   if (botUsername) cleaned = cleaned.split("@" + botUsername).join(" ");
-  return cleaned.replace(/\\bnexus(?:\\s+ai)?\\b[:,]?/ig, " ").replace(/\\s+/g, " ").trim();
+  return cleaned.replace(/\bnexus(?:\s+ai)?\b[:,]?/ig, " ").replace(/\s+/g, " ").trim();
 }
 
 const MAX_HISTORY = 10;
@@ -2881,7 +2881,7 @@ bot.command("giftgrant", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
     return ctx.reply("⛔ Эта команда доступна только администратору.");
   }
-  const match = String(ctx.match || "").trim().match(/^(\\d+)\\s+(\\d+)$/);
+  const match = String(ctx.match || "").trim().match(/^(\\d+)\s+(\\d+)$/);
   if (!match) return ctx.reply("Формат: /giftgrant TELEGRAM_ID НОМЕР_ПОДАРКА\nНомера: 1–" + FREE_GIFTS.length);
   const targetId = match[1];
   const index = Number(match[2]) - 1;
