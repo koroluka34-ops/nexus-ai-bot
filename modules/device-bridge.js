@@ -66,9 +66,9 @@ function installDeviceBridge(bot) {
       if (!arg || arg.length > 1000) return ctx.reply("Укажи текст длиной от 1 до 1000 символов.");
       action = "type_text"; args.text = arg;
     } else if (verb === "mouse") {
-      const [op, ...parts] = arg.split(/\\s+/);
+      const [op, ...parts] = arg.split(/\s+/);
       if (op === "move") {
-        if (parts.length !== 2 || !parts.every(v => /^\\d{1,5}$/.test(v))) return ctx.reply("Формат: /pc mouse move 500 300");
+        if (parts.length !== 2 || !parts.every(v => /^\d{1,5}$/.test(v))) return ctx.reply("Формат: /pc mouse move 500 300");
         args.x = Number(parts[0]); args.y = Number(parts[1]);
         if (args.x > 10000 || args.y > 10000) return ctx.reply("Координаты слишком большие.");
         action = "mouse_move";
