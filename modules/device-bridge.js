@@ -168,7 +168,6 @@ function verifyTelegramWebApp(initData) {
     if (!/^\d+$/.test(String(authDate)) || authDate > Date.now()/1000 + 60) return "auth_date_invalid";
     if (Date.now()/1000 - authDate > 86400) return "auth_data_expired";
     params.delete("hash");
-    params.delete("signature");
     const check = [...params.entries()].sort().map(([k,v]) => k + "=" + v).join("\n");
     const secret = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
     const expected = crypto.createHmac("sha256", secret).update(check).digest();
