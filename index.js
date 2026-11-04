@@ -2807,7 +2807,7 @@ bot.on("message:text", async ctx => {
   }
 
   const fileRequest = question.match(
-    /^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:файл|документ|док|текстовый\\s+файл|таблицу|презентацию)(?:\s+(docx|pdf|xlsx|pptx|txt))?\s*[:,-]?\s*([\s\S]*)$/i
+    /^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:файл|документ|док|текстовый\s+файл|таблицу|презентацию)(?:\s+(docx|pdf|xlsx|pptx|txt))?\s*[:,-]?\s*([\s\S]*)$/i
   );
   if (fileRequest) {
     const format = (fileRequest[1] || "").toLowerCase() ||
