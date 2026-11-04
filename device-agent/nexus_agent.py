@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-gamepad-v2"
+AGENT_VERSION = "2026.11.05-cursor-toggle"
 import base64
 import json
 import os
@@ -248,6 +248,7 @@ def start_webrtc_stream(cfg, offer):
             from av import VideoFrame
             import mss
             import numpy as np
+            cursor_visible = True
             class ScreenVideoTrack(VideoStreamTrack):
                 kind = "video"
                 def __init__(self):
@@ -293,7 +294,7 @@ def start_webrtc_stream(cfg, offer):
                             class CursorPoint(ctypes.Structure):
                                 _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
                             cursor = CursorPoint()
-                            if ctypes.windll.user32.GetCursorPos(ctypes.byref(cursor)):
+                            if cursor_visible and ctypes.windll.user32.GetCursorPos(ctypes.byref(cursor)):
                                 cx = int((cursor.x - int(self.monitor.get("left", 0))) * scale)
                                 cy = int((cursor.y - int(self.monitor.get("top", 0))) * scale)
                                 if 0 <= cx < shot.shape[1] and 0 <= cy < shot.shape[0]:
@@ -341,11 +342,16 @@ def start_webrtc_stream(cfg, offer):
                 print("WebRTC канал управления открыт:", channel.label)
                 @channel.on("message")
                 def on_control_message(message):
+                    nonlocal cursor_visible
                     try:
                         if isinstance(message, bytes):
                             message = message.decode("utf-8")
                         data = json.loads(message)
                         kind = data.get("type")
+                        if kind == "cursor-visibility":
+                            cursor_visible = bool(data.get("visible", True))
+                            print("Курсор в видеопотоке:", "показан" if cursor_visible else "скрыт")
+                            return
                         if kind == "move":
                             dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
                             if abs(dx) > 500 or abs(dy) > 500:
