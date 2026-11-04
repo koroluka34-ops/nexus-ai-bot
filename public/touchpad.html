@@ -65,8 +65,11 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b1020');tg.setBackgroundColor('#0b1020');}
  let sensitivity=0.5;const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0,moveChannel=null;
  function sendMoveFast(dx,dy){
-  // Отправляем движение через HTTP-очередь агента, чтобы оно было видно
-  // в логе как touch_move и обрабатывалось тем же путём, что и остальные команды.
+  // Камера требует частого относительного движения; DataChannel отправляет
+  // его напрямую агенту, без задержки HTTP-поллинга.
+  if(moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){
+   moveChannel.send(JSON.stringify({type:'move',dx,dy}));return true;
+  }
   return false;
  }
  async function send(payload){
@@ -137,9 +140,11 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function endGameLook(e){if(e.pointerId===gameLookPointer){gameLookPointer=null;send({type:'game-mouse',button:'right',state:'up'});}}
  screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
  function sendRealtime(payload,fallback){
-  // Игровые клавиши и кнопки отправляем через HTTP-очередь агента.
-  // DataChannel оставляем только для непрерывного движения камеры:
-  // так нажатия не теряются при несовпадении версий WebRTC-обработчика.
+  // Удержание ПКМ/ЛКМ отправляем через тот же быстрый WebRTC-канал,
+  // что и движение камеры: HTTP-поллинг мог доставить отпускание позже движения.
+  if(payload.type==='game-mouse'&&moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){
+   moveChannel.send(JSON.stringify({type:'game-mouse',button:payload.button,state:payload.state}));return true;
+  }
   send(fallback||payload);
   return false;
  }
