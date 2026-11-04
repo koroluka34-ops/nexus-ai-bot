@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-smooth1"
+AGENT_VERSION = "2026.11.04-smooth2"
 import base64
 import json
 import os
@@ -75,7 +75,7 @@ def execute(command):
         if action == "touch_move":
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
             if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
-            pyautogui.moveRel(dx, dy, duration=0.035)
+            pyautogui.moveRel(dx, dy, duration=0)
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
