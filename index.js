@@ -498,7 +498,7 @@ function allCommandsText() {
 <code>/start</code> — запустить бота.
 <code>/menu</code> — открыть главное меню.
 <code>/commands</code> — показать все команды.
-<code>/status</code> — проверить состояние сервисов.\n<code>/antiscam on|off</code> — защита группы от фишинга и скама.\n<code>/checksite URL</code> — разовая проверка сайта.\n<code>/watch URL</code>, <code>/watches</code>, <code>/unwatch ID</code> — мониторинг сайтов.\n<code>/personality</code> — выбрать характер NEXUS AI.
+<code>/status</code> — проверить состояние сервисов.\n<code>/antiscam on|off</code> — защита группы от фишинга и скама.\n<code>/checksite URL</code> — разовая проверка сайта.\n<code>/watch URL</code>, <code>/watches</code>, <code>/unwatch ID</code> — мониторинг сайтов.\n<code>/groupstats</code> — статистика активности группы (админам).\n<code>/rule add фраза | предупреждение</code> — своё правило группы.\n<code>/rule list|remove ID</code> — список / удаление правил.\n<code>/checkapi URL</code> — проверить API, HTTP, задержку и JSON.\n<code>/domaincheck домен</code> — проверить SPF, DMARC и MX.\n<code>/factcheck утверждение</code> — предварительный ИИ-разбор факта.\n<code>/nexushealth</code> — RAM, uptime, Node.js и состояние процесса.\n<code>/personality</code> — выбрать характер NEXUS AI.
 <code>/reset</code> — очистить текущую историю диалога.
 <code>/groupmode on|off</code> — общий контекст ИИ в группе.
 <code>/kb</code> — база знаний из твоих документов.
