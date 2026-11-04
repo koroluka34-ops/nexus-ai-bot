@@ -107,10 +107,15 @@ function installCommunitySuite(bot) {
           } catch {}
           const reasons = admin ? [] : antiSpamReasons(msg, rows);
           if (reasons.length) {
-            const oldStrike = violations.get(key) || { count: 0, at: now };
-            const count = now - oldStrike.at > 600000 ? 1 : oldStrike.count + 1;
-            violations.set(key, { count, at: now });
-            const reasonText = reasons.map(escapeHtml).join("; ");
+            const oldStrike = violations.get(key) || { count: 0, at: 0, lastTriggeredAt: 0 };
+            // Одна серия флуда (10 секунд) считается одним нарушением.
+            // Это не даёт выдать предупреждение, удаление и несколько мутов подряд.
+            if (now - oldStrike.lastTriggeredAt < 10000) {
+              // Нарушение этой серии уже обработано — ждём следующую отдельную серию.
+            } else {
+              const count = now - oldStrike.at > 600000 ? 1 : oldStrike.count + 1;
+              violations.set(key, { count, at: now, lastTriggeredAt: now });
+              const reasonText = reasons.map(escapeHtml).join("; ");
 
             if (count === 1) {
               await ctx.reply(
@@ -139,6 +144,7 @@ function installCommunitySuite(bot) {
                   ? "🔇 Пользователь получил мут на " + duration + " за повторный спам."
                   : "⚠️ Сообщение удалено. Не удалось выдать мут: назначь NEXUS администратором с правом блокировки участников.")
                   .catch(() => {});
+              }
               }
             }
           }
