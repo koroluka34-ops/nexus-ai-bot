@@ -42,10 +42,10 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
 <section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
 <div class="pad" id="pad"><div><strong>Води пальцем здесь</strong><span>Один палец — курсор · два пальца — прокрутка<br>Тап — левый клик</span></div></div>
-<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button></div></section>
+<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button><button type="button" data-key="f11" class="wide">⛶ F11 · Полный экран ПК</button></div></section>
 <div id="gamePicker" class="game-picker"><div class="game-picker-card"><h2>Во что играем?</h2><p>Выбери игру — откроется горизонтальный игровой экран с джойстиком.</p><div class="game-picker-options"><button type="button" data-select-game="minecraft"><span>⛏️</span>Minecraft</button><button type="button" data-select-game="roblox"><span>🎮</span>Roblox</button></div><button type="button" id="gamePickerCancel" class="game-picker-cancel">Отмена</button></div></div>
 <section id="gamePanel" class="game-panel">
- <div class="small">Джойстик — движение. Справа — действия. Удерживай кнопку, чтобы держать клавишу.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">100%</b></label><input id="sensitivity" type="range" min="25" max="180" step="5" value="100"></div>
+ <div class="small">Веди пальцем по изображению — поворот камеры. Джойстик слева — движение. Справа — действия.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">100%</b></label><input id="sensitivity" type="range" min="25" max="180" step="5" value="100"></div>
  <div class="game-layout">
   <div class="joystick-wrap"><div id="gameJoystick" class="joystick" aria-label="Игровой джойстик"><div id="joystickKnob" class="joystick-knob"></div></div><div class="joystick-caption">ДВИЖЕНИЕ</div></div>
   <div class="game-grid">
@@ -132,11 +132,9 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function endGameLook(e){if(e.pointerId===gameLookPointer)gameLookPointer=null;}
  screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
  function sendRealtime(payload,fallback){
-  // Игровые клавиши и кнопки мыши отправляем через HTTP-очередь:
-  // так они доходят до агента даже если WebRTC DataChannel открыт,
-  // но его канал ввода на телефоне работает нестабильно.
-  // Быстрый DataChannel оставляем только для движения камеры.
-  if(payload.type==='move'&&moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<65536){
+  // Весь игровой ввод отправляем напрямую по WebRTC, чтобы клавиши
+  // и джойстик не ждали очереди HTTP-команд. HTTP остаётся резервом.
+  if(['move','game-key','game-mouse','game-click'].includes(payload.type)&&moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<65536){
    try{moveChannel.send(JSON.stringify(payload));return true;}catch{}
   }
   send(fallback||payload);
@@ -178,9 +176,9 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
   if(dist>max){dx=dx/dist*max;dy=dy/dist*max;}
   joystickKnob.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
   const nx=dx/max,ny=dy/max,next=new Set();
-  if(Math.hypot(nx,ny)>.22){
-   if(ny<-.32)next.add('w');if(ny>.32)next.add('s');
-   if(nx<-.32)next.add('a');if(nx>.32)next.add('d');
+  if(Math.hypot(nx,ny)>.16){
+   if(ny<-.22)next.add('w');if(ny>.22)next.add('s');
+   if(nx<-.22)next.add('a');if(nx>.22)next.add('d');
   }
   for(const key of joystickKeys)if(!next.has(key))sendRealtime({type:'game-key',key,state:'up'},{type:'game-key',key,state:'up'});
   for(const key of next)if(!joystickKeys.has(key))sendRealtime({type:'game-key',key,state:'down'},{type:'game-key',key,state:'down'});
