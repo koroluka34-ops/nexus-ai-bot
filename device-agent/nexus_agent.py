@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-smooth4"
+AGENT_VERSION = "2026.11.04-stream1"
 import base64
 import json
 import os
@@ -131,9 +131,22 @@ def main():
     print("NEXUS Agent", AGENT_VERSION, "| файл:", __file__)
     print("NEXUS Agent подключается к", cfg["server"])
     print("Остановка: Ctrl+C. Агент не принимает произвольные shell-команды.")
+    last_screen_frame = 0
     while True:
         try:
             data = request(cfg, "/device/poll")
+            if data.get("touchpadActive") and time.time() - last_screen_frame >= 0.9:
+                try:
+                    import pyautogui
+                    from io import BytesIO
+                    shot = pyautogui.screenshot()
+                    shot.thumbnail((960, 540))
+                    buf = BytesIO()
+                    shot.save(buf, format="JPEG", quality=48, optimize=True)
+                    request(cfg, "/device/stream", {"image": base64.b64encode(buf.getvalue()).decode("ascii")})
+                    last_screen_frame = time.time()
+                except Exception as screen_exc:
+                    print("Не удалось обновить экран:", str(screen_exc)[:160])
             command = data.get("command")
             if command:
                 action_name = command.get("action") if isinstance(command, dict) else None
