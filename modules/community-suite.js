@@ -14,6 +14,7 @@ let githubTimer = null;
 
 const activity = new Map();
 const warned = new Map();
+const violations = new Map();
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
 function kvUrl() {
@@ -105,14 +106,41 @@ function installCommunitySuite(bot) {
             admin = member.status === "creator" || member.status === "administrator";
           } catch {}
           const reasons = admin ? [] : antiSpamReasons(msg, rows);
-          const lastWarning = warned.get(key) || 0;
-          if (reasons.length && now - lastWarning > 60000) {
-            warned.set(key, now);
-            await ctx.reply(
-              "🚨 <b>Возможный спам</b>\nNEXUS обнаружил: " + reasons.map(escapeHtml).join("; ") +
-              ". Пожалуйста, прекрати рассылку.",
-              { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } }
-            ).catch(() => {});
+          if (reasons.length) {
+            const oldStrike = violations.get(key) || { count: 0, at: now };
+            const count = now - oldStrike.at > 600000 ? 1 : oldStrike.count + 1;
+            violations.set(key, { count, at: now });
+            const reasonText = reasons.map(escapeHtml).join("; ");
+
+            if (count === 1) {
+              await ctx.reply(
+                "🚨 <b>Предупреждение за спам</b>\\nNEXUS обнаружил: " + reasonText +
+                ". Следующее нарушение — удаление сообщения, затем мут.",
+                { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } }
+              ).catch(() => {});
+            } else {
+              const deleted = await ctx.api.deleteMessage(ctx.chat.id, msg.message_id)
+                .then(() => true).catch(() => false);
+              if (count === 2) {
+                await ctx.reply("🗑 Повторное нарушение: сообщение удалено. Следующий спам приведёт к муту.")
+                  .catch(() => {});
+              } else {
+                const seconds = count === 3 ? 60 : 300;
+                const untilDate = Math.floor(Date.now() / 1000) + seconds;
+                const muted = await ctx.api.restrictChatMember(ctx.chat.id, ctx.from.id, {
+                  permissions: { can_send_messages: false },
+                  until_date: untilDate
+                }).then(() => true).catch(e => {
+                  console.warn("NEXUS anti-spam mute failed:", e.message);
+                  return false;
+                });
+                const duration = seconds === 60 ? "1 минуту" : "5 минут";
+                await ctx.reply(muted
+                  ? "🔇 Пользователь получил мут на " + duration + " за повторный спам."
+                  : "⚠️ Сообщение удалено. Не удалось выдать мут: назначь NEXUS администратором с правом блокировки участников.")
+                  .catch(() => {});
+              }
+            }
           }
         }
 
