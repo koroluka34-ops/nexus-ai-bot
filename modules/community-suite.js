@@ -214,7 +214,7 @@ function installCommunitySuite(bot) {
       const release = await fetchLatestRelease(repo);
       const item = {
         repo, userId: String(ctx.from.id), chatId: String(ctx.chat.id),
-        lastTag: release?.tag || "", lastUrl: release?.url || "", createdAt: Date.now()
+        lastTag: release?.tag || "", lastUrl: release?.url || "", initialized: true, createdAt: Date.now()
       };
       state.github.push(item);
       const saved = await save();
@@ -255,9 +255,10 @@ function installCommunitySuite(bot) {
       try {
         const release = await fetchLatestRelease(item.repo);
         if (!release) continue;
-        if (!item.lastTag) {
+        if (!item.initialized) {
           item.lastTag = release.tag;
           item.lastUrl = release.url;
+          item.initialized = true;
           continue;
         }
         if (release.tag && release.tag !== item.lastTag) {
