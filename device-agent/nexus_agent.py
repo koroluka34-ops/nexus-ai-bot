@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-touchpad-stable7"
+AGENT_VERSION = "2026.11.04-touchpad-winapi8"
 import base64
 import json
 import os
@@ -74,13 +74,24 @@ def execute(command):
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0 if action == "touch_move" else 0.15
         if action == "touch_move":
-            # PyAutoGUI ignores durations below MINIMUM_DURATION (default 0.1s).
-            # Lower the threshold so short touchpad moves are genuinely interpolated.
+            # Use the Windows cursor API directly. PyAutoGUI's tween/interpolation
+            # path can raise ZeroDivisionError for very short touchpad movements.
+            import ctypes
+            from ctypes import wintypes
+            class POINT(ctypes.Structure):
+                _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
-            if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
-            # A tiny interpolation smooths the cursor without adding noticeable lag.
-            pyautogui.MINIMUM_DURATION = 0.01
-            pyautogui.moveRel(dx, dy, duration=0)
+            if abs(dx) > 500 or abs(dy) > 500:
+                raise ValueError("Слишком большое движение тачпада")
+            point = POINT()
+            user32 = ctypes.windll.user32
+            if not user32.GetCursorPos(ctypes.byref(point)):
+                raise OSError("Windows не вернула позицию курсора")
+            width, height = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+            nx = max(0, min(width - 1, point.x + dx))
+            ny = max(0, min(height - 1, point.y + dy))
+            if not user32.SetCursorPos(nx, ny):
+                raise OSError("Windows не смогла переместить курсор")
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
