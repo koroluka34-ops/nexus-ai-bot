@@ -2858,7 +2858,7 @@ bot.command("chatid", async ctx => {
   await ctx.reply(
     "🆔 <b>ID чата:</b> <code>" + ctx.chat.id + "</code>\\n" +
     "Тип: <code>" + chatType + "</code>\\n" +
-    "Название: " + escapeHtml(chatTitle),
+    "Название: " + String(chatTitle).replace(/[&<>]/g, ""),
     { parse_mode: "HTML" }
   );
 });
