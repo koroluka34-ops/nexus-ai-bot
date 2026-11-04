@@ -257,10 +257,21 @@ async function handleDeviceHttp(req, res) {
           if (!value.trim()) return sendJson(res, 400, { error: "empty_text" });
           if (touchpad.events.length < 12) touchpad.events.push({ action: "type_text", args: { text: value } });
           else return sendJson(res, 429, { error: "touchpad_queue_full" });
+        } else if (data.type === "key") {
+          const allowed = ["backspace", "delete", "left", "right", "up", "down", "home", "end", "enter", "esc", "tab"];
+          const key = String(data.key || "").toLowerCase();
+          if (!allowed.includes(key)) return sendJson(res, 400, { error: "invalid_key" });
+          if (touchpad.events.length < 12) touchpad.events.push({ action: "key_press", args: { key } });
+          else return sendJson(res, 429, { error: "touchpad_queue_full" });
+        } else if (data.type === "hotkey") {
+          const combo = String(data.combo || "").toLowerCase();
+          if (combo !== "ctrl+a") return sendJson(res, 400, { error: "invalid_hotkey" });
+          if (touchpad.events.length < 12) touchpad.events.push({ action: "hotkey", args: { combo } });
+          else return sendJson(res, 429, { error: "touchpad_queue_full" });
         } else if (data.type !== "heartbeat") {
           return sendJson(res, 400, { error: "unknown_touch_action" });
         }
-        if (data.type === "move" || data.type === "click" || data.type === "scroll" || data.type === "text") wakeTouchpadPoller();
+        if (["move", "click", "scroll", "text", "key", "hotkey"].includes(data.type)) wakeTouchpadPoller();
         sendJson(res, 200, { ok: true });
       } catch { sendJson(res, 400, { error: "bad_json" }); }
     });
