@@ -6,6 +6,24 @@ const { InputFile, InlineKeyboard } = require("grammy");
 const TOKEN = String(process.env.PC_AGENT_TOKEN || "");
 const BOT_TOKEN = String(process.env.BOT_TOKEN || "");
 const touchpad = { activeUntil: 0, dx: 0, dy: 0, events: [] };
+const pollWaiters = new Set();
+function takeTouchpadCommand() {
+  if (touchpad.events.length) return touchpad.events.shift();
+  if (touchpad.dx || touchpad.dy) {
+    const command = { action: "touch_move", args: { dx: touchpad.dx, dy: touchpad.dy } };
+    touchpad.dx = 0; touchpad.dy = 0;
+    return command;
+  }
+  return null;
+}
+function wakeTouchpadPoller() {
+  const waiter = pollWaiters.values().next().value;
+  if (!waiter) return;
+  pollWaiters.delete(waiter);
+  clearTimeout(waiter.timer);
+  const command = takeTouchpadCommand();
+  if (!waiter.res.writableEnded) sendJson(waiter.res, 200, { ok: true, command, touchpadActive: touchpad.activeUntil > Date.now(), pollAfterMs: 0 });
+}
 const OWNER_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
 const queue = [];
 const pending = new Map();
@@ -206,6 +224,7 @@ async function handleDeviceHttp(req, res) {
         } else if (data.type !== "heartbeat") {
           return sendJson(res, 400, { error: "unknown_touch_action" });
         }
+        if (data.type === "move" || data.type === "click" || data.type === "scroll") wakeTouchpadPoller();
         sendJson(res, 200, { ok: true });
       } catch { sendJson(res, 400, { error: "bad_json" }); }
     });
@@ -221,17 +240,21 @@ async function handleDeviceHttp(req, res) {
       const msg = "⌛ Команда отменена: истекло время ожидания ПК.";
       deviceBot.api.sendMessage(expired.chatId, msg).catch(() => {});
     }
-    let command = null;
-    if (touchpad.activeUntil > now) {
-      if (touchpad.events.length) command = touchpad.events.shift();
-      else if (touchpad.dx || touchpad.dy) {
-        command = { action: "touch_move", args: { dx: touchpad.dx, dy: touchpad.dy } };
-        touchpad.dx = 0; touchpad.dy = 0;
-      }
-    }
+    let command = touchpad.activeUntil > now ? takeTouchpadCommand() : null;
     const item = command ? null : queue.shift();
     if (!command && item) command = { id: item.id, action: item.action, args: item.args };
-    sendJson(res, 200, { ok: true, command, touchpadActive: touchpad.activeUntil > now, pollAfterMs: touchpad.activeUntil > now ? 40 : 1800 });
+    if (command || touchpad.activeUntil <= now) {
+      sendJson(res, 200, { ok: true, command, touchpadActive: touchpad.activeUntil > now, pollAfterMs: touchpad.activeUntil > now ? 0 : 1800 });
+      return true;
+    }
+    // Keep one request open; incoming touch movement wakes the agent immediately.
+    const waiter = { res, timer: null };
+    waiter.timer = setTimeout(() => {
+      pollWaiters.delete(waiter);
+      if (!res.writableEnded) sendJson(res, 200, { ok: true, command: null, touchpadActive: touchpad.activeUntil > Date.now(), pollAfterMs: 0 });
+    }, 20000);
+    pollWaiters.add(waiter);
+    req.on("close", () => { clearTimeout(waiter.timer); pollWaiters.delete(waiter); });
     return true;
   }
   if (req.method === "POST" && url.pathname === "/device/result") {
