@@ -93,7 +93,10 @@ def _send_windows_input(kind, code, down=True):
         item.union.ki = KEYBDINPUT(vk, 0, 0 if down else KEYEVENTF_KEYUP, 0, 0)
     else:
         raise ValueError("Неизвестный тип ввода")
-    sent = ctypes.windll.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT))
+    send_input = ctypes.windll.user32.SendInput
+    send_input.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
+    send_input.restype = wintypes.UINT
+    sent = send_input(1, ctypes.byref(item), ctypes.sizeof(INPUT))
     if sent != 1:
         raise OSError("Windows отклонила игровой ввод через SendInput")
 
