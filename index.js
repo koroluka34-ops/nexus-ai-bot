@@ -737,6 +737,53 @@ bot.command("image", async ctx => {
   );
 });
 
+// Короткий MP4 из ИИ-картинки с движением камеры (не полноценная text-to-video модель).
+async function handleVideoPrompt(ctx, prompt) {
+  const userId = ctx.from.id;
+  if (!prompt) {
+    await ctx.reply("Напиши, какое видео создать. Например: создай видео футуристического города ночью");
+    return;
+  }
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди предыдущую задачу.");
+    return;
+  }
+  busyUsers.add(userId);
+  const status = await ctx.reply("🎬 Создаю изображение и собираю короткое видео...");
+  let imagePath;
+  let videoPath;
+  try {
+    const image = await generateImage(prompt);
+    imagePath = await mediaTempPath("jpg");
+    videoPath = await mediaTempPath("mp4");
+    await fs.writeFile(imagePath, image);
+    await runFfmpeg([
+      "-y", "-loop", "1", "-i", imagePath,
+      "-vf",
+      "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720," +
+      "zoompan=z='min(zoom+0.0015,1.12)':d=120:s=1280x720:fps=24,format=yuv420p",
+      "-t", "5", "-an", "-c:v", "libx264", "-preset", "veryfast",
+      "-movflags", "+faststart", videoPath
+    ]);
+    const stat = await fs.stat(videoPath);
+    if (!stat.size || stat.size > 49 * 1024 * 1024) throw new Error("Видео слишком большое для Telegram.");
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await ctx.replyWithVideo(
+      new InputFile(videoPath, "nexus-video.mp4"),
+      { caption: "🎬 Готово! Короткое анимированное видео по твоему описанию. Оно создано из ИИ-изображения с движением камеры." }
+    );
+  } catch (error) {
+    await ctx.api.editMessageText(ctx.chat.id, status.message_id,
+      "❌ Не удалось создать видео: " + String(error.message).slice(0, 1400)
+    ).catch(() => {});
+  } finally {
+    if (imagePath) await fs.unlink(imagePath).catch(() => {});
+    if (videoPath) await fs.unlink(videoPath).catch(() => {});
+    busyUsers.delete(userId);
+  }
+}
+
+
 // ======================================================
 // PHOTO ANALYSIS
 // ======================================================
@@ -1293,7 +1340,8 @@ async function generateDocument(ctx, format, prompt) {
     docx: { extension: "docx", name: "Word" },
     pdf: { extension: "pdf", name: "PDF" },
     xlsx: { extension: "xlsx", name: "Excel" },
-    pptx: { extension: "pptx", name: "PowerPoint" }
+    pptx: { extension: "pptx", name: "PowerPoint" },
+    txt: { extension: "txt", name: "TXT" }
   };
 
   const selected = formats[format];
@@ -1344,6 +1392,9 @@ async function generateDocument(ctx, format, prompt) {
     if (format === "pptx") {
       await createPptx(result.answer, filePath);
     }
+    if (format === "txt") {
+      await fs.writeFile(filePath, result.answer, "utf8");
+    }
 
     await ctx.api.deleteMessage(
       ctx.chat.id,
@@ -1370,7 +1421,7 @@ async function generateDocument(ctx, format, prompt) {
 
 bot.command("create", async ctx => {
   const input = String(ctx.match || "").trim();
-  const match = input.match(/^(docx|pdf|xlsx|pptx)\s+([\s\S]+)$/i);
+  const match = input.match(/^(docx|pdf|xlsx|pptx|txt)\s+([\s\S]+)$/i);
 
   if (!match) {
     await ctx.reply(
@@ -1378,7 +1429,8 @@ bot.command("create", async ctx => {
       "/create docx Создай резюме\n" +
       "/create pdf Напиши инструкцию\n" +
       "/create xlsx Создай таблицу расходов\n" +
-      "/create pptx Презентация о космосе"
+      "/create pptx Презентация о космосе\n" +
+      "/create txt Обычный текстовый файл"
     );
     return;
   }
@@ -1733,8 +1785,15 @@ async function runAgent(ctx, task) {
     return;
   }
 
-  if (/нарисуй|создай картин|сгенерируй изображ/i.test(lower)) {
-    await handleImage(ctx, task);
+  if (/\\b(создай|сделай|сгенерируй)\\b/i.test(lower) && /\\b(видео|ролик)\\b/i.test(lower)) {
+    const prompt = task.replace(/^(?:создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:видео|ролик)\\s*/i, "").trim();
+    await handleVideoPrompt(ctx, prompt);
+    return;
+  }
+
+  if (/нарисуй|создай|сделай|сгенерируй/i.test(lower) && /фото|фотограф|картин|изображ/i.test(lower)) {
+    const prompt = task.replace(/^(?:нарисуй|создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:фото|фотографию|картинку|изображение)\\s*/i, "").trim();
+    await handleImage(ctx, prompt);
     return;
   }
 
@@ -2731,12 +2790,29 @@ bot.on("message:text", async ctx => {
     return;
   }
 
-  const imageRequest = question.match(
-    /^(?:нарисуй|создай(?: мне)? картинку|создай(?: мне)? изображение|сгенерируй(?: мне)? картинку|сгенерируй(?: мне)? изображение)\s+([\s\S]+)/i
+  const videoRequest = question.match(
+    /^(?:создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:видео|ролик)\\s*[:,-]?\\s*([\\s\\S]*)$/i
   );
+  if (videoRequest) {
+    await handleVideoPrompt(ctx, videoRequest[1].trim());
+    return;
+  }
 
+  const imageRequest = question.match(
+    /^(?:нарисуй|создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:фото|фотографию|картинку|изображение)\\s*[:,-]?\\s*([\\s\\S]+)$/i
+  );
   if (imageRequest) {
-    await handleImage(ctx, imageRequest[1]);
+    await handleImage(ctx, imageRequest[1].trim());
+    return;
+  }
+
+  const fileRequest = question.match(
+    /^(?:создай|сделай|сгенерируй)(?:\\s+мне)?\\s+(?:файл|документ|док|текстовый\\s+файл|таблицу|презентацию)(?:\\s+(docx|pdf|xlsx|pptx|txt))?\\s*[:,-]?\\s*([\\s\\S]*)$/i
+  );
+  if (fileRequest) {
+    const format = (fileRequest[1] || "").toLowerCase() ||
+      (/таблиц/iu.test(question) ? "xlsx" : /презентац/iu.test(question) ? "pptx" : "docx");
+    await generateDocument(ctx, format, fileRequest[2].trim() || question);
     return;
   }
 
