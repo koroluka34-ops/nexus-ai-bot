@@ -42,7 +42,7 @@ function installDeviceBridge(bot) {
     const [verb, ...rest] = input.split(/\s+/);
     const arg = rest.join(" ").trim();
     if (!verb || verb === "help") {
-      return ctx.reply("🖥 NEXUS PC\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — напечатать текст в активном окне\n\nИзменяющие действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
+      return ctx.reply("🖥 NEXUS PC\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
     }
     if (verb === "status") {
       const d = devices.get("windows-main");
@@ -65,10 +65,47 @@ function installDeviceBridge(bot) {
     } else if (verb === "type") {
       if (!arg || arg.length > 1000) return ctx.reply("Укажи текст длиной от 1 до 1000 символов.");
       action = "type_text"; args.text = arg;
+    } else if (verb === "mouse") {
+      const [op, ...parts] = arg.split(/\\s+/);
+      if (op === "move") {
+        if (parts.length !== 2 || !parts.every(v => /^\\d{1,5}$/.test(v))) return ctx.reply("Формат: /pc mouse move 500 300");
+        args.x = Number(parts[0]); args.y = Number(parts[1]);
+        if (args.x > 10000 || args.y > 10000) return ctx.reply("Координаты слишком большие.");
+        action = "mouse_move";
+      } else if (op === "click") {
+        const button = (parts[0] || "left").toLowerCase();
+        if (!["left", "right", "middle"].includes(button) || parts.length > 1) return ctx.reply("Формат: /pc mouse click [left|right|middle]");
+        args.button = button; action = "mouse_click";
+      } else if (op === "double") {
+        const button = (parts[0] || "left").toLowerCase();
+        if (!["left", "right"].includes(button) || parts.length > 1) return ctx.reply("Формат: /pc mouse double [left|right]");
+        args.button = button; action = "mouse_double";
+      } else if (op === "scroll") {
+        const direction = (parts[0] || "").toLowerCase();
+        const amount = parts[1] === undefined ? 3 : Number(parts[1]);
+        if (!["up", "down"].includes(direction) || parts.length > 2 || !Number.isInteger(amount) || amount < 1 || amount > 10) return ctx.reply("Формат: /pc mouse scroll up 3 (1–10)");
+        args.direction = direction; args.amount = amount; action = "mouse_scroll";
+      } else return ctx.reply("Команды мыши: move X Y, click [left|right|middle], double, scroll up/down [1–10].");
+    } else if (verb === "key") {
+      const key = arg.toLowerCase();
+      const allowed = ["enter", "esc", "tab", "space", "backspace", "delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown"];
+      if (!allowed.includes(key)) return ctx.reply("Разрешённые клавиши: enter, esc, tab, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown.");
+      args.key = key; action = "key_press";
     } else return ctx.reply("Неизвестная команда. Напиши /pc help.");
     const id = crypto.randomUUID();
     pending.set(id, { action, args, userId: String(ctx.from.id), chatId: ctx.chat.id });
-    const label = action === "screenshot" ? "сделать скриншот" : action === "open_url" ? "открыть сайт " + args.url : action === "launch" ? "запустить " + args.app : "напечатать указанный текст";
+    const labels = {
+      screenshot: "сделать скриншот",
+      open_url: "открыть сайт " + args.url,
+      launch: "запустить " + args.app,
+      type_text: "вставить указанный текст",
+      mouse_move: "переместить мышь в " + args.x + ", " + args.y,
+      mouse_click: "нажать " + args.button + " кнопкой мыши",
+      mouse_double: "сделать двойной щелчок (" + args.button + ")",
+      mouse_scroll: "прокрутить " + args.direction + " на " + args.amount,
+      key_press: "нажать клавишу " + args.key
+    };
+    const label = labels[action] || action;
     const keyboard = new InlineKeyboard().text("✅ Подтвердить", "pc_yes:" + id).text("Отмена", "pc_no:" + id);
     return ctx.reply("Подтверди действие на подключённом компьютере: " + label, { reply_markup: keyboard });
   });
