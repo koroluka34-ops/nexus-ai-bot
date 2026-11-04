@@ -1912,10 +1912,41 @@ bot.command("research", async ctx => {
   const status = await ctx.reply("🔎 Провожу исследование и ищу источники...");
   try {
     const result = await askAI(userId, "Проведи подробное исследование темы. Используй актуальный веб-поиск, проверь факты по нескольким источникам, отдели подтверждённые сведения от предположений, укажи даты и ссылки. Структурируй вывод: краткий итог, подробности, сравнение/данные и вывод. Тема: " + query, true);
+    const sourceUrls = (Array.isArray(result.annotations) ? result.annotations : [])
+      .map(item => {
+        const citation = item && (item.url_citation || item);
+        return citation && typeof citation.url === "string" ? citation.url.trim() : "";
+      })
+      .filter(url => {
+        try {
+          const parsed = new URL(url);
+          return (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+            parsed.hostname.includes(".") &&
+            !/^(example\.com|localhost)$/i.test(parsed.hostname);
+        } catch {
+          return false;
+        }
+      });
+    const uniqueSourceUrls = [...new Set(sourceUrls)];
+
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
-    if (!Array.isArray(result.annotations) || result.annotations.length === 0) {
-      result.answer = "⚠️ Поиск не вернул проверяемые ссылки. Поэтому я не буду выдавать этот текст за подтверждённые новости. Попробуй повторить запрос чуть позже.\\n\\n" + result.answer;
+
+    // Не показываем исследование без минимум двух реальных ссылок из поисковых аннотаций.
+    if (uniqueSourceUrls.length < 2) {
+      await ctx.reply(
+        "⚠️ Не удалось получить минимум два проверяемых источника. " +
+        "Я остановил исследование и не буду показывать неподтверждённый ответ. " +
+        "Попробуй повторить запрос позже или сформулировать его точнее."
+      );
+      return;
     }
+
+    // Удаляем псевдо-ссылки вида 【0†L12-L20】, которые модель может выдумать.
+    result.answer = String(result.answer || "")
+      .replace(/【[^】]*†L\d+(?:-L?\d+)?】/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
     await deliverAnswer(ctx, userId, result);
   } catch (error) {
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Исследование не удалось: " + String(error.message).slice(0, 1600)).catch(() => {});
