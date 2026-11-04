@@ -98,7 +98,11 @@ def execute(command):
             up.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
             inputs.extend((down, up))
         array_type = INPUT * len(inputs)
-        sent = ctypes.windll.user32.SendInput(len(inputs), array_type(*inputs), ctypes.sizeof(INPUT))
+        user32 = ctypes.windll.user32
+        user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
+        user32.SendInput.restype = wintypes.UINT
+        input_array = array_type(*inputs)
+        sent = user32.SendInput(len(inputs), input_array, ctypes.sizeof(INPUT))
         if sent != len(inputs):
             raise OSError("Windows SendInput ввёл не все символы: " + str(sent) + "/" + str(len(inputs)))
         return {"result": "Текст введён в активное окно Windows (" + str(len(text)) + " символов)."}
