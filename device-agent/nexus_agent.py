@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-webrtc2"
+AGENT_VERSION = "2026.11.04-webrtc-debug1"
 import base64
 import json
 import os
@@ -139,8 +139,10 @@ def start_webrtc_stream(cfg, offer):
                 kind = "video"
                 def __init__(self):
                     super().__init__()
-                    self.capture = mss.mss()
+                    self.capture = mss.MSS()
                     self.monitor = self.capture.monitors[1]
+                    self.frames = 0
+                    print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
                 async def recv(self):
                     pts, time_base = await self.next_timestamp()
                     shot = np.array(self.capture.grab(self.monitor))[:, :, :3]
@@ -149,17 +151,26 @@ def start_webrtc_stream(cfg, offer):
                     if scale < 1.0:
                         from PIL import Image
                         shot = np.array(Image.fromarray(shot).resize((int(width * scale), int(height * scale))))
+                    self.frames += 1
+                    if self.frames == 1 or self.frames % 60 == 0:
+                        print("WebRTC кадр", self.frames, "|", shot.shape[1], "x", shot.shape[0], "| пиксели", int(shot.min()), "-", int(shot.max()))
                     frame = VideoFrame.from_ndarray(shot, format="BGR")
                     frame.pts = pts
                     frame.time_base = time_base
                     return frame
             pc = RTCPeerConnection(RTCConfiguration(iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]))
+            @pc.on("iceconnectionstatechange")
+            async def on_ice_state():
+                print("WebRTC ICE:", pc.iceConnectionState, "| connection:", pc.connectionState)
+            @pc.on("connectionstatechange")
+            async def on_connection_state():
+                print("WebRTC connection:", pc.connectionState, "| ICE:", pc.iceConnectionState)
             pc.addTrack(ScreenVideoTrack())
             await pc.setRemoteDescription(RTCSessionDescription(sdp=offer["sdp"], type=offer["type"]))
             answer = await pc.createAnswer()
             await pc.setLocalDescription(answer)
             request(cfg, "/device/webrtc/answer", {"sessionId": offer["sessionId"], "sdp": pc.localDescription.sdp, "type": pc.localDescription.type})
-            print("Живое видео экрана отправляется в Telegram.")
+            print("WebRTC answer отправлен. Состояние:", pc.connectionState, "| ICE:", pc.iceConnectionState)
             try:
                 while pc.connectionState not in ("failed", "closed"):
                     await asyncio.sleep(1)
