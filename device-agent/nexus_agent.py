@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-smooth3"
+AGENT_VERSION = "2026.11.04-smooth4"
 import base64
 import json
 import os
@@ -75,10 +75,11 @@ def execute(command):
         if action == "touch_move":
             # PyAutoGUI ignores durations below MINIMUM_DURATION (default 0.1s).
             # Lower the threshold so short touchpad moves are genuinely interpolated.
-            pyautogui.MINIMUM_DURATION = 0.01
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
             if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
-            pyautogui.moveRel(dx, dy, duration=0.02, tween=pyautogui.linear)
+            # Instant relative movement avoids PyAutoGUI interpolation edge cases
+            # that can raise ZeroDivisionError for very short durations.
+            pyautogui.moveRel(dx, dy, duration=0)
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
