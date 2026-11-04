@@ -2822,8 +2822,25 @@ bot.command("giftgrant", async ctx => {
 // REAL TELEGRAM GIFTS — отправка официальных подарков Telegram
 // ======================================================
 
+async function telegramBotApi(method, payload = {}) {
+  const response = await fetch("https://api.telegram.org/bot" + BOT_TOKEN + "/" + method, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(20000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) {
+    const error = new Error(data.description || ("Telegram API HTTP " + response.status));
+    error.description = data.description || error.message;
+    error.error_code = data.error_code || response.status;
+    throw error;
+  }
+  return data.result;
+}
+
 async function getTelegramGifts() {
-  const result = await bot.api.callApi("getAvailableGifts", {});
+  const result = await telegramBotApi("getAvailableGifts");
   return Array.isArray(result.gifts) ? result.gifts : [];
 }
 
@@ -2869,7 +2886,7 @@ bot.command("realgift", async ctx => {
     }
 
     await ctx.reply("⏳ Отправляю настоящий подарок Telegram…");
-    await bot.api.callApi("sendGift", {
+    await telegramBotApi("sendGift", {
       user_id: targetId,
       gift_id: gift.id,
       text: "Подарок от NEXUS AI"
