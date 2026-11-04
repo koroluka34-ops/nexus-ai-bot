@@ -3814,16 +3814,24 @@ async function start() {
     { command: "unpin", description: "Открепить сообщение" }
   ];
 
+  // Полный нативный список всех зарегистрированных команд (Telegram показывает его при вводе "/").
+  const fullCommands = [
+    ...commonCommands,
+    ...groupCommands.slice(commonCommands.length),
+    { command: "giftgrant", description: "Выдать виртуальные подарки пользователю (админ)" },
+    { command: "premiumgrant", description: "Выдать Premium пользователю (админ)" }
+  ];
+
   try {
-    await bot.api.setMyCommands(commonCommands, {
+    await bot.api.setMyCommands(fullCommands, {
       scope: { type: "all_private_chats" },
       language_code: "ru"
     });
-    await bot.api.setMyCommands(groupCommands, {
+    await bot.api.setMyCommands(fullCommands, {
       scope: { type: "all_group_chats" },
       language_code: "ru"
     });
-    console.log("Telegram command menus registered (RU).");
+    console.log(`Telegram full command menu registered (RU): ${fullCommands.length} commands.`);
   } catch (error) {
     console.error("Command menu registration:", error.message);
   }
