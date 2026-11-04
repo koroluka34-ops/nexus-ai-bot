@@ -36,7 +36,11 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
  const sessionId=crypto.randomUUID();
  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
  pc.addTransceiver('video',{direction:'recvonly'});
- pc.ontrack=e=>{video.srcObject=e.streams[0];video.play().catch(()=>{});screenState.textContent='🟢 Живое видео';};
+ pc.ontrack=e=>{video.srcObject=e.streams[0];video.play().catch(()=>{});screenState.textContent='Поток получен, ждём кадры…';};
+ pc.oniceconnectionstatechange=()=>{screenState.textContent='ICE: '+pc.iceConnectionState+' / '+pc.connectionState;};
+ video.onloadedmetadata=()=>{screenState.textContent='Видео: '+video.videoWidth+'×'+video.videoHeight;};
+ video.onplaying=()=>{screenState.textContent='🟢 Видео воспроизводится';};
+ video.onerror=()=>{screenState.textContent='Ошибка декодирования видео';};
  pc.onconnectionstatechange=()=>{if(['failed','disconnected','closed'].includes(pc.connectionState))screenState.textContent='Связь с видео потеряна';};
  try{
   const offer=await pc.createOffer();await pc.setLocalDescription(offer);
