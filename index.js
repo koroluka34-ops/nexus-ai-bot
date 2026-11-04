@@ -587,10 +587,13 @@ function allCommandsText() {
 <code>/base64 decode строка</code> — декодировать Base64.
 
 ━━━━━━━━━━━━━━━━━━
-🧠 <b>БИБЛИОТЕКА 950 НАВЫКОВ</b>
-<code>/skills</code> — открыть каталог из 950 ИИ-навыков.
+🧠 <b>БИБЛИОТЕКА 1 000 НАВЫКОВ</b>
+<code>/skills</code> — открыть каталог из 1 000 ИИ-навыков.
 <code>/skills 2</code> — открыть вторую страницу каталога.
 <code>/skill 501 запрос</code> — запустить выбранный навык.
+<code>/skillsearch тема</code> — найти навыки по ключевым словам.
+<code>/skillrandom</code> — выбрать случайный навык.
+<code>/skillinfo 1000</code> — посмотреть подробности навыка.
 
 ━━━━━━━━━━━━━━━━━━
 🌐 <b>ВНЕШНИЕ API</b>
@@ -3101,7 +3104,7 @@ bot.command("transcribe", async ctx => {
 // ======================================================
 // NEXUS AI — 1,000 SKILL LIBRARY + PUBLIC API TOOLS
 // ======================================================
-const { SKILLS, getSkill, skillsPage } = require("./nexus-catalog");
+const { SKILLS, getSkill, searchSkills, skillsPage } = require("./nexus-catalog");
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -3130,6 +3133,41 @@ bot.command("skill", async ctx => {
     return;
   }
   await runTextTool(ctx, "🧠 Навык " + skill.id + ": " + skill.domain, skill.instruction, match[2]);
+});
+
+bot.command("skillsearch", async ctx => {
+  const query = String(ctx.match || "").trim();
+  if (!query) return ctx.reply("🔎 Напиши тему для поиска. Например: /skillsearch Python отладка");
+  const found = searchSkills(query, 15);
+  if (!found.length) return ctx.reply("По этому запросу навыки не найдены. Попробуй другие слова или открой /skills.");
+  const rows = found.map(skill => skill.id + ". " + skill.domain + " — " + skill.task);
+  return ctx.reply(
+    "🔎 НАЙДЕНО НАВЫКОВ: " + found.length + "\\n\\n" + rows.join("\\n") +
+    "\\n\\nЗапуск: /skill НОМЕР твой запрос",
+    { disable_web_page_preview: true }
+  );
+});
+
+bot.command("skillrandom", async ctx => {
+  const skill = SKILLS[crypto.randomInt(SKILLS.length)];
+  return ctx.reply(
+    "🎲 СЛУЧАЙНЫЙ НАВЫК\\n\\n" + skill.id + ". " + skill.domain + " — " + skill.task +
+    "\\n\\nЗапусти его: /skill " + skill.id + " опиши свою задачу"
+  );
+});
+
+bot.command("skillinfo", async ctx => {
+  const id = Number(String(ctx.match || "").trim());
+  if (!Number.isInteger(id) || id < 1 || id > SKILLS.length) {
+    return ctx.reply("Укажи номер навыка от 1 до " + SKILLS.length + ". Например: /skillinfo 1000");
+  }
+  const skill = getSkill(id);
+  return ctx.reply(
+    "🧠 НАВЫК " + skill.id + "\\n\\nНаправление: " + skill.domain +
+    "\\nЗадача: " + skill.task +
+    "\\n\\nИнструкция: " + skill.instruction +
+    "\\n\\nЗапуск: /skill " + skill.id + " твой запрос"
+  );
 });
 
 bot.command("weather", async ctx => {
@@ -4245,6 +4283,9 @@ async function start() {
     { command: "transcribe", description: "Преобразовать аудио в текст" },
     { command: "skills", description: "Показать доступные навыки ИИ" },
     { command: "skill", description: "Использовать выбранный навык" },
+    { command: "skillsearch", description: "Найти ИИ-навык по теме" },
+    { command: "skillrandom", description: "Выбрать случайный ИИ-навык" },
+    { command: "skillinfo", description: "Подробности выбранного ИИ-навыка" },
     { command: "weather", description: "Узнать погоду" },
     { command: "fx", description: "Показать курс валют" },
     { command: "country", description: "Информация о стране" },
