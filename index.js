@@ -4054,8 +4054,8 @@ bot.on("message:text", async ctx => {
   if (adultArtPendingUsers.has(userId)) {
     adultArtPendingUsers.delete(userId);
     const adultArtPrompt =
-      "Photorealistic sensual boudoir and glamour editorial of a clearly adult 25+ fictional woman, elegant tasteful opaque lingerie set or silk robe, alluring but non-explicit pose, sophisticated intimate atmosphere, luxurious bedroom or hotel suite, soft warm cinematic lighting, natural realistic skin texture, high-end fashion magazine photography, detailed composition. " +
-      "Fictional adult character only; lingerie remains opaque and covers intimate areas; no nudity, no visible genitals, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
+      "Photorealistic fine-art boudoir editorial of a clearly adult 25+ fictional woman, artistic implied-nudity aesthetic with bare shoulders, back and legs, elegant pose, intimate cinematic atmosphere in a luxurious bedroom or hotel suite. Use carefully draped opaque silk sheets and tasteful framing to fully cover breasts, nipples and pelvic area; optional soft artistic blur only over the fabric-covered silhouette, never expose intimate anatomy. Warm soft lighting, natural realistic skin texture, high-end fine-art magazine photography, detailed composition. " +
+      "Fictional adult character only; intimate areas remain fully covered by opaque fabric and are not visible; no explicit nudity, no visible nipples or genitals, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
       "User's visual concept: " + addressedQuestion;
     await handleAdultImage(ctx, adultArtPrompt);
     return;
