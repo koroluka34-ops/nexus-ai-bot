@@ -143,8 +143,8 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function sendRealtime(payload,fallback){
   // Удержание ПКМ/ЛКМ отправляем через тот же быстрый WebRTC-канал,
   // что и движение камеры: HTTP-поллинг мог доставить отпускание позже движения.
-  if(payload.type==='game-mouse'&&moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){
-   moveChannel.send(JSON.stringify({type:'game-mouse',button:payload.button,state:payload.state}));return true;
+  if((payload.type==='game-mouse'||payload.type==='game-key')&&moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){
+   moveChannel.send(JSON.stringify(payload));return true;
   }
   send(fallback||payload);
   return false;
