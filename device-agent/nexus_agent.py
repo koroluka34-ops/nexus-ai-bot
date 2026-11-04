@@ -67,10 +67,15 @@ def execute(command):
         pyperclip.copy(text)
         pyautogui.hotkey("ctrl", "v")
         return {"result": "Текст вставлен в активное окно."}
-    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "key_press", "hotkey"):
+    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "touch_move", "key_press", "hotkey"):
         import pyautogui
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.15
+        if action == "touch_move":
+            dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
+            if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
+            pyautogui.moveRel(dx, dy, duration=0)
+            return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
             width, height = pyautogui.size()
@@ -127,10 +132,11 @@ def main():
             if command:
                 try: result = execute(command)
                 except Exception as exc: result = {"result": "Ошибка: " + str(exc)[:500]}
-                result["id"] = command["id"]
-                request(cfg, "/device/result", result)
+                if command.get("id"):
+                    result["id"] = command["id"]
+                    request(cfg, "/device/result", result)
             else:
-                time.sleep(max(0.5, min(5, data.get("pollAfterMs", 1800) / 1000)))
+                time.sleep(max(0.04, min(5, data.get("pollAfterMs", 1800) / 1000)))
         except urllib.error.HTTPError as exc:
             print("HTTP", exc.code, "— проверь PC_AGENT_TOKEN в Render и agent-config.json")
             time.sleep(8)
