@@ -242,12 +242,11 @@ async function consumeQuota(userId, kind) {
 
 function premiumStatusText(memory) {
   const tier = currentPlan(memory), plan = PREMIUM_PLANS[tier], usage = resetDailyUsage(memory);
-  const videoLimit = tier === "free" ? 0 : tier === "plus" ? 3 : 10;
   const model = tier === "free" ? "GPT-OSS 120B" : (memory.selectedModel || "qwen/qwen3.8-27b");
   return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" +
     "Запросы: " + usage.text + "/" + plan.text + " сегодня\n" +
-    "Изображения: " + usage.images + "/" + plan.images + " сегодня\n" +
-    "Видео: " + usage.videos + "/" + videoLimit + " сегодня\n" +
+    "Изображения: без лимита\n" +
+    "Видео: без лимита\n" +
     "Модель: <code>" + model + "</code>\n" +
     "Приоритет генерации: " + (tier === "ultra" ? "высокий" : tier === "plus" ? "повышенный" : "обычный") +
     (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
@@ -261,7 +260,7 @@ let generationRunning = false;
 async function enqueueGeneration(userId, task) {
   const memory = await loadMemory(userId);
   const tier = currentPlan(memory);
-  const priority = PREMIUM_PLANS[tier].priority;
+  const priority = 0; // Фото и видео доступны всем на равных условиях.
   return new Promise((resolve, reject) => {
     generationQueue.push({ userId, priority, createdAt: Date.now(), task, resolve, reject });
     generationQueue.sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt);
@@ -853,11 +852,6 @@ async function handleImage(ctx, prompt) {
     await ctx.reply("⏳ Подожди предыдущий запрос.");
     return;
   }
-
-  const quota = await consumeQuota(userId, "image");
-  if (!quota.ok) return ctx.reply(quota.storageError
-    ? "❌ Не удалось сохранить лимит в Cloudflare KV."
-    : "⛔ Дневной лимит изображений исчерпан. Обновится завтра. /premium");
 
   busyUsers.add(userId);
 
@@ -1769,10 +1763,6 @@ bot.command("circle", async ctx => {
 
 // Не выдаём анимацию за генерацию ИИ-видео и не подключаем платный API.
 bot.command("video", async ctx => {
-  const quota = await consumeQuota(ctx.from.id, "video");
-  if (!quota.ok) return ctx.reply(quota.storageError
-    ? "❌ Не удалось сохранить лимит в Cloudflare KV."
-    : "⛔ Видео доступно тарифам NEXUS PLUS и ULTRA. /premium");
   await handleVideoPrompt(ctx, String(ctx.match || "").trim());
 });
 
