@@ -18,7 +18,7 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
 <div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div>
 <div class="small">Удерживай палец и перемещай его для перетаскивания</div>
 <script>
-(()=> {
+(()=>{
  const tg=window.Telegram?.WebApp,status=document.getElementById('status'),pad=document.getElementById('pad'),initData=tg?.initData||'';
  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b1020');tg.setBackgroundColor('#0b1020');}
  const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0;
@@ -28,7 +28,7 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
   catch{status.textContent='Нет связи с сервером';return false;}
  }
  async function drainMoves(){if(sendingMove)return;sendingMove=true;while(pendingMoveX||pendingMoveY){const dx=Math.max(-400,Math.min(400,Math.round(pendingMoveX))),dy=Math.max(-400,Math.min(400,Math.round(pendingMoveY)));if(!dx&&!dy)break;pendingMoveX-=dx;pendingMoveY-=dy;const ok=await send({type:'move',dx,dy});if(!ok){pendingMoveX=0;pendingMoveY=0;break;}}sendingMove=false;}
- function flush(){raf=0;if(moveX||moveY){pendingMoveX+=moveX*4.0;pendingMoveY+=moveY*4.0;moveX=0;moveY=0;drainMoves();}}
+ function flush(){raf=0;if(moveX||moveY){pendingMoveX+=moveX*1.5;pendingMoveY+=moveY*1.5;moveX=0;moveY=0;drainMoves();}}
  function queueMove(dx,dy){moveX+=dx;moveY+=dy;if(!raf)raf=requestAnimationFrame(flush);}
  setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});
  pad.addEventListener('pointerdown',e=>{e.preventDefault();pad.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){primary=e.pointerId;start={x:e.clientX,y:e.clientY};moved=false;}else{start=null;}});
