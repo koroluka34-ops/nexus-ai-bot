@@ -59,6 +59,15 @@ installOpsSuite(bot, askAI);
 const { installCommunitySuite } = require("./modules/community-suite");
 installCommunitySuite(bot);
 
+const { installPersonalSuite } = require("./modules/personal-suite");
+installPersonalSuite(bot);
+
+const { installUtilitySuite } = require("./modules/utility-suite");
+installUtilitySuite(bot);
+
+const { installQrSuite } = require("./modules/qr-suite");
+installQrSuite(bot);
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
@@ -587,13 +596,28 @@ function allCommandsText() {
 <code>/base64 decode строка</code> — декодировать Base64.
 
 ━━━━━━━━━━━━━━━━━━
-🧠 <b>БИБЛИОТЕКА 1 000 НАВЫКОВ</b>
-<code>/skills</code> — открыть каталог из 1 000 ИИ-навыков.
+🧠 <b>БИБЛИОТЕКА ИИ-ШАБЛОНОВ</b>
+<code>/skills</code> — 1 000 шаблонов запросов для общего ИИ, не самостоятельные программные функции.
 <code>/skills 2</code> — открыть вторую страницу каталога.
 <code>/skill 501 запрос</code> — запустить выбранный навык.
 <code>/skillsearch тема</code> — найти навыки по ключевым словам.
 <code>/skillrandom</code> — выбрать случайный навык.
 <code>/skillinfo 1000</code> — посмотреть подробности навыка.
+
+━━━━━━━━━━━━━━━━━━
+🧰 <b>РАБОЧИЕ УТИЛИТЫ NEXUS</b>
+<code>/note add текст</code> — создать личную заметку.
+<code>/note list|get ID|find слово|del ID</code> — управлять заметками.
+<code>/todo add задача</code> — добавить личную задачу.
+<code>/todo list|done ID|undo ID|del ID|clear</code> — список и статусы задач.
+<code>/poll вопрос | вариант 1 | вариант 2</code> — создать настоящий Telegram-опрос.
+<code>/qr текст</code> — создать QR-картинку локально.
+<code>/dns домен</code> — получить публичные DNS-записи.
+<code>/tz Europe/Kyiv</code> — узнать время в часовом поясе.
+<code>/timestamp значение</code> — перевести Unix-время или дату.
+<code>/color #3498db</code> — конвертер HEX/RGB/HSL.
+<code>/jsoncheck</code> — проверить и отформатировать JSON.
+<code>/urlinfo ссылка</code> — разобрать URL и скрыть чувствительные параметры.
 
 ━━━━━━━━━━━━━━━━━━
 🌐 <b>ВНЕШНИЕ API</b>
@@ -4286,6 +4310,16 @@ async function start() {
     { command: "skillsearch", description: "Найти ИИ-навык по теме" },
     { command: "skillrandom", description: "Выбрать случайный ИИ-навык" },
     { command: "skillinfo", description: "Подробности выбранного ИИ-навыка" },
+    { command: "note", description: "Личные заметки с сохранением" },
+    { command: "todo", description: "Список задач и отметка выполнения" },
+    { command: "poll", description: "Создать Telegram-опрос" },
+    { command: "qr", description: "Создать QR-код из текста или ссылки" },
+    { command: "dns", description: "Проверить DNS-записи домена" },
+    { command: "tz", description: "Текущее время в часовом поясе" },
+    { command: "timestamp", description: "Конвертировать Unix-время и дату" },
+    { command: "color", description: "Конвертировать HEX, RGB и HSL" },
+    { command: "jsoncheck", description: "Проверить и отформатировать JSON" },
+    { command: "urlinfo", description: "Разобрать структуру интернет-ссылки" },
     { command: "weather", description: "Узнать погоду" },
     { command: "fx", description: "Показать курс валют" },
     { command: "country", description: "Информация о стране" },
