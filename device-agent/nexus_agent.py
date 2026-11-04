@@ -67,7 +67,7 @@ def execute(command):
         pyperclip.copy(text)
         pyautogui.hotkey("ctrl", "v")
         return {"result": "Текст вставлен в активное окно."}
-    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "key_press"):
+    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "key_press", "hotkey"):
         import pyautogui
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.15
