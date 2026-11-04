@@ -73,9 +73,12 @@ def execute(command):
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0 if action == "touch_move" else 0.15
         if action == "touch_move":
+            # PyAutoGUI ignores durations below MINIMUM_DURATION (default 0.1s).
+            # Lower the threshold so short touchpad moves are genuinely interpolated.
+            pyautogui.MINIMUM_DURATION = 0.01
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
             if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
-            pyautogui.moveRel(dx, dy, duration=0)
+            pyautogui.moveRel(dx, dy, duration=0.04, tween=pyautogui.easeOutQuad)
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
