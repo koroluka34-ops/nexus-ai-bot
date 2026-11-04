@@ -11,12 +11,12 @@ header{display:flex;justify-content:space-between;align-items:center;font-weight
 .pad strong{display:block;font-size:20px;margin-bottom:8px}.pad span{color:#94a3b8;font-size:13px}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{border:1px solid #334155;background:#1e293b;color:#fff;border-radius:15px;padding:17px 10px;font-size:16px;font-weight:650;touch-action:manipulation}
-button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}
+button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}.keyboard-row{display:flex;justify-content:flex-end}.keyboard-button{padding:9px 13px;font-size:19px;border-radius:12px}.keyboard-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:8px}.keyboard-panel.open{display:grid}.keyboard-panel textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#fff;padding:10px;font:16px system-ui}.keyboard-panel button{padding:12px}
 </style></head><body>
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
 <section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
 <div class="pad" id="pad"><div><strong>Води пальцем здесь</strong><span>Один палец — курсор · два пальца — прокрутка<br>Тап — левый клик</span></div></div>
-<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div>
+<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row"><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><textarea id="keyboardText" maxlength="1000" placeholder="Напиши текст для компьютера…"></textarea><button id="sendText">Отправить на ПК</button></section>
 <div class="small">Удерживай палец и перемещай его для перетаскивания</div>
 <script>
 (()=>{
@@ -58,5 +58,8 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  pad.addEventListener('pointerup',endPointer);pad.addEventListener('pointercancel',endPointer);
  document.getElementById('left').addEventListener('click',()=>send({type:'click',button:'left'}));
  document.getElementById('right').addEventListener('click',()=>send({type:'click',button:'right'}));
+ const keyboardButton=document.getElementById('keyboardButton'),keyboardPanel=document.getElementById('keyboardPanel'),keyboardText=document.getElementById('keyboardText');
+ keyboardButton.addEventListener('click',()=>{keyboardPanel.classList.toggle('open');if(keyboardPanel.classList.contains('open'))keyboardText.focus();});
+ document.getElementById('sendText').addEventListener('click',async()=>{const value=keyboardText.value;if(!value.trim())return;const ok=await send({type:'text',text:value});if(ok){keyboardText.value='';keyboardPanel.classList.remove('open');}});
 })();
 </script></body></html>
