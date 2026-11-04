@@ -699,7 +699,7 @@ async function handleImage(ctx, prompt) {
 
   // Не придумываем случайный объект, если пользователь просит только аватарку.
   const genericAvatarRequest =
-    /^(?:(?:мне|пожалуйста)\\s+)?(?:(?:красивую|крутая|крутую|стильную|новую|классную)\\s+)*(?:ав(?:у|атар(?:ку|ка)?)|фото|картинку)?\\s*(?:ав(?:у|атар(?:ку|ка)?))?\\s*(?:для\\s+(?:тг|телеграм(?:а)?|telegram)|в\\s+телеграм(?:е)?)?$/iu.test(cleanPrompt) ||
+    /^(?:(?:мне|пожалуйста)\s+)?(?:(?:красивую|крутая|крутую|стильную|новую|классную)\s+)*(?:ав(?:у|атар(?:ку|ка)?)|фото|картинку)?\s*(?:ав(?:у|атар(?:ку|ка)?))?\s*(?:для\s+(?:тг|телеграм(?:а)?|telegram)|в\s+телеграм(?:е)?)?$/iu.test(cleanPrompt) ||
     /^(?:ав(?:у|атар(?:ку|ка)?)|фото для профиля|аватарка для профиля)$/iu.test(cleanPrompt);
 
   if (genericAvatarRequest) {
@@ -726,7 +726,7 @@ async function handleImage(ctx, prompt) {
 
     await ctx.replyWithPhoto(
       new InputFile(image, "nexus-image.jpg"),
-      { caption: "🖼 Готово!\n\n" + prompt.slice(0, 700) }
+      { caption: "🖼 Готово!" }
     );
   } catch (error) {
     await ctx.api.editMessageText(
@@ -1797,13 +1797,13 @@ async function runAgent(ctx, task) {
   }
 
   if (/\b(создай|сделай|сгенерируй)\b/i.test(lower) && /\b(видео|ролик)\b/i.test(lower)) {
-    const prompt = task.replace(/^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:видео|ролик)\\s*/i, "").trim();
+    const prompt = task.replace(/^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:видео|ролик)\s*/i, "").trim();
     await handleVideoPrompt(ctx, prompt);
     return;
   }
 
   if (/нарисуй|создай|сделай|сгенерируй/i.test(lower) && /фото|фотограф|картин|изображ/i.test(lower)) {
-    const prompt = task.replace(/^(?:нарисуй|создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:фото|фотографию|картинку|изображение)\\s*/i, "").trim();
+    const prompt = task.replace(/^(?:нарисуй|создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:фото|фотографию|картинку|изображение)\s*/i, "").trim();
     await handleImage(ctx, prompt);
     return;
   }
