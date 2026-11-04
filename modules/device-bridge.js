@@ -211,7 +211,7 @@ async function handleDeviceHttp(req, res) {
         touchpad.activeUntil = Date.now() + 5000;
         if (data.type === "move") {
           const dx = Number(data.dx), dy = Number(data.dy);
-          if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 120 || Math.abs(dy) > 120) return sendJson(res, 400, { error: "invalid_delta" });
+          if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.abs(dx) > 500 || Math.abs(dy) > 500) return sendJson(res, 400, { error: "invalid_delta" });
           touchpad.dx = Math.max(-500, Math.min(500, touchpad.dx + dx));
           touchpad.dy = Math.max(-500, Math.min(500, touchpad.dy + dy));
         } else if (data.type === "click") {
