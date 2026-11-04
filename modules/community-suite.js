@@ -89,7 +89,7 @@ function installCommunitySuite(bot) {
         const chatId = String(ctx.chat.id);
         const userId = String(ctx.from.id);
         const text = String(msg.text || msg.caption || "");
-        const command = /^\\//.test(text);
+        const command = /^\//.test(text);
         if (state.antiSpam[chatId] && !command) {
           let key = chatId + ":" + userId;
           const now = Date.now();
