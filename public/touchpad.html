@@ -128,9 +128,9 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function endPointer(e){if(!pointers.has(e.pointerId))return;const wasSingle=pointers.size===1&&e.pointerId===primary;pointers.delete(e.pointerId);if(wasSingle&&start&&!moved)send({type:'click',button:'left'});if(!pointers.size){primary=null;start=null;}}
  pad.addEventListener('pointerup',endPointer);pad.addEventListener('pointercancel',endPointer);
  const screenWrap=document.querySelector('.screen-wrap');let gameLookPointer=null,lastLookX=0,lastLookY=0;
- screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(e.target.closest('#gamePanel,#gameButton'))return;if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();});
+ screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(e.target.closest('#gamePanel,#gameButton'))return;if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();send({type:'game-mouse',button:'right',state:'down'});});
  screenWrap.addEventListener('pointermove',e=>{if(e.pointerId!==gameLookPointer)return;e.preventDefault();const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;queueMove(dx,dy);});
- function endGameLook(e){if(e.pointerId===gameLookPointer)gameLookPointer=null;}
+ function endGameLook(e){if(e.pointerId===gameLookPointer){gameLookPointer=null;send({type:'game-mouse',button:'right',state:'up'});}}
  screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
  function sendRealtime(payload,fallback){
   // Игровые клавиши и кнопки отправляем через HTTP-очередь агента.
