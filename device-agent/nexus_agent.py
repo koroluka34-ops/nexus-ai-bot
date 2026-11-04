@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
+import base64
+import json
+import os
+import subprocess
+import time
+import urllib.request
+import urllib.error
+import webbrowser
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+CONFIG = ROOT / "agent-config.json"
+
+def load_config():
+    if CONFIG.exists():
+        data = json.loads(CONFIG.read_text(encoding="utf-8"))
+    else:
+        print("Первый запуск NEXUS Agent")
+        data = {
+            "server": input("URL NEXUS (например https://nexus-ai-bot-kt4w.onrender.com): ").strip().rstrip("/"),
+            "token": input("PC_AGENT_TOKEN из Render: ").strip(),
+        }
+        if not data["server"].startswith("https://") or len(data["token"]) < 32:
+            raise SystemExit("Нужен HTTPS URL и токен длиной минимум 32 символа.")
+        CONFIG.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        try: os.chmod(CONFIG, 0o600)
+        except OSError: pass
+    if not data.get("server", "").startswith("https://") or len(data.get("token", "")) < 32:
+        raise SystemExit("Проверь agent-config.json: нужен HTTPS и корректный токен.")
+    return data
+
+def request(cfg, path, payload=None):
+    raw = None if payload is None else json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(cfg["server"] + path, data=raw, method="GET" if payload is None else "POST",
+        headers={"Authorization": "Bearer " + cfg["token"], "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=35) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+def execute(command):
+    action, args = command["action"], command.get("args", {})
+    if action == "screenshot":
+        import pyautogui
+        shot = pyautogui.screenshot()
+        from io import BytesIO
+        buf = BytesIO()
+        shot.save(buf, format="PNG")
+        return {"result": "Скриншот готов.", "image": base64.b64encode(buf.getvalue()).decode("ascii")}
+    if action == "open_url":
+        url = args.get("url", "")
+        if not url.startswith(("https://", "http://")): raise ValueError("URL rejected")
+        webbrowser.open(url, new=2)
+        return {"result": "Сайт открыт в браузере."}
+    if action == "launch":
+        allowed = {"notepad": "notepad.exe", "calculator": "calc.exe", "paint": "mspaint.exe", "explorer": "explorer.exe"}
+        app = args.get("app")
+        if app not in allowed: raise ValueError("Application not allowed")
+        subprocess.Popen([allowed[app]], shell=False)
+        return {"result": "Запущено: " + app}
+    if action == "type_text":
+        text = str(args.get("text", ""))
+        if len(text) > 1000: raise ValueError("Text too long")
+        import pyautogui
+        pyautogui.write(text, interval=0.01)
+        return {"result": "Текст напечатан в активном окне."}
+    raise ValueError("Unknown action")
+
+def main():
+    cfg = load_config()
+    print("NEXUS Agent подключается к", cfg["server"])
+    print("Остановка: Ctrl+C. Агент не принимает произвольные shell-команды.")
+    while True:
+        try:
+            data = request(cfg, "/device/poll")
+            command = data.get("command")
+            if command:
+                try: result = execute(command)
+                except Exception as exc: result = {"result": "Ошибка: " + str(exc)[:500]}
+                result["id"] = command["id"]
+                request(cfg, "/device/result", result)
+            else:
+                time.sleep(max(0.5, min(5, data.get("pollAfterMs", 1800) / 1000)))
+        except urllib.error.HTTPError as exc:
+            print("HTTP", exc.code, "— проверь PC_AGENT_TOKEN в Render и agent-config.json")
+            time.sleep(8)
+        except Exception as exc:
+            print("Связь недоступна:", str(exc)[:250])
+            time.sleep(8)
+
+if __name__ == "__main__":
+    try: main()
+    except KeyboardInterrupt: print("\nNEXUS Agent остановлен.")
