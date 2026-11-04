@@ -263,6 +263,17 @@ async function handleDeviceHttp(req, res) {
           if (!allowed.includes(key)) return sendJson(res, 400, { error: "invalid_key" });
           if (touchpad.events.length < 12) touchpad.events.push({ action: "key_press", args: { key } });
           else return sendJson(res, 429, { error: "touchpad_queue_full" });
+        } else if (data.type === "game-key") {
+          const key = String(data.key || "").toLowerCase();
+          const allowed = ["w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter"];
+          if (!allowed.includes(key) || !["down","up"].includes(data.state)) return sendJson(res, 400, { error: "invalid_game_key" });
+          if (touchpad.events.length < 12) touchpad.events.push({ action: data.state === "down" ? "key_down" : "key_up", args: { key } });
+          else return sendJson(res, 429, { error: "touchpad_queue_full" });
+        } else if (data.type === "game-mouse") {
+          const button = String(data.button || "left");
+          if (!["left","right"].includes(button) || !["down","up"].includes(data.state)) return sendJson(res, 400, { error: "invalid_game_mouse" });
+          if (touchpad.events.length < 12) touchpad.events.push({ action: data.state === "down" ? "mouse_down" : "mouse_up", args: { button } });
+          else return sendJson(res, 429, { error: "touchpad_queue_full" });
         } else if (data.type === "hotkey") {
           const combo = String(data.combo || "").toLowerCase();
           if (combo !== "ctrl+a") return sendJson(res, 400, { error: "invalid_hotkey" });
@@ -271,7 +282,7 @@ async function handleDeviceHttp(req, res) {
         } else if (data.type !== "heartbeat") {
           return sendJson(res, 400, { error: "unknown_touch_action" });
         }
-        if (["move", "click", "scroll", "text", "key", "hotkey"].includes(data.type)) wakeTouchpadPoller();
+        if (["move", "click", "scroll", "text", "key", "game-key", "game-mouse", "hotkey"].includes(data.type)) wakeTouchpadPoller();
         sendJson(res, 200, { ok: true });
       } catch { sendJson(res, 400, { error: "bad_json" }); }
     });
