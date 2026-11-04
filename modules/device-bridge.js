@@ -260,7 +260,7 @@ async function handleDeviceHttp(req, res) {
         } else if (data.type !== "heartbeat") {
           return sendJson(res, 400, { error: "unknown_touch_action" });
         }
-        if (data.type === "move" || data.type === "click" || data.type === "scroll") wakeTouchpadPoller();
+        if (data.type === "move" || data.type === "click" || data.type === "scroll" || data.type === "text") wakeTouchpadPoller();
         sendJson(res, 200, { ok: true });
       } catch { sendJson(res, 400, { error: "bad_json" }); }
     });
