@@ -3742,6 +3742,92 @@ bot.on("message:text", async ctx => {
 async function start() {
   await bot.init();
 
+  // Native Telegram "/" command menu with short Russian descriptions.
+  const commonCommands = [
+    { command: "start", description: "Запустить бота и открыть приветствие" },
+    { command: "menu", description: "Открыть главное меню возможностей" },
+    { command: "commands", description: "Показать список команд и описания" },
+    { command: "image", description: "Создать изображение по описанию" },
+    { command: "create", description: "Создать контент с помощью ИИ" },
+    { command: "sticker", description: "Создать стикер из текста или фото" },
+    { command: "circle", description: "Сделать видеосообщение-кружок" },
+    { command: "video", description: "Создать короткое видео из картинки" },
+    { command: "overdrive", description: "Запустить команду ИИ-агентов" },
+    { command: "agent", description: "Обратиться к ИИ-агенту" },
+    { command: "remember", description: "Сохранить факт в память" },
+    { command: "memory", description: "Посмотреть сохранённую память" },
+    { command: "forget", description: "Удалить данные из памяти" },
+    { command: "research", description: "Провести расширенное исследование" },
+    { command: "team", description: "Получить командный ответ нескольких ИИ" },
+    { command: "ocr", description: "Распознать текст на изображении" },
+    { command: "remind", description: "Создать напоминание" },
+    { command: "reminders", description: "Показать активные напоминания" },
+    { command: "cancelreminder", description: "Отменить напоминание" },
+    { command: "translate", description: "Перевести текст на другой язык" },
+    { command: "summary", description: "Кратко пересказать текст" },
+    { command: "code", description: "Написать или объяснить код" },
+    { command: "calc", description: "Выполнить математический расчёт" },
+    { command: "password", description: "Сгенерировать надёжный пароль" },
+    { command: "uuid", description: "Сгенерировать UUID" },
+    { command: "random", description: "Случайное число или выбор" },
+    { command: "wordcount", description: "Посчитать слова и символы" },
+    { command: "hash", description: "Создать хеш текста" },
+    { command: "base64", description: "Кодировать или декодировать Base64" },
+    { command: "convert", description: "Конвертировать единицы измерения" },
+    { command: "enhance", description: "Улучшить текст или запрос" },
+    { command: "transcribe", description: "Преобразовать аудио в текст" },
+    { command: "skills", description: "Показать доступные навыки ИИ" },
+    { command: "skill", description: "Использовать выбранный навык" },
+    { command: "weather", description: "Узнать погоду" },
+    { command: "fx", description: "Показать курс валют" },
+    { command: "country", description: "Информация о стране" },
+    { command: "joke", description: "Получить случайную шутку" },
+    { command: "jokelang", description: "Изменить язык шуток" },
+    { command: "api", description: "Проверить доступность ИИ-сервисов" },
+    { command: "id", description: "Показать Telegram ID" },
+    { command: "gift", description: "Отправить виртуальный подарок" },
+    { command: "mygifts", description: "Посмотреть свои подарки" },
+    { command: "premium", description: "Проверить статус Premium" },
+    { command: "model", description: "Посмотреть или выбрать модель ИИ" },
+    { command: "status", description: "Проверить состояние бота" },
+    { command: "voice", description: "Настройки голосового ответа" },
+    { command: "voice_on", description: "Включить голосовые ответы" },
+    { command: "voice_off", description: "Выключить голосовые ответы" },
+    { command: "say", description: "Озвучить текст голосом" },
+    { command: "reset", description: "Сбросить контекст диалога" }
+  ];
+
+  const groupCommands = [
+    ...commonCommands,
+    { command: "groupmode", description: "Включить или выключить общий режим ИИ" },
+    { command: "kb", description: "Управление базой знаний группы" },
+    { command: "ban", description: "Заблокировать участника (ответом на сообщение)" },
+    { command: "unban", description: "Разблокировать участника" },
+    { command: "kick", description: "Удалить участника из группы" },
+    { command: "mute", description: "Запретить участнику писать на время" },
+    { command: "unmute", description: "Снять ограничение на отправку сообщений" },
+    { command: "warn", description: "Выдать предупреждение участнику" },
+    { command: "warnings", description: "Посмотреть предупреждения участника" },
+    { command: "clearwarns", description: "Очистить предупреждения участника" },
+    { command: "purge", description: "Удалить несколько сообщений" },
+    { command: "pin", description: "Закрепить сообщение" },
+    { command: "unpin", description: "Открепить сообщение" }
+  ];
+
+  try {
+    await bot.api.setMyCommands(commonCommands, {
+      scope: { type: "all_private_chats" },
+      language_code: "ru"
+    });
+    await bot.api.setMyCommands(groupCommands, {
+      scope: { type: "all_group_chats" },
+      language_code: "ru"
+    });
+    console.log("Telegram command menus registered (RU).");
+  } catch (error) {
+    console.error("Command menu registration:", error.message);
+  }
+
   const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url === "/") {
       res.writeHead(200, {
