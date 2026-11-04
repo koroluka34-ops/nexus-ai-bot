@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-stream1"
+AGENT_VERSION = "2026.11.04-webrtc1"
 import base64
 import json
 import os
@@ -126,6 +126,51 @@ def execute(command):
         return {"result": f"Нажата клавиша: {key}."}
     raise ValueError("Unknown action: " + repr(action) + "; args=" + repr(args)[:200])
 
+def start_webrtc_stream(cfg, offer):
+    import asyncio
+    import threading
+    def worker():
+        async def run():
+            from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer, MediaStreamTrack
+            from av import VideoFrame
+            import mss
+            import numpy as np
+            class ScreenVideoTrack(MediaStreamTrack):
+                kind = "video"
+                def __init__(self):
+                    super().__init__()
+                    self.capture = mss.mss()
+                    self.monitor = self.capture.monitors[1]
+                async def recv(self):
+                    pts, time_base = await self.next_timestamp()
+                    shot = np.array(self.capture.grab(self.monitor))[:, :, :3]
+                    frame = VideoFrame.from_ndarray(shot, format="BGR")
+                    frame.pts = pts
+                    frame.time_base = time_base
+                    return frame
+            pc = RTCPeerConnection(RTCConfiguration(iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]))
+            pc.addTrack(ScreenVideoTrack())
+            await pc.setRemoteDescription(RTCSessionDescription(sdp=offer["sdp"], type=offer["type"]))
+            answer = await pc.createAnswer()
+            await pc.setLocalDescription(answer)
+            request(cfg, "/device/webrtc/answer", {"sessionId": offer["sessionId"], "sdp": pc.localDescription.sdp, "type": pc.localDescription.type})
+            print("Живое видео экрана отправляется в Telegram.")
+            try:
+                while pc.connectionState not in ("failed", "closed"):
+                    await asyncio.sleep(1)
+                    if pc.connectionState == "disconnected":
+                        await asyncio.sleep(5)
+                        if pc.connectionState == "disconnected":
+                            break
+            finally:
+                await pc.close()
+                print("Видеотрансляция остановлена.")
+        try:
+            asyncio.run(run())
+        except Exception as exc:
+            print("Ошибка WebRTC:", repr(exc))
+    threading.Thread(target=worker, daemon=True).start()
+
 def main():
     cfg = load_config()
     print("NEXUS Agent", AGENT_VERSION, "| файл:", __file__)
@@ -134,19 +179,10 @@ def main():
     last_screen_frame = 0
     while True:
         try:
+            offer_data = request(cfg, "/device/webrtc/offer")
+            if offer_data.get("offer"):
+                start_webrtc_stream(cfg, offer_data["offer"])
             data = request(cfg, "/device/poll")
-            if data.get("touchpadActive") and time.time() - last_screen_frame >= 0.9:
-                try:
-                    import pyautogui
-                    from io import BytesIO
-                    shot = pyautogui.screenshot()
-                    shot.thumbnail((960, 540))
-                    buf = BytesIO()
-                    shot.save(buf, format="JPEG", quality=48, optimize=True)
-                    request(cfg, "/device/stream", {"image": base64.b64encode(buf.getvalue()).decode("ascii")})
-                    last_screen_frame = time.time()
-                except Exception as screen_exc:
-                    print("Не удалось обновить экран:", str(screen_exc)[:160])
             command = data.get("command")
             if command:
                 action_name = command.get("action") if isinstance(command, dict) else None
