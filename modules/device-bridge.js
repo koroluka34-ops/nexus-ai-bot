@@ -258,7 +258,7 @@ async function handleDeviceHttp(req, res) {
           if (touchpad.events.length < 12) touchpad.events.push({ action: "type_text", args: { text: value } });
           else return sendJson(res, 429, { error: "touchpad_queue_full" });
         } else if (data.type === "key") {
-          const allowed = ["backspace", "delete", "left", "right", "up", "down", "home", "end", "enter", "esc", "tab"];
+          const allowed = ["backspace", "delete", "left", "right", "up", "down", "home", "end", "enter", "esc", "tab", "f11"];
           const key = String(data.key || "").toLowerCase();
           if (!allowed.includes(key)) return sendJson(res, 400, { error: "invalid_key" });
           if (touchpad.events.length < 12) touchpad.events.push({ action: "key_press", args: { key } });
