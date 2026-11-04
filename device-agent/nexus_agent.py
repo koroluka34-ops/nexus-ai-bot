@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-balanced-30fps"
+AGENT_VERSION = "2026.11.04-gaming-controls"
 import base64
 import json
 import os
@@ -106,10 +106,10 @@ def execute(command):
         if sent != len(inputs):
             raise OSError("Windows SendInput ввёл не все символы: " + str(sent) + "/" + str(len(inputs)))
         return {"result": "Текст введён в активное окно Windows (" + str(len(text)) + " символов)."}
-    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "touch_move", "key_press", "hotkey"):
+    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "mouse_down", "mouse_up", "touch_move", "key_press", "key_down", "key_up", "hotkey"):
         import pyautogui
         pyautogui.FAILSAFE = True
-        pyautogui.PAUSE = 0 if action == "touch_move" else 0.15
+        pyautogui.PAUSE = 0
         if action == "touch_move":
             # Use the Windows cursor API directly. PyAutoGUI's tween/interpolation
             # path can raise ZeroDivisionError for very short touchpad movements.
@@ -130,6 +130,19 @@ def execute(command):
             if not user32.SetCursorPos(nx, ny):
                 raise OSError("Windows не смогла переместить курсор")
             return {"result": "Курсор перемещён тачпадом."}
+        if action in ("key_down", "key_up"):
+            key = str(args.get("key", "")).lower()
+            allowed_game_keys = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
+            if key not in allowed_game_keys:
+                raise ValueError("Игровая клавиша не разрешена")
+            (pyautogui.keyDown if action == "key_down" else pyautogui.keyUp)(key)
+            return {"result": ("Удерживается: " if action == "key_down" else "Отпущена: ") + key}
+        if action in ("mouse_down", "mouse_up"):
+            button = args.get("button", "left")
+            if button not in ("left", "right"):
+                raise ValueError("Игровая кнопка мыши не разрешена")
+            (pyautogui.mouseDown if action == "mouse_down" else pyautogui.mouseUp)(button=button)
+            return {"result": "Кнопка мыши обновлена."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
             width, height = pyautogui.size()
