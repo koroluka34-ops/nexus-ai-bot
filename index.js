@@ -3646,8 +3646,8 @@ bot.on("message:text", async ctx => {
   );
   if (fileRequest) {
     const format = (fileRequest[1] || "").toLowerCase() ||
-      (/таблиц/iu.test(question) ? "xlsx" : /презентац/iu.test(question) ? "pptx" : "docx");
-    await generateDocument(ctx, format, fileRequest[2].trim() || question);
+      (/таблиц/iu.test(addressedQuestion) ? "xlsx" : /презентац/iu.test(addressedQuestion) ? "pptx" : "docx");
+    await generateDocument(ctx, format, fileRequest[2].trim() || addressedQuestion);
     return;
   }
 
