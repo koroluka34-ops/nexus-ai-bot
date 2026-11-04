@@ -608,7 +608,7 @@ async function translateImagePrompt(prompt) {
     {
       role: "system",
       content:
-        "Translate the image prompt into English. Preserve all details. Return only the prompt."
+        "You are an expert image-prompt editor. Translate the user's image request into clear, detailed English suitable for a text-to-image model. Preserve the exact requested subject, objects, setting, style, colors, composition, and mood. Do not replace the requested subject with an animal or add cats, dogs, tigers, wolves, wildlife, or any other animal unless the user explicitly requested one. Do not invent a new main subject. If the request is broad, improve visual quality through lighting, composition, materials, and background while keeping its meaning. Return only the final English image prompt, with no commentary."
     },
     { role: "user", content: prompt }
   ];
