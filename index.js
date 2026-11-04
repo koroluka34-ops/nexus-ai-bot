@@ -420,7 +420,8 @@ async function askGroq(messages, searchMode = false) {
   if (searchMode) {
     body.tools = [{ type: "browser_search" }];
     body.tool_choice = "required";
-    body.reasoning_effort = "low";
+    body.reasoning_effort = "medium";
+    body.citation_options = "enabled";
   }
 
   const response = await fetch(
@@ -449,9 +450,32 @@ async function askGroq(messages, searchMode = false) {
     throw new Error("Groq не вернул ответ.");
   }
 
+  // Groq may expose source metadata either as message annotations or
+  // as browser-search results attached to executed tools (API versions vary).
+  const annotations = Array.isArray(message.annotations) ? [...message.annotations] : [];
+  const executedTools = [
+    ...(Array.isArray(message.executed_tools) ? message.executed_tools : []),
+    ...(Array.isArray(data.executed_tools) ? data.executed_tools : [])
+  ];
+
+  for (const tool of executedTools) {
+    const results = [
+      ...(Array.isArray(tool.browser_results) ? tool.browser_results : []),
+      ...(Array.isArray(tool.search_results?.results) ? tool.search_results.results : [])
+    ];
+    for (const item of results) {
+      if (item && typeof item.url === "string") {
+        annotations.push({
+          url: item.url,
+          title: item.title || "Источник"
+        });
+      }
+    }
+  }
+
   return {
     answer,
-    annotations: message.annotations || [],
+    annotations,
     provider: "Groq"
   };
 }
@@ -1931,22 +1955,18 @@ bot.command("research", async ctx => {
 
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
 
-    // Если Groq не вернул URL-аннотации, не блокируем весь ответ:
-    // явно помечаем его как непроверенный и удаляем любые псевдо-ссылки.
-    if (uniqueSourceUrls.length === 0) {
-      result.answer =
-        "⚠️ Groq выполнил запрос, но не передал боту проверяемые URL источников. " +
-        "Поэтому ниже — только предварительный обзор, а не подтверждённое исследование. " +
-        "Не используй его как источник фактов без самостоятельной проверки.\\n\\n" +
-        String(result.answer || "");
-    } else if (uniqueSourceUrls.length === 1) {
-      result.answer =
-        "⚠️ Найден только один источник. Это недостаточно для независимой перепроверки; " +
-        "ниже предварительный обзор с ограниченной надёжностью.\\n\\n" +
-        String(result.answer || "");
+    // Не показываем исследование, если браузер не вернул реальные URL.
+    // Текст модели без источников может содержать выдуманные новости.
+    if (uniqueSourceUrls.length < 2) {
+      await ctx.reply(
+        "⚠️ Groq не передал минимум две реальные ссылки на найденные материалы. " +
+        "Я не буду показывать сгенерированный текст: в нём могут быть выдуманные новости. " +
+        "Попробуй позже. Если проблема повторяется, нужен отдельный поисковый API."
+      );
+      return;
     }
 
-    // Удаляем псевдо-ссылки вида 【0†L12-L20】, которые модель может выдумать.
+    // Удаляем внутренние маркеры цитирования Groq; реальные URL будут добавлены ниже.
     result.answer = String(result.answer || "")
       .replace(/【[^】]*†L\d+(?:-L?\d+)?】/g, "")
       .replace(/\n{3,}/g, "\n\n")
