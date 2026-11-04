@@ -262,6 +262,22 @@ async function handleDeviceHttp(req, res) {
     return true;
   }
   if (!auth(req)) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+  if (req.method === "POST" && url.pathname === "/device/webrtc/answer") {
+    let body = "";
+    req.on("data", chunk => { body += chunk; if (body.length > 200000) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const data = JSON.parse(body || "{}");
+        const sessionId = String(data.sessionId || "");
+        if (!/^[a-f0-9-]{20,64}$/i.test(sessionId) || typeof data.sdp !== "string" || data.sdp.length > 150000 || data.type !== "answer") {
+          return sendJson(res, 400, { error: "invalid_answer" });
+        }
+        webRtcAnswers.set(sessionId, { sdp: data.sdp, type: data.type });
+        sendJson(res, 200, { ok: true });
+      } catch { sendJson(res, 400, { error: "bad_json" }); }
+    });
+    return true;
+  }
   if (req.method === "GET" && url.pathname === "/device/webrtc/offer") {
     const offer = pendingWebRtcOffer;
     if (!offer || Date.now() - offer.createdAt > 60000) {
