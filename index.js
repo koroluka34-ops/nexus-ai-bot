@@ -2818,6 +2818,74 @@ bot.command("giftgrant", async ctx => {
   await bot.api.sendMessage(targetId, "🎁 Администратор NEXUS подарил тебе: " + gift.icon + " " + gift.name + "!\n/mygifts").catch(() => {});
 });
 
+// ======================================================
+// REAL TELEGRAM GIFTS — отправка официальных подарков Telegram
+// ======================================================
+
+async function getTelegramGifts() {
+  const result = await bot.api.callApi("getAvailableGifts", {});
+  return Array.isArray(result.gifts) ? result.gifts : [];
+}
+
+bot.command("realgifts", async ctx => {
+  try {
+    const gifts = await getTelegramGifts();
+    if (!gifts.length) return ctx.reply("Сейчас Telegram не вернул доступных подарков для этого бота.");
+    const lines = gifts.map((gift, index) => {
+      const limited = gift.remaining_count != null ? " | осталось: " + gift.remaining_count : "";
+      const personal = gift.personal_remaining_count != null ? " | лимит бота: " + gift.personal_remaining_count : "";
+      return (index + 1) + ". " + (gift.sticker?.emoji || "🎁") + " — " + gift.star_count + " ⭐" + limited + personal;
+    });
+    await ctx.reply(
+      "🎁 ОФИЦИАЛЬНЫЕ ПОДАРКИ TELEGRAM\n\n" +
+      lines.join("\n") +
+      "\n\nОтправка администратором: /realgift TELEGRAM_ID НОМЕР\n" +
+      "Важно: подарок оплачивается Telegram Stars с баланса самого бота."
+    );
+  } catch (error) {
+    console.error("REAL GIFTS LIST:", error);
+    await ctx.reply("❌ Не удалось загрузить подарки Telegram: " + String(error.description || error.message).slice(0, 700));
+  }
+});
+
+bot.command("realgift", async ctx => {
+  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
+    return ctx.reply("⛔ Отправлять реальные Telegram Gifts может только администратор NEXUS.");
+  }
+
+  const match = String(ctx.match || "").trim().match(/^(\d+)\s+(\d+)$/);
+  if (!match) return ctx.reply("Формат: /realgift TELEGRAM_ID НОМЕР\nСначала посмотри каталог: /realgifts");
+
+  const targetId = Number(match[1]);
+  const index = Number(match[2]) - 1;
+  if (!Number.isSafeInteger(targetId) || targetId <= 0) return ctx.reply("❌ Некорректный Telegram ID.");
+
+  try {
+    const gifts = await getTelegramGifts();
+    const gift = gifts[index];
+    if (!gift) return ctx.reply("❌ Подарка с таким номером нет. Обнови список: /realgifts");
+    if (gift.personal_remaining_count === 0 || gift.remaining_count === 0) {
+      return ctx.reply("❌ Этот подарок закончился или исчерпан лимит бота.");
+    }
+
+    await ctx.reply("⏳ Отправляю настоящий подарок Telegram…");
+    await bot.api.callApi("sendGift", {
+      user_id: targetId,
+      gift_id: gift.id,
+      text: "Подарок от NEXUS AI"
+    });
+    await ctx.reply("✅ Настоящий Telegram Gift отправлен пользователю " + targetId + ". Он появится у него в Telegram.");
+  } catch (error) {
+    console.error("REAL GIFT SEND:", error);
+    const description = String(error.description || error.message || "Неизвестная ошибка");
+    await ctx.reply(
+      "❌ Telegram не отправил подарок.\n" +
+      description.slice(0, 900) +
+      "\n\nПроверь баланс Telegram Stars у бота, доступность подарка и возможность пользователя получать подарки."
+    );
+  }
+});
+
 bot.command("premium", async ctx => {
   const memory = await loadMemory(ctx.from.id);
   const suffix = currentPlan(memory) === "free" ? "\n\n💎 Для активации NEXUS Premium обратись к администратору." : "";
