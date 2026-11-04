@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
+AGENT_VERSION = "2026.11.04-debug1"
 import base64
 import json
 import os
@@ -119,10 +120,11 @@ def execute(command):
         if key not in allowed_keys: raise ValueError("Клавиша не разрешена")
         pyautogui.press(key)
         return {"result": f"Нажата клавиша: {key}."}
-    raise ValueError("Unknown action")
+    raise ValueError("Unknown action: " + repr(action) + "; args=" + repr(args)[:200])
 
 def main():
     cfg = load_config()
+    print("NEXUS Agent", AGENT_VERSION, "| файл:", __file__)
     print("NEXUS Agent подключается к", cfg["server"])
     print("Остановка: Ctrl+C. Агент не принимает произвольные shell-команды.")
     while True:
@@ -130,8 +132,12 @@ def main():
             data = request(cfg, "/device/poll")
             command = data.get("command")
             if command:
+                action_name = command.get("action") if isinstance(command, dict) else None
+                print("Получена команда:", repr(action_name), "| поля:", list(command.keys()) if isinstance(command, dict) else type(command).__name__)
                 try: result = execute(command)
-                except Exception as exc: result = {"result": "Ошибка: " + str(exc)[:500]}
+                except Exception as exc:
+                    print("Ошибка выполнения:", repr(exc))
+                    result = {"result": "Ошибка: " + str(exc)[:500]}
                 if command.get("id"):
                     result["id"] = command["id"]
                     request(cfg, "/device/result", result)
