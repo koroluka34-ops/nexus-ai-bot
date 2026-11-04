@@ -63,9 +63,43 @@ def execute(command):
         if len(text) > 1000: raise ValueError("Text too long")
         import pyautogui
         import pyperclip
+        pyautogui.FAILSAFE = True
         pyperclip.copy(text)
         pyautogui.hotkey("ctrl", "v")
         return {"result": "Текст вставлен в активное окно."}
+    if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "key_press"):
+        import pyautogui
+        pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0.15
+        if action == "mouse_move":
+            x, y = int(args.get("x", -1)), int(args.get("y", -1))
+            width, height = pyautogui.size()
+            if not (0 <= x < width and 0 <= y < height):
+                raise ValueError(f"Координаты вне экрана {width}x{height}")
+            pyautogui.moveTo(x, y, duration=0.15)
+            return {"result": f"Курсор перемещён: {x}, {y}."}
+        if action == "mouse_click":
+            button = args.get("button", "left")
+            if button not in ("left", "right", "middle"): raise ValueError("Недопустимая кнопка мыши")
+            pyautogui.click(button=button)
+            return {"result": f"Нажатие мыши: {button}."}
+        if action == "mouse_double":
+            button = args.get("button", "left")
+            if button not in ("left", "right"): raise ValueError("Недопустимая кнопка мыши")
+            pyautogui.doubleClick(button=button)
+            return {"result": "Двойной щелчок мышью."}
+        if action == "mouse_scroll":
+            direction = args.get("direction")
+            amount = int(args.get("amount", 3))
+            if direction not in ("up", "down") or not 1 <= amount <= 10:
+                raise ValueError("Прокрутка: направление up/down, шаги 1–10")
+            pyautogui.scroll(amount if direction == "up" else -amount)
+            return {"result": f"Прокрутка {direction}: {amount}."}
+        key = args.get("key", "")
+        allowed_keys = {"enter", "esc", "tab", "space", "backspace", "delete", "up", "down", "left", "right", "home", "end", "pageup", "pagedown"}
+        if key not in allowed_keys: raise ValueError("Клавиша не разрешена")
+        pyautogui.press(key)
+        return {"result": f"Нажата клавиша: {key}."}
     raise ValueError("Unknown action")
 
 def main():
