@@ -69,6 +69,9 @@ installUtilitySuite(bot);
 const { installQrSuite } = require("./modules/qr-suite");
 installQrSuite(bot);
 
+const { installDeviceBridge, handleDeviceHttp } = require("./modules/device-bridge");
+installDeviceBridge(bot);
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
@@ -4323,6 +4326,8 @@ async function start() {
     { command: "color", description: "Конвертировать HEX, RGB и HSL" },
     { command: "jsoncheck", description: "Проверить и отформатировать JSON" },
     { command: "urlinfo", description: "Разобрать структуру интернет-ссылки" },
+    { command: "pc", description: "Управление подключённым компьютером" },
+    { command: "pcdisconnect", description: "Отключить мост управления ПК" },
     { command: "weather", description: "Узнать погоду" },
     { command: "fx", description: "Показать курс валют" },
     { command: "country", description: "Информация о стране" },
@@ -4386,6 +4391,14 @@ async function start() {
   }
 
   const server = http.createServer((req, res) => {
+    if (req.url.startsWith("/device/")) {
+      handleDeviceHttp(req, res).catch(error => {
+        console.error("Device bridge:", error.message);
+        if (!res.headersSent) { res.writeHead(500); res.end("Internal error"); }
+      });
+      return;
+    }
+
     if (req.method === "GET" && req.url === "/") {
       res.writeHead(200, {
         "Content-Type": "text/plain"
