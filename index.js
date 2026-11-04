@@ -56,6 +56,9 @@ installSecurityMonitor(bot);
 const { installOpsSuite } = require("./modules/ops-suite");
 installOpsSuite(bot, askAI);
 
+const { installCommunitySuite } = require("./modules/community-suite");
+installCommunitySuite(bot);
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
