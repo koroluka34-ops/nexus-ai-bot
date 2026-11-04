@@ -409,17 +409,31 @@ def start_webrtc_stream(cfg, offer):
             print("Ошибка WebRTC:", repr(exc))
     threading.Thread(target=worker, daemon=True).start()
 
+def webrtc_offer_listener(cfg):
+    """Check WebRTC offers independently from the long-polling command loop."""
+    while True:
+        try:
+            offer_data = request(cfg, "/device/webrtc/offer")
+            offer = offer_data.get("offer")
+            if offer:
+                print("Получено предложение WebRTC:", offer.get("sessionId"))
+                start_webrtc_stream(cfg, offer)
+            else:
+                time.sleep(0.25)
+        except Exception as exc:
+            print("Ошибка проверки WebRTC:", str(exc)[:250])
+            time.sleep(3)
+
+
 def main():
     cfg = load_config()
     print("NEXUS Agent", AGENT_VERSION, "| файл:", __file__)
     print("NEXUS Agent подключается к", cfg["server"])
     print("Остановка: Ctrl+C. Агент не принимает произвольные shell-команды.")
-    last_screen_frame = 0
+    threading.Thread(target=webrtc_offer_listener, args=(cfg,), daemon=True).start()
+    print("Проверка WebRTC запущена отдельно от команд.")
     while True:
         try:
-            offer_data = request(cfg, "/device/webrtc/offer")
-            if offer_data.get("offer"):
-                start_webrtc_stream(cfg, offer_data["offer"])
             data = request(cfg, "/device/poll")
             command = data.get("command")
             if command:
