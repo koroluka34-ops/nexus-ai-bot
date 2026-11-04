@@ -9,6 +9,7 @@ const queue = [];
 const pending = new Map();
 const devices = new Map();
 const results = new Map();
+let deviceBot = null;
 const MAX_QUEUE = 20;
 
 function authorized(ctx) {
@@ -33,6 +34,7 @@ function enqueue(action, args, userId, chatId, messageId) {
   return id;
 }
 function installDeviceBridge(bot) {
+  deviceBot = bot;
   bot.command("pc", async ctx => {
     if (!authorized(ctx)) return ctx.reply("⛔ Управление ПК доступно только владельцу бота.");
     if (!TOKEN || TOKEN.length < 32) return ctx.reply("⚠️ Мост ПК ещё не настроен: добавь PC_AGENT_TOKEN (не менее 32 символов) в переменные Render.");
@@ -107,7 +109,7 @@ async function handleDeviceHttp(req, res) {
       const expired = queue.shift();
       results.delete(expired.id);
       const msg = "⌛ Команда отменена: истекло время ожидания ПК.";
-      bot.api.sendMessage(expired.chatId, msg).catch(() => {});
+      deviceBot.api.sendMessage(expired.chatId, msg).catch(() => {});
     }
     const item = queue.shift();
     sendJson(res, 200, { ok: true, command: item ? { id: item.id, action: item.action, args: item.args } : null, pollAfterMs: 1800 });
@@ -127,11 +129,11 @@ async function handleDeviceHttp(req, res) {
           if (typeof data.image !== "string" || data.image.length > 10 * 1024 * 1024) return sendJson(res, 413, { error: "image_too_large" });
           const bytes = Buffer.from(data.image, "base64");
           if (bytes.length > 7 * 1024 * 1024) return sendJson(res, 413, { error: "image_too_large" });
-          if (item) await bot.api.sendPhoto(item.chatId, new InputFile(bytes, "pc-screen.png"), { caption: "🖥 Скриншот компьютера" }).catch(() => {});
+          if (item) await deviceBot.api.sendPhoto(item.chatId, new InputFile(bytes, "pc-screen.png"), { caption: "🖥 Скриншот компьютера" }).catch(() => {});
         }
         if (item) {
           const text = safeText(result || (data.image ? "Скриншот отправлен." : "Команда выполнена."), 3000);
-          await bot.api.sendMessage(item.chatId, "🖥 NEXUS PC: " + text).catch(() => {});
+          await deviceBot.api.sendMessage(item.chatId, "🖥 NEXUS PC: " + text).catch(() => {});
           results.delete(id);
         }
         sendJson(res, 200, { ok: true });
