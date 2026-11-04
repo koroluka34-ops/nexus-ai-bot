@@ -74,9 +74,41 @@ const PREMIUM_CUSTOM_EMOJI_IDS = [
   "5330176782249254424"
 ];
 
+let PREMIUM_CUSTOM_EMOJIS = [];
+
+async function loadPremiumCustomEmojis() {
+  try {
+    const stickers = await bot.api.getCustomEmojiStickers(PREMIUM_CUSTOM_EMOJI_IDS);
+    PREMIUM_CUSTOM_EMOJIS = (stickers || [])
+      .filter(sticker => sticker.custom_emoji_id && sticker.emoji)
+      .map(sticker => ({
+        id: String(sticker.custom_emoji_id),
+        emoji: sticker.emoji
+      }));
+
+    console.log("Premium custom emojis loaded:", PREMIUM_CUSTOM_EMOJIS.length);
+  } catch (error) {
+    PREMIUM_CUSTOM_EMOJIS = [];
+    console.error("Premium custom emojis unavailable:", error.message);
+  }
+}
+
 function premiumEmojiEntity() {
-  const id = PREMIUM_CUSTOM_EMOJI_IDS[Math.floor(Math.random() * PREMIUM_CUSTOM_EMOJI_IDS.length)];
-  return { type: "custom_emoji", offset: 0, length: 1, custom_emoji_id: id };
+  if (!PREMIUM_CUSTOM_EMOJIS.length) return null;
+
+  const item = PREMIUM_CUSTOM_EMOJIS[
+    Math.floor(Math.random() * PREMIUM_CUSTOM_EMOJIS.length)
+  ];
+
+  return {
+    emoji: item.emoji,
+    entity: {
+      type: "custom_emoji",
+      offset: 0,
+      length: item.emoji.length,
+      custom_emoji_id: item.id
+    }
+  };
 }
 
 const histories = new Map();
@@ -1330,8 +1362,15 @@ async function sendLongMessage(ctx, text) {
     const chunk = text.slice(i, i + maxLength);
     const options = { link_preview_options: { is_disabled: true } };
     if (firstChunk && chunk.length) {
-      options.entities = [premiumEmojiEntity()];
-      await ctx.reply("⭐ " + chunk, options);
+      const premium = premiumEmojiEntity();
+
+      if (premium) {
+        options.entities = [premium.entity];
+        await ctx.reply(premium.emoji + " " + chunk, options);
+      } else {
+        await ctx.reply("⭐ " + chunk, options);
+      }
+
       firstChunk = false;
     } else {
       await ctx.reply(chunk, options);
@@ -3242,6 +3281,7 @@ bot.on("message:text", async ctx => {
 
 async function start() {
   await bot.init();
+  await loadPremiumCustomEmojis();
 
   const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url === "/") {
