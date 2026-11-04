@@ -3839,12 +3839,14 @@ async function start() {
     // Register both default and Russian-localized lists for private chats and groups.
     for (const scope of [
       { type: "all_private_chats" },
-      { type: "all_group_chats" }
+      { type: "all_group_chats" },
+      // Explicit group scope takes precedence over all_group_chats.
+      { type: "chat", chat_id: -1004462919324 }
     ]) {
       await bot.api.setMyCommands(fullCommands, { scope });
       await bot.api.setMyCommands(fullCommands, { scope, language_code: "ru" });
     }
-    console.log(`Telegram full command menus registered (default + RU): ${fullCommands.length} commands.`);
+    console.log(`Telegram full command menus registered (default + RU, including target group): ${fullCommands.length} commands.`);
   } catch (error) {
     console.error("Command menu registration:", error.message);
   }
