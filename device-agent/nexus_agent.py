@@ -144,20 +144,26 @@ def start_webrtc_stream(cfg, offer):
                     self.frames = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
                 async def recv(self):
-                    pts, time_base = await self.next_timestamp()
-                    shot = np.array(self.capture.grab(self.monitor))[:, :, :3]
-                    height, width = shot.shape[:2]
-                    scale = min(1.0, 1280 / width, 720 / height)
-                    if scale < 1.0:
-                        from PIL import Image
-                        shot = np.array(Image.fromarray(shot).resize((int(width * scale), int(height * scale))))
-                    self.frames += 1
-                    if self.frames == 1 or self.frames % 60 == 0:
-                        print("WebRTC кадр", self.frames, "|", shot.shape[1], "x", shot.shape[0], "| пиксели", int(shot.min()), "-", int(shot.max()))
-                    frame = VideoFrame.from_ndarray(shot, format="BGR")
-                    frame.pts = pts
-                    frame.time_base = time_base
-                    return frame
+                    try:
+                        pts, time_base = await self.next_timestamp()
+                        # MSS capture may block; run it outside the asyncio event loop.
+                        raw = await asyncio.to_thread(self.capture.grab, self.monitor)
+                        shot = np.array(raw)[:, :, :3]
+                        height, width = shot.shape[:2]
+                        scale = min(1.0, 1280 / width, 720 / height)
+                        if scale < 1.0:
+                            from PIL import Image
+                            shot = np.array(Image.fromarray(shot).resize((int(width * scale), int(height * scale))))
+                        self.frames += 1
+                        if self.frames == 1 or self.frames % 15 == 0:
+                            print("WebRTC кадр", self.frames, "|", shot.shape[1], "x", shot.shape[0], "| пиксели", int(shot.min()), "-", int(shot.max()))
+                        frame = VideoFrame.from_ndarray(shot, format="BGR")
+                        frame.pts = pts
+                        frame.time_base = time_base
+                        return frame
+                    except Exception as exc:
+                        print("Ошибка получения WebRTC кадра:", repr(exc))
+                        raise
             pc = RTCPeerConnection(RTCConfiguration(iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])]))
             @pc.on("iceconnectionstatechange")
             async def on_ice_state():
