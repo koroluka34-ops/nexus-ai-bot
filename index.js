@@ -2852,6 +2852,17 @@ bot.command("id", async ctx => {
   await ctx.reply("Твой Telegram ID: <code>" + ctx.from.id + "</code>", { parse_mode: "HTML" });
 });
 
+bot.command("chatid", async ctx => {
+  const chatType = ctx.chat?.type || "unknown";
+  const chatTitle = ctx.chat?.title || "Личный чат";
+  await ctx.reply(
+    "🆔 <b>ID чата:</b> <code>" + ctx.chat.id + "</code>\\n" +
+    "Тип: <code>" + chatType + "</code>\\n" +
+    "Название: " + escapeHtml(chatTitle),
+    { parse_mode: "HTML" }
+  );
+});
+
 // Бесплатные виртуальные подарки NEXUS (не Telegram Gifts, Stars не нужны).
 const FREE_GIFTS = [
   { name: "Звёздный кот", icon: "🐱", rarity: "Обычный", note: "Маленький хранитель удачи" },
@@ -3785,6 +3796,7 @@ async function start() {
     { command: "jokelang", description: "Изменить язык шуток" },
     { command: "api", description: "Проверить доступность ИИ-сервисов" },
     { command: "id", description: "Показать Telegram ID" },
+    { command: "chatid", description: "Показать ID текущего чата или группы" },
     { command: "gift", description: "Отправить виртуальный подарок" },
     { command: "mygifts", description: "Посмотреть свои подарки" },
     { command: "premium", description: "Проверить статус Premium" },
