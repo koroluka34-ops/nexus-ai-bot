@@ -133,11 +133,9 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function endGameLook(e){if(e.pointerId===gameLookPointer)gameLookPointer=null;}
  screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
  function sendRealtime(payload,fallback){
-  // Весь игровой ввод отправляем напрямую по WebRTC, чтобы клавиши
-  // и джойстик не ждали очереди HTTP-команд. HTTP остаётся резервом.
-  if(['move','game-key','game-mouse','game-click'].includes(payload.type)&&moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<65536){
-   try{moveChannel.send(JSON.stringify(payload));return true;}catch{}
-  }
+  // Игровые клавиши и кнопки отправляем через HTTP-очередь агента.
+  // DataChannel оставляем только для непрерывного движения камеры:
+  // так нажатия не теряются при несовпадении версий WebRTC-обработчика.
   send(fallback||payload);
   return false;
  }
