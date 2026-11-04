@@ -37,6 +37,7 @@ const PREMIUM_ADMIN_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY;
+const VENICE_API_KEY = process.env.VENICE_API_KEY;
 const CLOUDFLARE_KV_NAMESPACE_ID =
   process.env.CLOUDFLARE_KV_NAMESPACE_ID;
 
@@ -506,7 +507,7 @@ function allCommandsText() {
 ━━━━━━━━━━━━━━━━━━
 🎨 <b>ИЗОБРАЖЕНИЯ И МЕДИА</b>
 <code>/image описание</code> — создать изображение по описанию.
-<code>/art18</code> — создать чувственный, но не откровенный арт с вымышленными совершеннолетними персонажами (нужно подтвердить 18+).
+<code>/art18</code> — создать художественный ню с вымышленными совершеннолетними персонажами (нужно подтвердить 18+).
 <code>/sticker описание</code> — создать стикер по тексту.
 <code>/sticker</code> — сделать стикер из фото (ответом на фото).
 <code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
@@ -948,6 +949,74 @@ async function generateImage(prompt) {
   );
   if (!isImageBuffer(buffer)) throw new Error("Получено некорректное изображение.");
   return buffer;
+}
+
+async function generateVeniceAdultImage(prompt, userId) {
+  if (!VENICE_API_KEY) {
+    throw new Error("Для /art18 нужно добавить VENICE_API_KEY в Render → Environment. Обычная генерация продолжает работать через прежнего провайдера.");
+  }
+
+  const response = await fetch("https://api.venice.ai/api/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${VENICE_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "lustify-v8",
+      prompt: String(prompt).slice(0, 1450),
+      moderation: "low",
+      n: 1,
+      size: "1024x1024",
+      output_format: "png",
+      response_format: "b64_json",
+      anon_user_id: String(userId)
+    }),
+    signal: AbortSignal.timeout(180000)
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = payload.error || payload.message || JSON.stringify(payload).slice(0, 500);
+    throw new Error(`Venice API HTTP ${response.status}: ${detail}`);
+  }
+
+  const encoded = payload?.data?.[0]?.b64_json;
+  if (!encoded) throw new Error("Venice API не вернул изображение в b64_json.");
+  const image = Buffer.from(encoded, "base64");
+  if (!isImageBuffer(image)) throw new Error("Venice API вернул некорректное изображение.");
+  return image;
+}
+
+async function handleAdultImage(ctx, prompt) {
+  const userId = ctx.from.id;
+  const cleanPrompt = String(prompt || "").trim();
+  if (!cleanPrompt) {
+    await ctx.reply("Напиши описание вымышленной совершеннолетней модели.");
+    return;
+  }
+  if (busyUsers.has(userId)) {
+    await ctx.reply("⏳ Подожди предыдущий запрос.");
+    return;
+  }
+
+  busyUsers.add(userId);
+  const status = await ctx.reply("🔞 Создаю художественное изображение...");
+  try {
+    const image = await enqueueGeneration(userId, () => generateVeniceAdultImage(cleanPrompt, userId));
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await ctx.replyWithPhoto(new InputFile(image, "nexus-art18.png"), {
+      caption: "🖼 Готово! Только вымышленные совершеннолетние персонажи."
+    });
+  } catch (error) {
+    await ctx.api.editMessageText(
+      ctx.chat.id,
+      status.message_id,
+      "❌ " + String(error.message).slice(0, 1800)
+    ).catch(() => {});
+  } finally {
+    busyUsers.delete(userId);
+  }
 }
 
 async function handleImage(ctx, prompt) {
@@ -4001,11 +4070,10 @@ bot.on("message:text", async ctx => {
   if (adultArtPendingUsers.has(userId)) {
     adultArtPendingUsers.delete(userId);
     const adultArtPrompt =
-      "Create a tasteful, sensual, non-explicit adult glamour or boudoir editorial photograph. All characters must be clearly 25+ fictional adults. " +
-      "Allow elegant lingerie, satin robes, swimwear, fitted dresses, tasteful cleavage, artistic silhouettes, intimate cinematic lighting, confident fashion poses, and romantic atmosphere. " +
-      "Keep the image non-explicit: no visible genitals, no exposed nipples, no sexual acts, no masturbation, no pornographic close-ups, no coercion, and no real or identifiable people. " +
-      "Do not make the subject look underage. User's visual concept: " + addressedQuestion;
-    await handleImage(ctx, adultArtPrompt);
+      "Fine-art nude studio photograph of a clearly adult 25+ fictional woman. Artistic, non-sexual nude portrait, natural anatomy, tasteful full-body composition, professional fine-art photography, soft studio lighting, realistic skin texture. " +
+      "The subject must be unmistakably an adult; fictional person only. No minors, no youthful appearance, no real or identifiable people, no sexual activity, no coercion. " +
+      "User's visual concept: " + addressedQuestion;
+    await handleAdultImage(ctx, adultArtPrompt);
     return;
   }
 
