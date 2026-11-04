@@ -156,28 +156,34 @@ function installDeviceBridge(bot) {
 }
 
 function verifyTelegramWebApp(initData) {
-  if (!BOT_TOKEN || !OWNER_ID || !initData || initData.length > 8192) return false;
+  if (!BOT_TOKEN) return "server_bot_token_missing";
+  if (!OWNER_ID) return "server_owner_missing";
+  if (!initData || initData.length > 8192) return "init_data_missing";
   try {
     const params = new URLSearchParams(initData);
     const hash = params.get("hash");
     const authDate = Number(params.get("auth_date") || 0);
     const user = JSON.parse(params.get("user") || "{}");
-    if (!hash || !/^\d+$/.test(String(authDate)) || Date.now()/1000 - authDate > 86400 || authDate > Date.now()/1000 + 60) return false;
+    if (!hash) return "hash_missing";
+    if (!/^\d+$/.test(String(authDate)) || authDate > Date.now()/1000 + 60) return "auth_date_invalid";
+    if (Date.now()/1000 - authDate > 86400) return "auth_data_expired";
     params.delete("hash");
-    const check = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k + "=" + v).join("\n");
+    const check = [...params.entries()].sort().map(([k,v]) => k + "=" + v).join("\n");
     const secret = crypto.createHmac("sha256", BOT_TOKEN).update("WebAppData").digest();
     const expected = crypto.createHmac("sha256", secret).update(check).digest();
     const supplied = Buffer.from(hash, "hex");
-    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return false;
-    return String(user.id) === OWNER_ID;
-  } catch { return false; }
+    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return "hash_mismatch";
+    if (String(user.id) !== OWNER_ID) return "owner_mismatch";
+    return "";
+  } catch { return "invalid_init_data"; }
 }
 async function handleDeviceHttp(req, res) {
   const url = new URL(req.url, "http://localhost");
   if (!url.pathname.startsWith("/device/")) return false;
   if (req.method === "POST" && url.pathname === "/device/touchpad") {
-    if (!verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""))) {
-      sendJson(res, 401, { error: "telegram_auth_failed" }); return true;
+    const authError = verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""));
+    if (authError) {
+      sendJson(res, 401, { error: authError }); return true;
     }
     let body = "";
     req.on("data", chunk => { body += chunk; if (body.length > 4096) req.destroy(); });
