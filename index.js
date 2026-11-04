@@ -506,7 +506,7 @@ function allCommandsText() {
 ━━━━━━━━━━━━━━━━━━
 🎨 <b>ИЗОБРАЖЕНИЯ И МЕДИА</b>
 <code>/image описание</code> — создать изображение по описанию.
-<code>/art18</code> — создать художественный ню с вымышленными совершеннолетними персонажами (нужно подтвердить 18+).
+<code>/art18</code>, <code>/intim</code> — чувственная фотосессия взрослых вымышленных персонажей (нужно подтвердить 18+).
 <code>/sticker описание</code> — создать стикер по тексту.
 <code>/sticker</code> — сделать стикер из фото (ответом на фото).
 <code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
@@ -1053,7 +1053,24 @@ bot.command("art18", async ctx => {
   adultArtPendingUsers.delete(ctx.from.id);
   await ctx.reply(
     "🔞 <b>NEXUS — ADULT ART</b>\n\n" +
-    "Режим предназначен только для совершеннолетних. Он создаёт неоткровенные гламурные и fashion-изображения вымышленных взрослых персонажей в одежде. Нагота и сексуальные действия не поддерживаются.\n\n" +
+    "Режим для пользователей 18+. Создаёт чувственные гламурные фотосессии вымышленных взрослых персонажей: выразительные позы, стильные открытые образы и кинематографичный свет. Полная нагота и откровенные сексуальные действия не поддерживаются.\n\n" +
+    "Подтверди, что тебе уже исполнилось 18 лет.",
+    {
+      parse_mode: "HTML",
+      reply_markup: new InlineKeyboard()
+        .text("Мне есть 18 — продолжить", "adult_art_confirm")
+        .row()
+        .text("Отмена", "adult_art_cancel")
+    }
+  );
+});
+
+// /intim — age-gated alias for adult glamour image generation.
+bot.command("intim", async ctx => {
+  adultArtPendingUsers.delete(ctx.from.id);
+  await ctx.reply(
+    "🔞 <b>NEXUS — INTIM</b>\n\n" +
+    "Чувственные фотосессии только с вымышленными совершеннолетними персонажами. Полная нагота и откровенные сексуальные действия не поддерживаются.\n\n" +
     "Подтверди, что тебе уже исполнилось 18 лет.",
     {
       parse_mode: "HTML",
@@ -1069,7 +1086,7 @@ bot.callbackQuery("adult_art_confirm", async ctx => {
   adultArtPendingUsers.add(ctx.from.id);
   await ctx.answerCallbackQuery({ text: "Подтверждение принято" });
   await ctx.reply(
-    "✅ Опиши вымышленного совершеннолетнего персонажа и стиль. Например: «взрослая модель в элегантном вечернем платье, модная журнальная фотосессия, мягкий кинематографичный свет»."
+    "✅ Опиши взрослого вымышленного персонажа и стиль. Например: «совершеннолетняя модель в эффектном вечернем образе, чувственная поза, роскошный интерьер, мягкий кинематографичный свет»."
   );
 });
 
@@ -4037,8 +4054,8 @@ bot.on("message:text", async ctx => {
   if (adultArtPendingUsers.has(userId)) {
     adultArtPendingUsers.delete(userId);
     const adultArtPrompt =
-      "Elegant non-explicit adult glamour fashion photograph of a clearly adult 25+ fictional woman, fully clothed in a tasteful evening dress, sophisticated editorial styling, confident natural pose, soft cinematic studio lighting, realistic skin texture, premium fashion magazine photography. " +
-      "Fictional adult person only; no nudity, no lingerie, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
+      "Sensual, non-explicit glamour editorial photograph of a clearly adult 25+ fictional person, stylish revealing but non-transparent fashion outfit, tasteful intimate editorial mood, confident elegant pose, luxurious setting, soft cinematic studio lighting, realistic skin texture, premium magazine photography. " +
+      "Fictional adult person only; no explicit nudity, no visible genitals, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
       "User's visual concept: " + addressedQuestion;
     await handleAdultImage(ctx, adultArtPrompt);
     return;
@@ -4135,7 +4152,8 @@ async function start() {
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
     { command: "image", description: "Создать изображение по описанию" },
-    { command: "art18", description: "Чувственный неоткровенный арт (18+)" },
+    { command: "art18", description: "Чувственный художественный арт (18+)" },
+    { command: "intim", description: "Чувственная фотосессия (18+)" },
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
     { command: "circle", description: "Сделать видеосообщение-кружок" },
