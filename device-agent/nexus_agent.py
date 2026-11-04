@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-smooth2"
+AGENT_VERSION = "2026.11.04-smooth3"
 import base64
 import json
 import os
@@ -78,7 +78,7 @@ def execute(command):
             pyautogui.MINIMUM_DURATION = 0.01
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
             if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
-            pyautogui.moveRel(dx, dy, duration=0.04, tween=pyautogui.easeOutQuad)
+            pyautogui.moveRel(dx, dy, duration=0.02, tween=pyautogui.linear)
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
@@ -145,7 +145,7 @@ def main():
                     result["id"] = command["id"]
                     request(cfg, "/device/result", result)
             else:
-                time.sleep(max(0.04, min(5, data.get("pollAfterMs", 1800) / 1000)))
+                time.sleep(max(0.005, min(5, data.get("pollAfterMs", 1800) / 1000)))
         except urllib.error.HTTPError as exc:
             print("HTTP", exc.code, "— проверь PC_AGENT_TOKEN в Render и agent-config.json")
             time.sleep(8)
