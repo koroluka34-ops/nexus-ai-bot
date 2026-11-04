@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-touchpad-dc10"
+AGENT_VERSION = "2026.11.04-touchpad-dc11"
 import base64
 import json
 import os
@@ -62,13 +62,46 @@ def execute(command):
     if action == "type_text":
         text = str(args.get("text", ""))
         if len(text) > 1000: raise ValueError("Text too long")
-        import pyautogui
-        import pyperclip
-        pyautogui.FAILSAFE = True
-        pyperclip.copy(text)
-        time.sleep(0.06)  # Дать Windows обновить буфер обмена перед вставкой.
-        pyautogui.hotkey("ctrl", "v")
-        return {"result": "Текст вставлен в активное окно."}
+        if not text:
+            return {"result": "Пустой текст — нечего вводить."}
+        # Ввод Unicode напрямую через Windows SendInput: не зависит от буфера обмена.
+        import ctypes
+        from ctypes import wintypes
+        ULONG_PTR = ctypes.c_size_t
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                        ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                        ("dwExtraInfo", ULONG_PTR)]
+        class MOUSEINPUT(ctypes.Structure):
+            _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
+                        ("mouseData", wintypes.DWORD), ("dwFlags", wintypes.DWORD),
+                        ("time", wintypes.DWORD), ("dwExtraInfo", ULONG_PTR)]
+        class HARDWAREINPUT(ctypes.Structure):
+            _fields_ = [("uMsg", wintypes.DWORD), ("wParamL", wintypes.WORD),
+                        ("wParamH", wintypes.WORD)]
+        class INPUTUNION(ctypes.Union):
+            _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT), ("hi", HARDWAREINPUT)]
+        class INPUT(ctypes.Structure):
+            _fields_ = [("type", wintypes.DWORD), ("union", INPUTUNION)]
+        INPUT_KEYBOARD = 1
+        KEYEVENTF_KEYUP = 0x0002
+        KEYEVENTF_UNICODE = 0x0004
+        inputs = []
+        encoded = text.encode("utf-16-le")
+        for i in range(0, len(encoded), 2):
+            code = int.from_bytes(encoded[i:i+2], "little")
+            down = INPUT()
+            down.type = INPUT_KEYBOARD
+            down.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
+            up = INPUT()
+            up.type = INPUT_KEYBOARD
+            up.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
+            inputs.extend((down, up))
+        array_type = INPUT * len(inputs)
+        sent = ctypes.windll.user32.SendInput(len(inputs), array_type(*inputs), ctypes.sizeof(INPUT))
+        if sent != len(inputs):
+            raise OSError("Windows SendInput ввёл не все символы: " + str(sent) + "/" + str(len(inputs)))
+        return {"result": "Текст введён в активное окно Windows (" + str(len(text)) + " символов)."}
     if action in ("mouse_move", "mouse_click", "mouse_double", "mouse_scroll", "mouse_drag", "touch_move", "key_press", "hotkey"):
         import pyautogui
         pyautogui.FAILSAFE = True
@@ -162,7 +195,7 @@ def start_webrtc_stream(cfg, offer):
                         raw = await asyncio.to_thread(self.capture.grab, self.monitor)
                         shot = np.array(raw)[:, :, :3]
                         height, width = shot.shape[:2]
-                        scale = min(1.0, 960 / width, 540 / height)
+                        scale = min(1.0, 1280 / width, 720 / height)
                         if scale < 1.0:
                             from PIL import Image
                             shot = np.array(Image.fromarray(shot[:, :, ::-1]).resize((int(width * scale), int(height * scale))))[:, :, ::-1]
