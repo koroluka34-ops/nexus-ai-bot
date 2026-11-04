@@ -1,4 +1,4 @@
-// NEXUS AI: 1,000 prompt-powered skills + free API utilities.
+// NEXUS AI: 1,000 reusable prompt templates for the general AI dispatcher.
 // Skills are real AI workflows dispatched through the configured Groq/OpenRouter providers.
 const DOMAINS = [
   "Образование","Математика","Физика","Химия","Биология","История","География","Литература","Языки","Психология",
@@ -83,6 +83,6 @@ function skillsPage(page = 1, size = 20) {
   const p = Math.min(totalPages, Math.max(1, Number(page) || 1));
   const start = (p - 1) * size;
   const rows = SKILLS.slice(start, start + size).map(x => x.id + ". " + x.domain + " — " + x.task);
-  return "🧠 NEXUS AI: БИБЛИОТЕКА НАВЫКОВ\nВсего навыков: " + SKILLS.length + "\nСтраница " + p + "/" + totalPages + "\n\n" + rows.join("\n") + "\n\nЗапуск: /skill НОМЕР ваш запрос\nНапример: /skill " + SKILLS[start]?.id + " объясни тему для новичка\nСледующая страница: /skills " + (p + 1);
+  return "🧠 NEXUS AI: БИБЛИОТЕКА ИИ-ШАБЛОНОВ\nВсего шаблонов запросов: " + SKILLS.length + "\nСтраница " + p + "/" + totalPages + "\n\n" + rows.join("\n") + "\n\nЗапуск шаблона через ИИ: /skill НОМЕР ваш запрос\nНапример: /skill " + SKILLS[start]?.id + " объясни тему для новичка\nСледующая страница: /skills " + (p + 1);
 }
 module.exports = { SKILLS, getSkill, searchSkills, skillsPage };
