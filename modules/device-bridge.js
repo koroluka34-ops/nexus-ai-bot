@@ -166,7 +166,7 @@ function verifyTelegramWebApp(initData) {
     params.delete("hash");
     params.delete("signature");
     const check = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k + "=" + v).join("\n");
-    const secret = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+    const secret = crypto.createHmac("sha256", BOT_TOKEN).update("WebAppData").digest();
     const expected = crypto.createHmac("sha256", secret).update(check).digest();
     const supplied = Buffer.from(hash, "hex");
     if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return false;
