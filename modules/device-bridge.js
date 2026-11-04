@@ -29,6 +29,7 @@ function enqueue(action, args, userId, chatId, messageId) {
   if (queue.length >= MAX_QUEUE) throw new Error("Очередь команд заполнена. Подожди выполнения предыдущих.");
   const id = crypto.randomUUID();
   queue.push({ id, action, args, userId: String(userId), chatId, messageId, createdAt: Date.now() });
+  results.set(id, { chatId, userId: String(userId) });
   return id;
 }
 function installDeviceBridge(bot) {
@@ -78,6 +79,8 @@ function installDeviceBridge(bot) {
     pending.delete(id);
     await ctx.answerCallbackQuery();
     if (ctx.match[1] === "no") return ctx.editMessageText("❎ Действие отменено.");
+    const device = devices.get("windows-main");
+    if (!device || Date.now() - device.lastSeen > 45000) return ctx.editMessageText("🔴 Компьютер сейчас не подключён. Запусти NEXUS Agent и повтори команду.");
     try {
       enqueue(item.action, item.args, ctx.from.id, ctx.chat.id, ctx.callbackQuery.message.message_id);
       return ctx.editMessageText("⏳ Команда отправлена на ПК. Жду ответ агента...");
@@ -100,6 +103,12 @@ async function handleDeviceHttp(req, res) {
   if (req.method === "GET" && url.pathname === "/device/poll") {
     const now = Date.now();
     devices.set("windows-main", { lastSeen: now, version: "1.0" });
+    while (queue.length && now - queue[0].createdAt > 60000) {
+      const expired = queue.shift();
+      results.delete(expired.id);
+      const msg = "⌛ Команда отменена: истекло время ожидания ПК.";
+      bot.api.sendMessage(expired.chatId, msg).catch(() => {});
+    }
     const item = queue.shift();
     sendJson(res, 200, { ok: true, command: item ? { id: item.id, action: item.action, args: item.args } : null, pollAfterMs: 1800 });
     return true;
