@@ -244,7 +244,7 @@ function premiumStatusText(memory) {
   const tier = currentPlan(memory), plan = PREMIUM_PLANS[tier], usage = resetDailyUsage(memory);
   const model = tier === "free" ? "GPT-OSS 120B" : (memory.selectedModel || "qwen/qwen3.8-27b");
   return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" +
-    "Запросы: " + usage.text + "/" + plan.text + " сегодня\n" +
+    "Запросы: без лимита\n" +
     "Изображения: без лимита\n" +
     "Видео: без лимита\n" +
     "Модель: <code>" + model + "</code>\n" +
@@ -657,10 +657,6 @@ function formatSources(annotations) {
 // ======================================================
 
 async function askAI(userId, question, searchMode = false) {
-  const quota = await consumeQuota(userId, "text");
-  if (!quota.ok) throw new Error(quota.storageError
-    ? "Не удалось сохранить дневной лимит в Cloudflare KV."
-    : "Дневной лимит тарифа " + PREMIUM_PLANS[quota.tier].name + " исчерпан. Обновится завтра по Киеву. /premium");
   const memory = await loadMemory(userId);
 
   const memoryText = [
@@ -2739,7 +2735,8 @@ bot.command("id", async ctx => {
 
 bot.command("premium", async ctx => {
   const memory = await loadMemory(ctx.from.id);
-  await ctx.reply(premiumStatusText(memory) + "\n\nДля активации тарифа обратись к администратору.", { parse_mode: "HTML" });
+  const suffix = currentPlan(memory) === "free" ? "\n\n💎 Для активации NEXUS Premium обратись к администратору." : "";
+  await ctx.reply(premiumStatusText(memory) + suffix, { parse_mode: "HTML" });
 });
 
 bot.command("model", async ctx => {
