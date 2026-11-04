@@ -164,7 +164,6 @@ function verifyTelegramWebApp(initData) {
     const user = JSON.parse(params.get("user") || "{}");
     if (!hash || !/^\d+$/.test(String(authDate)) || Date.now()/1000 - authDate > 86400 || authDate > Date.now()/1000 + 60) return false;
     params.delete("hash");
-    params.delete("signature");
     const check = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => k + "=" + v).join("\n");
     const secret = crypto.createHmac("sha256", BOT_TOKEN).update("WebAppData").digest();
     const expected = crypto.createHmac("sha256", secret).update(check).digest();
