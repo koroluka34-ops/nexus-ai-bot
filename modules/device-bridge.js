@@ -6,6 +6,7 @@ const { InputFile, InlineKeyboard } = require("grammy");
 const TOKEN = String(process.env.PC_AGENT_TOKEN || "");
 const BOT_TOKEN = String(process.env.BOT_TOKEN || "");
 const touchpad = { activeUntil: 0, dx: 0, dy: 0, events: [] };
+let latestScreen = "", latestScreenAt = 0;
 const pollWaiters = new Set();
 function takeTouchpadCommand() {
   if (touchpad.events.length) return touchpad.events.shift();
@@ -198,6 +199,11 @@ function verifyTelegramWebApp(initData) {
 async function handleDeviceHttp(req, res) {
   const url = new URL(req.url, "http://localhost");
   if (!url.pathname.startsWith("/device/")) return false;
+  if (req.method === "GET" && url.pathname === "/device/screen") {
+    const authError = verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""));
+    if (authError) { sendJson(res, 401, { error: authError }); return true; }
+    sendJson(res, 200, { image: Date.now() - latestScreenAt < 3000 ? latestScreen : "", capturedAt: latestScreenAt }); return true;
+  }
   if (req.method === "POST" && url.pathname === "/device/touchpad") {
     const authError = verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""));
     if (authError) {
@@ -231,6 +237,12 @@ async function handleDeviceHttp(req, res) {
     return true;
   }
   if (!auth(req)) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+  if (req.method === "POST" && url.pathname === "/device/stream") {
+    let body = "";
+    req.on("data", chunk => { body += chunk; if (body.length > 4 * 1024 * 1024) req.destroy(); });
+    req.on("end", () => { try { const data = JSON.parse(body || "{}"); const image = String(data.image || ""); if (!/^[A-Za-z0-9+/=]+$/.test(image) || image.length > 3 * 1024 * 1024) return sendJson(res, 400, { error: "invalid_image" }); latestScreen = image; latestScreenAt = Date.now(); sendJson(res, 200, { ok: true }); } catch { sendJson(res, 400, { error: "bad_json" }); } });
+    return true;
+  }
   if (req.method === "GET" && url.pathname === "/device/poll") {
     const now = Date.now();
     devices.set("windows-main", { lastSeen: now, version: "1.0" });
@@ -252,7 +264,7 @@ async function handleDeviceHttp(req, res) {
     waiter.timer = setTimeout(() => {
       pollWaiters.delete(waiter);
       if (!res.writableEnded) sendJson(res, 200, { ok: true, command: null, touchpadActive: touchpad.activeUntil > Date.now(), pollAfterMs: 0 });
-    }, 20000);
+    }, touchpad.activeUntil > Date.now() ? 900 : 20000);
     pollWaiters.add(waiter);
     res.on("close", () => { clearTimeout(waiter.timer); pollWaiters.delete(waiter); });
     return true;
