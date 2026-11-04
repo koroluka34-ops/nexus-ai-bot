@@ -48,6 +48,29 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+// В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
+function isGroupChat(ctx) {
+  return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
+}
+
+function isAddressedToBot(ctx, text = "") {
+  if (!isGroupChat(ctx)) return true;
+  const botUsername = bot.botInfo?.username;
+  const usernameMention = botUsername
+    ? String(text).toLowerCase().includes("@" + botUsername.toLowerCase())
+    : false;
+  const nameMention = /\\bnexus(?:\\s+ai)?\\b/i.test(text);
+  const repliedToBot = ctx.message?.reply_to_message?.from?.id === bot.botInfo?.id;
+  return usernameMention || nameMention || repliedToBot;
+}
+
+function removeBotMention(text) {
+  const botUsername = bot.botInfo?.username;
+  let cleaned = String(text || "");
+  if (botUsername) cleaned = cleaned.split("@" + botUsername).join(" ");
+  return cleaned.replace(/\\bnexus(?:\\s+ai)?\\b[:,]?/ig, " ").replace(/\\s+/g, " ").trim();
+}
+
 const MAX_HISTORY = 10;
 const MAX_OUTPUT = 1200;
 const MAX_IMAGE_BYTES = 14 * 1024 * 1024;
@@ -3522,6 +3545,7 @@ bot.callbackQuery("menu_reset", async ctx => {
 // ======================================================
 
 bot.on("message:voice", async ctx => {
+  if (!isAddressedToBot(ctx)) return;
   const userId = ctx.from.id;
 
   if (busyUsers.has(userId)) {
@@ -3588,13 +3612,20 @@ bot.on("message:text", async ctx => {
 
   if (!question || question.startsWith("/")) return;
 
+  if (isGroupChat(ctx)) {
+    if (!isAddressedToBot(ctx, question)) return;
+    const cleanedQuestion = removeBotMention(question);
+    if (cleanedQuestion) ctx.message.text = cleanedQuestion;
+  }
+  const addressedQuestion = ctx.message.text.trim();
+
   if (imagePendingUsers.has(userId)) {
     imagePendingUsers.delete(userId);
-    await handleImage(ctx, question);
+    await handleImage(ctx, addressedQuestion);
     return;
   }
 
-  const videoRequest = question.match(
+  const videoRequest = addressedQuestion.match(
     /^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:видео|ролик)\s*[:,-]?\s*([\s\S]*)$/i
   );
   if (videoRequest) {
@@ -3602,7 +3633,7 @@ bot.on("message:text", async ctx => {
     return;
   }
 
-  const imageRequest = question.match(
+  const imageRequest = addressedQuestion.match(
     /^(?:нарисуй|создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:фото|фотографию|картинку|изображение)\s*[:,-]?\s*([\s\S]+)$/i
   );
   if (imageRequest) {
@@ -3610,7 +3641,7 @@ bot.on("message:text", async ctx => {
     return;
   }
 
-  const fileRequest = question.match(
+  const fileRequest = addressedQuestion.match(
     /^(?:создай|сделай|сгенерируй)(?:\s+мне)?\s+(?:файл|документ|док|текстовый\s+файл|таблицу|презентацию)(?:\s+(docx|pdf|xlsx|pptx|txt))?\s*[:,-]?\s*([\s\S]*)$/i
   );
   if (fileRequest) {
@@ -3642,7 +3673,7 @@ bot.on("message:text", async ctx => {
     const sharedGroupMode = groupChat && await isGroupModeEnabled(ctx.chat.id);
     const result = await askAI(
       userId,
-      question,
+      addressedQuestion,
       searchMode,
       sharedGroupMode
         ? { historyKey: "group:" + ctx.chat.id, includePersonalMemory: false }
