@@ -37,7 +37,6 @@ const PREMIUM_ADMIN_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const POLLINATIONS_API_KEY = process.env.POLLINATIONS_API_KEY;
-const VENICE_API_KEY = process.env.VENICE_API_KEY;
 const CLOUDFLARE_KV_NAMESPACE_ID =
   process.env.CLOUDFLARE_KV_NAMESPACE_ID;
 
@@ -875,21 +874,25 @@ async function generateImage(prompt) {
       encodeURIComponent(englishPrompt) +
       "?model=black-forest-labs%2Fflux.1-schnell&width=1024&height=1024&nologo=true";
 
-    const pollinationsResponse = await fetch(pollinationsUrl, {
-      headers: { Authorization: `Bearer ${POLLINATIONS_API_KEY}` },
-      signal: AbortSignal.timeout(120000)
-    });
-    const pollinationsImage = Buffer.from(await pollinationsResponse.arrayBuffer());
+    try {
+      const pollinationsResponse = await fetch(pollinationsUrl, {
+        headers: { Authorization: `Bearer ${POLLINATIONS_API_KEY}` },
+        signal: AbortSignal.timeout(120000)
+      });
+      const pollinationsImage = Buffer.from(await pollinationsResponse.arrayBuffer());
 
-    if (!pollinationsResponse.ok) {
-      throw new Error(
-        `Pollinations HTTP ${pollinationsResponse.status}: ${pollinationsImage.toString("utf8").slice(0, 500)}`
-      );
-    }
-    if (!isImageBuffer(pollinationsImage)) {
-      throw new Error("Pollinations вернул некорректное изображение.");
-    }
-    return pollinationsImage;
+      if (!pollinationsResponse.ok) {
+        throw new Error(
+          `Pollinations HTTP ${pollinationsResponse.status}: ${pollinationsImage.toString("utf8").slice(0, 350)}`
+        );
+      }
+      if (!isImageBuffer(pollinationsImage)) {
+        throw new Error("Pollinations вернул некорректное изображение.");
+      }
+      return pollinationsImage;
+    } catch (pollinationsError) {
+      console.warn("Pollinations image failed; trying Cloudflare Workers AI:", pollinationsError.message);
+      // Continue to Cloudflare fallback below.
   }
 
   if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
@@ -951,43 +954,6 @@ async function generateImage(prompt) {
   return buffer;
 }
 
-async function generateVeniceAdultImage(prompt, userId) {
-  if (!VENICE_API_KEY) {
-    throw new Error("Для /art18 нужно добавить VENICE_API_KEY в Render → Environment. Обычная генерация продолжает работать через прежнего провайдера.");
-  }
-
-  const response = await fetch("https://api.venice.ai/api/v1/images/generations", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${VENICE_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "lustify-v8",
-      prompt: String(prompt).slice(0, 1450),
-      moderation: "low",
-      n: 1,
-      size: "1024x1024",
-      output_format: "png",
-      response_format: "b64_json",
-      anon_user_id: String(userId)
-    }),
-    signal: AbortSignal.timeout(180000)
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = payload.error || payload.message || JSON.stringify(payload).slice(0, 500);
-    throw new Error(`Venice API HTTP ${response.status}: ${detail}`);
-  }
-
-  const encoded = payload?.data?.[0]?.b64_json;
-  if (!encoded) throw new Error("Venice API не вернул изображение в b64_json.");
-  const image = Buffer.from(encoded, "base64");
-  if (!isImageBuffer(image)) throw new Error("Venice API вернул некорректное изображение.");
-  return image;
-}
-
 async function handleAdultImage(ctx, prompt) {
   const userId = ctx.from.id;
   const cleanPrompt = String(prompt || "").trim();
@@ -1003,7 +969,7 @@ async function handleAdultImage(ctx, prompt) {
   busyUsers.add(userId);
   const status = await ctx.reply("🔞 Создаю художественное изображение...");
   try {
-    const image = await enqueueGeneration(userId, () => generateVeniceAdultImage(cleanPrompt, userId));
+    const image = await enqueueGeneration(userId, () => generateImage(cleanPrompt));
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
     await ctx.replyWithPhoto(new InputFile(image, "nexus-art18.png"), {
       caption: "🖼 Готово! Только вымышленные совершеннолетние персонажи."
@@ -1086,7 +1052,7 @@ bot.command("art18", async ctx => {
   adultArtPendingUsers.delete(ctx.from.id);
   await ctx.reply(
     "🔞 <b>NEXUS — ADULT ART</b>\n\n" +
-    "Режим предназначен только для совершеннолетних. Он создаёт чувственные гламурные/романтические изображения вымышленных взрослых персонажей, но не порнографию: без наготы, интимных частей тела и сексуальных действий.\n\n" +
+    "Режим предназначен только для совершеннолетних. Он создаёт неоткровенные гламурные и fashion-изображения вымышленных взрослых персонажей в одежде. Нагота и сексуальные действия не поддерживаются.\n\n" +
     "Подтверди, что тебе уже исполнилось 18 лет.",
     {
       parse_mode: "HTML",
@@ -1102,7 +1068,7 @@ bot.callbackQuery("adult_art_confirm", async ctx => {
   adultArtPendingUsers.add(ctx.from.id);
   await ctx.answerCallbackQuery({ text: "Подтверждение принято" });
   await ctx.reply(
-    "✅ Напиши описание вымышленного совершеннолетнего персонажа и стиль изображения. Например: «взрослая модель в элегантном вечернем платье, мягкий кинематографичный свет, гламурная фотосессия»."
+    "✅ Опиши вымышленного совершеннолетнего персонажа и стиль. Например: «взрослая модель в элегантном вечернем платье, модная журнальная фотосессия, мягкий кинематографичный свет»."
   );
 });
 
@@ -4070,8 +4036,8 @@ bot.on("message:text", async ctx => {
   if (adultArtPendingUsers.has(userId)) {
     adultArtPendingUsers.delete(userId);
     const adultArtPrompt =
-      "Fine-art nude studio photograph of a clearly adult 25+ fictional woman. Artistic, non-sexual nude portrait, natural anatomy, tasteful full-body composition, professional fine-art photography, soft studio lighting, realistic skin texture. " +
-      "The subject must be unmistakably an adult; fictional person only. No minors, no youthful appearance, no real or identifiable people, no sexual activity, no coercion. " +
+      "Elegant non-explicit adult glamour fashion photograph of a clearly adult 25+ fictional woman, fully clothed in a tasteful evening dress, sophisticated editorial styling, confident natural pose, soft cinematic studio lighting, realistic skin texture, premium fashion magazine photography. " +
+      "Fictional adult person only; no nudity, no lingerie, no sexual activity, no minors, no youthful appearance, no real or identifiable people. " +
       "User's visual concept: " + addressedQuestion;
     await handleAdultImage(ctx, adultArtPrompt);
     return;
