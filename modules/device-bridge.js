@@ -7,6 +7,8 @@ const TOKEN = String(process.env.PC_AGENT_TOKEN || "");
 const BOT_TOKEN = String(process.env.BOT_TOKEN || "");
 const touchpad = { activeUntil: 0, dx: 0, dy: 0, events: [] };
 let latestScreen = "", latestScreenAt = 0;
+let pendingWebRtcOffer = null;
+const webRtcAnswers = new Map();
 const pollWaiters = new Set();
 function takeTouchpadCommand() {
   if (touchpad.events.length) return touchpad.events.shift();
@@ -199,6 +201,29 @@ function verifyTelegramWebApp(initData) {
 async function handleDeviceHttp(req, res) {
   const url = new URL(req.url, "http://localhost");
   if (!url.pathname.startsWith("/device/")) return false;
+  if (req.method === "POST" && url.pathname === "/device/webrtc/offer") {
+    const authError = verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""));
+    if (authError) { sendJson(res, 401, { error: authError }); return true; }
+    let body = "";
+    req.on("data", chunk => { body += chunk; if (body.length > 200000) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const data = JSON.parse(body || "{}");
+        if (!/^[a-f0-9-]{20,64}$/i.test(String(data.sessionId || "")) || typeof data.sdp !== "string" || data.sdp.length > 150000 || data.type !== "offer") return sendJson(res, 400, { error: "invalid_offer" });
+        pendingWebRtcOffer = { sessionId: data.sessionId, sdp: data.sdp, type: data.type, createdAt: Date.now() };
+        webRtcAnswers.delete(data.sessionId);
+        sendJson(res, 200, { ok: true });
+      } catch { sendJson(res, 400, { error: "bad_json" }); }
+    });
+    return true;
+  }
+  if (req.method === "GET" && url.pathname === "/device/webrtc/answer") {
+    const authError = verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""));
+    if (authError) { sendJson(res, 401, { error: authError }); return true; }
+    const sessionId = url.searchParams.get("sessionId") || "";
+    sendJson(res, 200, { answer: webRtcAnswers.get(sessionId) || null });
+    return true;
+  }
   if (req.method === "GET" && url.pathname === "/device/screen") {
     const authError = verifyTelegramWebApp(String(req.headers["x-telegram-init-data"] || ""));
     if (authError) { sendJson(res, 401, { error: authError }); return true; }
