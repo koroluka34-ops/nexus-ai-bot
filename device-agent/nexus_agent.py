@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-webrtc-rgb2"
+AGENT_VERSION = "2026.11.04-touchpad-smooth5"
 import base64
 import json
 import os
@@ -77,9 +77,9 @@ def execute(command):
             # Lower the threshold so short touchpad moves are genuinely interpolated.
             dx, dy = int(args.get("dx", 0)), int(args.get("dy", 0))
             if abs(dx) > 500 or abs(dy) > 500: raise ValueError("Слишком большое движение тачпада")
-            # Instant relative movement avoids PyAutoGUI interpolation edge cases
-            # that can raise ZeroDivisionError for very short durations.
-            pyautogui.moveRel(dx, dy, duration=0)
+            # A tiny interpolation smooths the cursor without adding noticeable lag.
+            pyautogui.MINIMUM_DURATION = 0.01
+            pyautogui.moveRel(dx, dy, duration=0.015)
             return {"result": "Курсор перемещён тачпадом."}
         if action == "mouse_move":
             x, y = int(args.get("x", -1)), int(args.get("y", -1))
