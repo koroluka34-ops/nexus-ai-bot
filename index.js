@@ -757,18 +757,71 @@ async function askOpenRouter(messages) {
 
 // Reject research answers that contain explicit dates in the future.
 function hasFutureDatedClaims(value) {
-  const text = String(value || "");
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).split("-").map(Number);
-  const today = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59);
-  const months = { "января":0,"февраля":1,"марта":2,"апреля":3,"мая":4,"июня":5,"июля":6,"августа":7,"сентября":8,"октября":9,"ноября":10,"декабря":11 };
-  const future = (y, m, d) => new Date(y, m, d, 23, 59, 59) > today;
+  // Normalize non-breaking spaces often used in generated Russian text.
+  const text = String(value || "").replace(/[\u00a0\u202f]/g, " ");
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const part = type => Number(parts.find(item => item.type === type)?.value);
+  const todayKey = part("year") * 10000 + part("month") * 100 + part("day");
+
+  const isFuture = (year, month, day) => {
+    const date = new Date(Date.UTC(year, month, day));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month ||
+      date.getUTCDate() !== day
+    ) return false;
+    return year * 10000 + (month + 1) * 100 + day > todayKey;
+  };
+
+  const monthAliases = {
+    "января": 0, "январь": 0, "янв": 0,
+    "февраля": 1, "февраль": 1, "фев": 1,
+    "марта": 2, "март": 2, "мар": 2,
+    "апреля": 3, "апрель": 3, "апр": 3,
+    "мая": 4, "май": 4,
+    "июня": 5, "июнь": 5, "июн": 5,
+    "июля": 6, "июль": 6, "июл": 6,
+    "августа": 7, "август": 7, "авг": 7,
+    "сентября": 8, "сентябрь": 8, "сен": 8, "сент": 8,
+    "октября": 9, "октябрь": 9, "окт": 9,
+    "ноября": 10, "ноябрь": 10, "ноя": 10,
+    "декабря": 11, "декабрь": 11, "дек": 11
+  };
+
   let match;
-  const ru = /\\b(\\d{1,2})\\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\\s+(20\\d{2})\\b/giu;
-  while ((match = ru.exec(text))) if (future(Number(match[3]), months[match[2].toLowerCase()], Number(match[1]))) return true;
-  const iso = /\\b(20\\d{2})-(\\d{2})-(\\d{2})\\b/g;
-  while ((match = iso.exec(text))) if (future(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) return true;
-  const dotted = /\\b(\\d{1,2})\\.(\\d{1,2})\\.(20\\d{2})\\b/g;
-  while ((match = dotted.exec(text))) if (future(Number(match[3]), Number(match[2]) - 1, Number(match[1]))) return true;
+  const monthPattern = Object.keys(monthAliases).sort((a, b) => b.length - a.length).join("|");
+  const russianDate = new RegExp(
+    "\\\\b(\\\\d{1,2})\\\\s+(" + monthPattern + ")\\\\.?\\\\s+(20\\\\d{2})\\\\b",
+    "giu"
+  );
+  while ((match = russianDate.exec(text))) {
+    if (isFuture(Number(match[3]), monthAliases[match[2].toLowerCase()], Number(match[1]))) return true;
+  }
+
+  const isoDate = /\\b(20\\d{2})-(\\d{2})-(\\d{2})\\b/g;
+  while ((match = isoDate.exec(text))) {
+    if (isFuture(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) return true;
+  }
+
+  const dottedDate = /\\b(\\d{1,2})\\.(\\d{1,2})\\.(20\\d{2})\\b/g;
+  while ((match = dottedDate.exec(text))) {
+    if (isFuture(Number(match[3]), Number(match[2]) - 1, Number(match[1]))) return true;
+  }
+
+  // Also catch upcoming dates written without a year, e.g. "5 ноября".
+  const yearlessDate = new RegExp(
+    "\\\\b(\\\\d{1,2})\\\\s+(" + monthPattern + ")\\\\.?\\\\b",
+    "giu"
+  );
+  while ((match = yearlessDate.exec(text))) {
+    if (isFuture(part("year"), monthAliases[match[2].toLowerCase()], Number(match[1]))) return true;
+  }
+
   return false;
 }
 // ======================================================
