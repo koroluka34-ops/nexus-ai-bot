@@ -23,6 +23,7 @@ const crypto = require("crypto");
 const { spawn } = require("child_process");
 
 const ffmpegPath = require("ffmpeg-static");
+const { routeTask, MODEL_GPT, MODEL_QWEN } = require("./modules/model-router");
 
 // ======================================================
 // CONFIG
@@ -800,8 +801,9 @@ async function askAI(userId, question, searchMode = false, options = {}) {
   let result;
 
   try {
-    const selectedModel = currentPlan(memory) === "free" ? "openai/gpt-oss-120b" : (memory.selectedModel || "qwen/qwen3.8-27b");
-    result = await askGroq(messages, searchMode, searchMode ? "openai/gpt-oss-120b" : selectedModel);
+    const preference = memory.selectedModel || "auto";
+    const route = routeTask(question, searchMode ? "gpt" : preference);
+    result = await askGroq(messages, searchMode, route.model);
   } catch (error) {
     console.error("Groq:", error.message);
 
@@ -3003,14 +3005,21 @@ bot.command("premium", async ctx => {
 
 bot.command("model", async ctx => {
   const memory = await loadMemory(ctx.from.id);
-  if (currentPlan(memory) === "free") return ctx.reply("Выбор модели доступен NEXUS PLUS и ULTRA. Сейчас GPT-OSS 120B. /premium");
-  const model = String(ctx.match || "").trim().toLowerCase();
-  if (!model) return ctx.reply("Доступно: /model gpt или /model qwen");
-  if (model === "gpt") memory.selectedModel = "openai/gpt-oss-120b";
-  else if (model === "qwen") memory.selectedModel = "qwen/qwen3.8-27b";
-  else return ctx.reply("Доступно: /model gpt или /model qwen");
-  if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить выбор модели.");
-  await ctx.reply("✅ Модель выбрана: " + memory.selectedModel);
+  const mode = String(ctx.match || "").trim().toLowerCase();
+  if (!mode || mode === "status") {
+    const active = memory.selectedModel || "auto";
+    return ctx.reply(
+      "🧠 УПРАВЛЕНИЕ ИИ-МОДЕЛЯМИ\\n\\n" +
+      "Режим: " + (active === "auto" ? "🤖 Автоматический выбор" : active === "gpt" ? "GPT-OSS 120B" : "Qwen 3.8 27B") + "\\n\\n" +
+      "Доступно всем бесплатно:\\n/model auto — ИИ сам выбирает модель\\n/model gpt — универсальные задачи\\n/model qwen — код, техника и анализ"
+    );
+  }
+  if (!["auto", "gpt", "qwen"].includes(mode)) {
+    return ctx.reply("Использование: /model auto, /model gpt или /model qwen");
+  }
+  memory.selectedModel = mode;
+  if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить выбор модели. Проверь Cloudflare KV.");
+  await ctx.reply("✅ Режим моделей сохранён: " + (mode === "auto" ? "автоматический выбор" : mode.toUpperCase()));
 });
 
 bot.command("premiumgrant", async ctx => {
