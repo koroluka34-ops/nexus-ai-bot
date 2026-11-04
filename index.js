@@ -79,12 +79,11 @@ function removeBotMention(text) {
   const botUsername = bot.botInfo?.username;
   let cleaned = String(text || "");
   if (botUsername) {
-    // Telegram usernames contain only letters, digits and underscores.
     cleaned = cleaned.replace(new RegExp("@" + botUsername, "ig"), " ");
   }
   return cleaned
-    .replace(/(?:^|[^\\p{L}\\p{N}_])(?:nexus(?:\\s+ai)?|бот)(?=$|[^\\p{L}\\p{N}_])[:,]?/giu, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/(?:^|[^\p{L}\p{N}_])(?:nexus(?:\s+ai)?|бот)(?=$|[^\p{L}\p{N}_])[:,]?/giu, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 const MAX_HISTORY = 10;
