@@ -278,7 +278,7 @@ function installSecurityMonitor(bot) {
       const id = require("node:crypto").randomBytes(3).toString("hex");
       const item = {
         id, userId: String(ctx.from.id), chatId: String(ctx.chat.id),
-        url: new URL(raw).origin, lastOk: result.ok, lastStatus: result.status,
+        url: new URL(raw).toString(), lastOk: result.ok, lastStatus: result.status,
         createdAt: Date.now(), lastCheckedAt: Date.now()
       };
       state.watches.push(item);
