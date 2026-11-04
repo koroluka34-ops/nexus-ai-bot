@@ -12,6 +12,28 @@ header{display:flex;justify-content:space-between;align-items:center;font-weight
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 button{border:1px solid #334155;background:#1e293b;color:#fff;border-radius:15px;padding:17px 10px;font-size:16px;font-weight:650;touch-action:manipulation}
 button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;color:#94a3b8;text-align:center;padding-bottom:4px}.keyboard-row{display:flex;justify-content:flex-end}.keyboard-button{padding:9px 13px;font-size:19px;border-radius:12px}.keyboard-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:8px}.keyboard-panel.open{display:grid}.keyboard-panel textarea{width:100%;min-height:76px;resize:vertical;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#fff;padding:10px;font:16px system-ui}.keyboard-panel button{padding:12px}.key-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.key-actions button{padding:12px 4px;font-size:14px}.key-actions .wide{grid-column:span 2}.game-panel{display:none;border:1px solid #334155;border-radius:16px;background:#111827;padding:10px;gap:9px}.game-panel.open{display:grid}.game-layout{display:grid;grid-template-columns:136px minmax(0,1fr);gap:10px;align-items:center}.joystick-wrap{display:grid;justify-items:center;gap:7px}.joystick{width:128px;height:128px;border:2px solid #64748b;border-radius:50%;background:radial-gradient(circle,#334155 0 4px,#1e293b 5px 42%,#0f172a 72%);position:relative;touch-action:none;user-select:none}.joystick:before,.joystick:after{content:'';position:absolute;background:#475569;opacity:.55}.joystick:before{width:1px;height:100%;left:50%;top:0}.joystick:after{height:1px;width:100%;top:50%;left:0}.joystick-knob{position:absolute;width:48px;height:48px;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:linear-gradient(145deg,#94a3b8,#475569);border:2px solid #cbd5e1;box-shadow:0 3px 10px #0009;pointer-events:none;z-index:1}.game-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.game-grid button{min-height:48px;padding:8px 3px;font-size:14px;touch-action:none;user-select:none}.game-grid .action{font-size:12px;min-height:42px}.joystick-caption{font-size:11px;color:#94a3b8;text-align:center}@media(max-width:350px){.game-layout{grid-template-columns:112px minmax(0,1fr);gap:7px}.joystick{width:108px;height:108px}.joystick-knob{width:42px;height:42px}.game-grid{gap:5px}.game-grid button{font-size:12px}}
+body.game-mode{position:fixed;inset:0;width:100vw;height:100dvh;min-height:0;padding:0;gap:0;overflow:hidden;background:#020617}
+body.game-mode header,body.game-mode>.pad,body.game-mode>.controls,body.game-mode>.keyboard-row,body.game-mode>#keyboardPanel,body.game-mode>body>.small{display:none!important}
+body.game-mode .screen-wrap{position:absolute;inset:0;padding:0;border:0;border-radius:0;background:#020617;overflow:hidden}
+body.game-mode .screen-head{position:absolute;z-index:4;top:env(safe-area-inset-top,8px);left:10px;right:10px;margin:0;padding:4px 8px;background:#02061788;border-radius:8px}
+body.game-mode #liveVideo{width:100vw;height:100dvh;aspect-ratio:auto;object-fit:contain;border-radius:0}
+body.game-mode #gameButton{position:absolute;z-index:12;top:calc(env(safe-area-inset-top,0px) + 8px);right:10px;padding:8px 12px;background:#111827cc}
+body.game-mode #keyboardButton{display:none}
+body.game-mode #gamePanel{display:block!important;position:absolute;inset:0;z-index:8;padding:0;border:0;border-radius:0;background:transparent;pointer-events:none}
+body.game-mode #gamePanel>.small{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:65vw;padding:5px 9px;border-radius:8px;background:#02061788;color:#fff}
+body.game-mode .game-layout{display:contents}
+body.game-mode .joystick-wrap{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));pointer-events:auto}
+body.game-mode .joystick{width:clamp(118px,22vh,170px);height:clamp(118px,22vh,170px);background:radial-gradient(circle,#475569 0 4px,#334155 5px 42%,#0f172acc 72%);border-color:#cbd5e1aa}
+body.game-mode .joystick-knob{width:clamp(48px,8vh,64px);height:clamp(48px,8vh,64px);background:linear-gradient(145deg,#e2e8f0,#64748b)}
+body.game-mode .joystick-caption{color:white;text-shadow:0 1px 3px #000}
+body.game-mode .game-grid{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));width:min(43vw,340px);grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;pointer-events:auto}
+body.game-mode .game-grid button{min-height:clamp(42px,8vh,58px);border-radius:50%;padding:5px;background:#172033cc;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(10px,2vh,14px);backdrop-filter:blur(5px)}
+body.game-mode .game-grid button:active{background:#475569ee}
+body.game-mode .game-grid button[data-game-key="space"]{background:#2563ebcc}
+body.game-mode .game-grid button[data-game-mouse="left"]{background:#b45309dd}
+body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
+@media(orientation:portrait){body.game-mode #gamePanel:after{content:'Поверни телефон горизонтально';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:8px 12px;background:#020617bb;border-radius:10px;color:white;font-size:13px;pointer-events:none}}
+
 </style></head><body>
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
 <section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
@@ -100,14 +122,31 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  pad.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;e.preventDefault();const prev=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size>=2){const dy=e.clientY-prev.y;if(Math.abs(dy)>1)send({type:'scroll',direction:dy>0?-1:1,amount:Math.max(1,Math.min(3,Math.round(Math.abs(dy)/24)))});return;}if(e.pointerId===primary){const dx=e.clientX-prev.x,dy=e.clientY-prev.y;if(Math.abs(e.clientX-start.x)+Math.abs(e.clientY-start.y)>7)moved=true;queueMove(dx,dy);}});
  function endPointer(e){if(!pointers.has(e.pointerId))return;const wasSingle=pointers.size===1&&e.pointerId===primary;pointers.delete(e.pointerId);if(wasSingle&&start&&!moved)send({type:'click',button:'left'});if(!pointers.size){primary=null;start=null;}}
  pad.addEventListener('pointerup',endPointer);pad.addEventListener('pointercancel',endPointer);
- document.getElementById('left').addEventListener('click',()=>send({type:'click',button:'left'}));
- document.getElementById('right').addEventListener('click',()=>send({type:'click',button:'right'}));
+ function sendRealtime(payload,fallback){
+  if(moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<65536){moveChannel.send(JSON.stringify(payload));return true;}
+  if(fallback)send(fallback);
+  return false;
+ }
+ document.getElementById('left').addEventListener('click',()=>sendRealtime({type:'game-click',button:'left'},{type:'click',button:'left'}));
+ document.getElementById('right').addEventListener('click',()=>sendRealtime({type:'game-click',button:'right'},{type:'click',button:'right'}));
  const gameButton=document.getElementById('gameButton'),gamePanel=document.getElementById('gamePanel');
- gameButton.addEventListener('click',()=>{gamePanel.classList.toggle('open');if(gamePanel.classList.contains('open'))keyboardPanel.classList.remove('open');});
+ gameButton.addEventListener('click',async()=>{
+  const active=document.body.classList.toggle('game-mode');
+  gamePanel.classList.toggle('open',active);
+  if(active){
+   keyboardPanel.classList.remove('open');gameButton.textContent='✕';
+   try{if(tg?.requestFullscreen)await tg.requestFullscreen();}catch{}
+   try{if(screen.orientation?.lock)await screen.orientation.lock('landscape');}catch{}
+  }else{
+   gameButton.textContent='🎮';
+   try{if(screen.orientation?.unlock)screen.orientation.unlock();}catch{}
+   try{if(tg?.exitFullscreen)await tg.exitFullscreen();}catch{}
+  }
+ });
  function bindGameHold(el,payload){
   let held=false;
-  const release=()=>{if(!held)return;held=false;send({...payload,state:'up'});};
-  el.addEventListener('pointerdown',e=>{e.preventDefault();if(held)return;held=true;try{el.setPointerCapture(e.pointerId);}catch{}send({...payload,state:'down'});});
+  const release=()=>{if(!held)return;held=false;sendRealtime({...payload,state:'up'},{...payload,state:'up'});};
+  el.addEventListener('pointerdown',e=>{e.preventDefault();if(held)return;held=true;try{el.setPointerCapture(e.pointerId);}catch{}sendRealtime({...payload,state:'down'},{...payload,state:'down'});});
   el.addEventListener('pointerup',e=>{e.preventDefault();release();});
   el.addEventListener('pointercancel',release);
   el.addEventListener('lostpointercapture',release);
@@ -126,13 +165,13 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
    if(ny<-.32)next.add('w');if(ny>.32)next.add('s');
    if(nx<-.32)next.add('a');if(nx>.32)next.add('d');
   }
-  for(const key of joystickKeys)if(!next.has(key))send({type:'game-key',key,state:'up'});
-  for(const key of next)if(!joystickKeys.has(key))send({type:'game-key',key,state:'down'});
+  for(const key of joystickKeys)if(!next.has(key))sendRealtime({type:'game-key',key,state:'up'},{type:'game-key',key,state:'up'});
+  for(const key of next)if(!joystickKeys.has(key))sendRealtime({type:'game-key',key,state:'down'},{type:'game-key',key,state:'down'});
   joystickKeys=next;
  }
  function resetJoystick(){
   joystickPointer=null;joystickKnob.style.transform='translate(-50%,-50%)';
-  for(const key of joystickKeys)send({type:'game-key',key,state:'up'});
+  for(const key of joystickKeys)sendRealtime({type:'game-key',key,state:'up'},{type:'game-key',key,state:'up'});
   joystickKeys.clear();
  }
  joystick.addEventListener('pointerdown',e=>{e.preventDefault();if(joystickPointer!==null)return;joystickPointer=e.pointerId;try{joystick.setPointerCapture(e.pointerId);}catch{}updateJoystick(e);});
