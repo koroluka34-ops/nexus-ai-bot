@@ -1,10 +1,10 @@
-// NEXUS AI: 950 prompt-powered skills + free API utilities.
+// NEXUS AI: 1,000 prompt-powered skills + free API utilities.
 // Skills are real AI workflows dispatched through the configured Groq/OpenRouter providers.
 const DOMAINS = [
   "Образование","Математика","Физика","Химия","Биология","История","География","Литература","Языки","Психология",
   "Бизнес","Маркетинг","Продажи","Финансы","Предпринимательство","Менеджмент","HR","Юриспруденция","Медицина (справочная информация)","Здоровый образ жизни",
   "Программирование","Веб-разработка","Мобильная разработка","Базы данных","DevOps","Кибербезопасность","Дизайн","UX/UI","Искусство","Фотография",
-  "Видео","Музыка","Telegram-боты","Социальные сети","Журналистика","Наука","Путешествия","Повседневная жизнь"
+  "Видео","Музыка","Telegram-боты","Социальные сети","Журналистика","Наука","Путешествия","Повседневная жизнь","Игры и геймдизайн","Системное администрирование"
 ];
 const TASKS = [
   "объяснение темы простыми словами","пошаговая инструкция","краткое резюме","подробный анализ","поиск ошибок и исправления",
@@ -47,6 +47,26 @@ const SKILLS = DOMAINS.flatMap((domain, di) => TASKS.map((task, ti) => ({
   instruction: "Ты специализированный помощник по направлению «" + domain + "». Выполни задачу: " + (TASK_GUIDES[task] || task) + " Отвечай на русском, понятно и структурированно. Не выдумывай источники, цифры или факты. Если вопрос требует актуальных данных, прямо укажи, что нужна проверка через интернет/API."
 })));
 function getSkill(id) { return SKILLS.find(x => x.id === Number(id)); }
+function searchSkills(query, limit = 15) {
+  const terms = String(query || "").toLocaleLowerCase("ru")
+    .split(/[\\s,.;:!?/|+-]+/u).filter(Boolean).slice(0, 10);
+  if (!terms.length) return [];
+  return SKILLS.map(skill => {
+    const domain = skill.domain.toLocaleLowerCase("ru");
+    const task = skill.task.toLocaleLowerCase("ru");
+    const searchable = (domain + " " + task + " " + skill.instruction).toLocaleLowerCase("ru");
+    let score = 0;
+    for (const term of terms) {
+      if (domain.includes(term)) score += 10;
+      if (task.includes(term)) score += 5;
+      if (!domain.includes(term) && !task.includes(term) && searchable.includes(term)) score += 1;
+    }
+    return { skill, score };
+  }).filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.skill.id - b.skill.id)
+    .slice(0, Math.max(1, Math.min(30, Number(limit) || 15)))
+    .map(item => item.skill);
+}
 function skillsPage(page = 1, size = 20) {
   const totalPages = Math.ceil(SKILLS.length / size);
   const p = Math.min(totalPages, Math.max(1, Number(page) || 1));
@@ -54,4 +74,4 @@ function skillsPage(page = 1, size = 20) {
   const rows = SKILLS.slice(start, start + size).map(x => x.id + ". " + x.domain + " — " + x.task);
   return "🧠 NEXUS AI: БИБЛИОТЕКА НАВЫКОВ\nВсего навыков: " + SKILLS.length + "\nСтраница " + p + "/" + totalPages + "\n\n" + rows.join("\n") + "\n\nЗапуск: /skill НОМЕР ваш запрос\nНапример: /skill " + SKILLS[start]?.id + " объясни тему для новичка\nСледующая страница: /skills " + (p + 1);
 }
-module.exports = { SKILLS, getSkill, skillsPage };
+module.exports = { SKILLS, getSkill, searchSkills, skillsPage };
