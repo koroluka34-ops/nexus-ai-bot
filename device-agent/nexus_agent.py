@@ -162,7 +162,7 @@ def start_webrtc_stream(cfg, offer):
                         raw = await asyncio.to_thread(self.capture.grab, self.monitor)
                         shot = np.array(raw)[:, :, :3]
                         height, width = shot.shape[:2]
-                        scale = min(1.0, 1280 / width, 720 / height)
+                        scale = min(1.0, 960 / width, 540 / height)
                         if scale < 1.0:
                             from PIL import Image
                             shot = np.array(Image.fromarray(shot[:, :, ::-1]).resize((int(width * scale), int(height * scale))))[:, :, ::-1]
