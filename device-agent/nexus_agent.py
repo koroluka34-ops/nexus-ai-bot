@@ -266,7 +266,7 @@ def start_webrtc_stream(cfg, offer):
                     self.video_started = None
                     self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
-                    print("WebRTC режим: 854x480, до 20 FPS")
+                    print("WebRTC режим: 854x480, цель до 60 FPS")
 
                 async def next_timestamp(self):
                     # До 100 FPS: фиксированный шаг RTP timestamp, без очереди старых кадров.
@@ -275,7 +275,7 @@ def start_webrtc_stream(cfg, offer):
                         self.video_started = time.monotonic()
                         self.video_pts = 0
                     else:
-                        self.video_pts += 4500  # 90000 / 20 FPS; уменьшаем нагрузку и задержку
+                        self.video_pts += 1500  # 90000 / 60 FPS
                         target = self.video_started + self.video_pts / 90000
                         await asyncio.sleep(max(0, target - time.monotonic()))
                     return self.video_pts, fractions.Fraction(1, 90000)
