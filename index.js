@@ -420,6 +420,12 @@ function allCommandsText() {
 <code>/reset</code> — очистить текущую историю диалога.
 <code>/groupmode on|off</code> — общий контекст ИИ в группе.
 <code>/kb</code> — база знаний из твоих документов.
+<code>/ban</code>, <code>/unban</code> — заблокировать / разблокировать (ответом на сообщение).
+<code>/kick</code> — удалить участника из группы.
+<code>/mute 10m</code>, <code>/unmute</code> — выдать / снять мут.
+<code>/warn</code>, <code>/warnings</code>, <code>/clearwarns</code> — предупреждения.
+<code>/purge 10</code> — удалить сообщения до команды.
+<code>/pin</code>, <code>/unpin</code> — закрепить / открепить сообщение.
 <code>/agent задача</code> — поручить ИИ выполнить задачу.
 <code>/research тема</code> — глубокое исследование с веб-поиском и источниками.
 <code>/team задача</code> — запустить команду из нескольких ИИ.
@@ -2898,6 +2904,227 @@ bot.command("premiumgrant", async ctx => {
   if (!await saveMemory(targetId)) return ctx.reply("❌ Не удалось сохранить тариф в Cloudflare KV.");
   await ctx.reply("✅ " + tier.toUpperCase() + " выдан пользователю " + targetId + (tier === "free" ? "." : " на " + days + " дней."));
   if (tier !== "free") await bot.api.sendMessage(targetId, "💎 Тебе активирован NEXUS " + tier.toUpperCase() + " на " + days + " дней. /premium").catch(() => {});
+});
+
+// ======================================================
+// GROUP MODERATION — TELEGRAM ADMIN PERMISSIONS REQUIRED
+// ======================================================
+
+function moderationTarget(ctx) {
+  const message = ctx.message?.reply_to_message;
+  if (!message?.from || message.from.is_bot) return null;
+  return message.from;
+}
+
+async function requireGroupAdmin(ctx) {
+  if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") {
+    await ctx.reply("Эта команда работает только в группах.");
+    return false;
+  }
+  try {
+    const member = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
+    if (!["creator", "administrator"].includes(member.status)) {
+      await ctx.reply("⛔ Команда доступна только администраторам группы.");
+      return false;
+    }
+    return true;
+  } catch (error) {
+    await ctx.reply("❌ Не удалось проверить права администратора: " + String(error.description || error.message).slice(0, 250));
+    return false;
+  }
+}
+
+async function getWarnings(chatId, userId) {
+  if (!kvConfigured()) return [];
+  try {
+    const response = await fetch(kvValueUrl("nexus:warnings:" + chatId + ":" + userId), {
+      headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (response.status === 404) return [];
+    if (!response.ok) throw new Error("KV HTTP " + response.status);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("WARNINGS LOAD:", error.message);
+    return null;
+  }
+}
+
+async function saveWarnings(chatId, userId, warnings) {
+  if (!kvConfigured()) return false;
+  try {
+    const response = await fetch(kvValueUrl("nexus:warnings:" + chatId + ":" + userId), {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(warnings),
+      signal: AbortSignal.timeout(8000)
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("WARNINGS SAVE:", error.message);
+    return false;
+  }
+}
+
+function parseMuteDuration(input) {
+  const match = String(input || "").trim().match(/^(\d+)(m|h|d)$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const multiplier = { m: 60, h: 3600, d: 86400 }[match[2].toLowerCase()];
+  if (!amount || amount > 365) return null;
+  return Math.min(amount * multiplier, 366 * 86400);
+}
+
+bot.command("ban", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /ban на сообщение нарушителя. Можно добавить причину.");
+  const reason = String(ctx.match || "").trim();
+  try {
+    await ctx.api.banChatMember(ctx.chat.id, target.id);
+    await ctx.reply("🔨 Пользователь " + target.first_name + " заблокирован." + (reason ? "\nПричина: " + reason : ""));
+  } catch (error) {
+    await ctx.reply("❌ Не удалось заблокировать: " + String(error.description || error.message).slice(0, 300));
+  }
+});
+
+bot.command("unban", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /unban на сообщение пользователя.");
+  try {
+    await ctx.api.unbanChatMember(ctx.chat.id, target.id, { only_if_banned: true });
+    await ctx.reply("✅ Блокировка пользователя " + target.first_name + " снята.");
+  } catch (error) {
+    await ctx.reply("❌ Не удалось снять блокировку: " + String(error.description || error.message).slice(0, 300));
+  }
+});
+
+bot.command("kick", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /kick на сообщение участника.");
+  try {
+    await ctx.api.banChatMember(ctx.chat.id, target.id);
+    await ctx.api.unbanChatMember(ctx.chat.id, target.id, { only_if_banned: true });
+    await ctx.reply("👢 Пользователь " + target.first_name + " удалён из группы. Он сможет вступить снова по ссылке.");
+  } catch (error) {
+    await ctx.reply("❌ Не удалось удалить участника: " + String(error.description || error.message).slice(0, 300));
+  }
+});
+
+bot.command("mute", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /mute 10m на сообщение участника. Формат: 10m, 2h, 1d.");
+  const duration = parseMuteDuration(ctx.match);
+  if (!duration) return ctx.reply("Укажи длительность: /mute 10m, /mute 2h или /mute 1d (максимум 365 дней).");
+  try {
+    await ctx.api.restrictChatMember(ctx.chat.id, target.id, {
+      permissions: {
+        can_send_messages: false, can_send_audios: false, can_send_documents: false,
+        can_send_photos: false, can_send_videos: false, can_send_video_notes: false,
+        can_send_voice_notes: false, can_send_polls: false, can_send_other_messages: false,
+        can_add_web_page_previews: false
+      },
+      until_date: Math.floor(Date.now() / 1000) + duration
+    });
+    await ctx.reply("🔇 " + target.first_name + " получил мут на " + String(ctx.match).trim() + ".");
+  } catch (error) {
+    await ctx.reply("❌ Не удалось выдать мут: " + String(error.description || error.message).slice(0, 300));
+  }
+});
+
+bot.command("unmute", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /unmute на сообщение участника.");
+  try {
+    await ctx.api.restrictChatMember(ctx.chat.id, target.id, {
+      permissions: {
+        can_send_messages: true, can_send_audios: true, can_send_documents: true,
+        can_send_photos: true, can_send_videos: true, can_send_video_notes: true,
+        can_send_voice_notes: true, can_send_polls: true, can_send_other_messages: true,
+        can_add_web_page_previews: true, can_invite_users: true
+      }
+    });
+    await ctx.reply("🔊 Мут с пользователя " + target.first_name + " снят.");
+  } catch (error) {
+    await ctx.reply("❌ Не удалось снять мут: " + String(error.description || error.message).slice(0, 300));
+  }
+});
+
+bot.command("warn", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /warn на сообщение нарушителя. Можно добавить причину.");
+  const warnings = await getWarnings(ctx.chat.id, target.id);
+  if (warnings === null) return ctx.reply("❌ Не удалось прочитать предупреждения из Cloudflare KV.");
+  warnings.push({ at: new Date().toISOString(), by: ctx.from.id, reason: String(ctx.match || "").trim().slice(0, 300) });
+  if (!await saveWarnings(ctx.chat.id, target.id, warnings)) return ctx.reply("❌ Не удалось сохранить предупреждение в Cloudflare KV.");
+  await ctx.reply("⚠️ Предупреждение для " + target.first_name + ". Всего: " + warnings.length + "/3." +
+    (warnings.length >= 3 ? "\n🚫 Достигнут лимит 3 предупреждения. Администратор может выдать мут или бан." : ""));
+});
+
+bot.command("warnings", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /warnings на сообщение участника.");
+  const warnings = await getWarnings(ctx.chat.id, target.id);
+  if (warnings === null) return ctx.reply("❌ Не удалось загрузить предупреждения.");
+  await ctx.reply("⚠️ Предупреждения " + target.first_name + ": " + warnings.length + "\n" +
+    (warnings.length ? warnings.map((w, i) => (i + 1) + ". " + new Date(w.at).toLocaleString("ru-RU") + (w.reason ? " — " + w.reason : "")).join("\n") : "Нет предупреждений."));
+});
+
+bot.command("clearwarns", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = moderationTarget(ctx);
+  if (!target) return ctx.reply("Ответь командой /clearwarns на сообщение участника.");
+  if (!await saveWarnings(ctx.chat.id, target.id, [])) return ctx.reply("❌ Не удалось очистить предупреждения.");
+  await ctx.reply("✅ Предупреждения " + target.first_name + " очищены.");
+});
+
+bot.command("purge", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const count = Math.max(1, Math.min(100, Number.parseInt(ctx.match, 10) || 1));
+  const replied = ctx.message.reply_to_message;
+  if (!replied) return ctx.reply("Ответь командой /purge 10 на сообщение, с которого начать удаление (до 100 сообщений).");
+  const firstId = replied.message_id;
+  const lastId = ctx.message.message_id;
+  let deleted = 0;
+  for (let id = lastId; id >= firstId && deleted < count; id--) {
+    try { await ctx.api.deleteMessage(ctx.chat.id, id); deleted++; } catch {}
+  }
+  try { await ctx.api.deleteMessage(ctx.chat.id, lastId); } catch {}
+  await ctx.reply("🧹 Удалено сообщений: " + deleted).catch(() => {});
+});
+
+bot.command("pin", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  const target = ctx.message.reply_to_message;
+  if (!target) return ctx.reply("Ответь командой /pin на сообщение, которое нужно закрепить.");
+  try {
+    await ctx.api.pinChatMessage(ctx.chat.id, target.message_id);
+    await ctx.reply("📌 Сообщение закреплено.");
+  } catch (error) {
+    await ctx.reply("❌ Не удалось закрепить: " + String(error.description || error.message).slice(0, 300));
+  }
+});
+
+bot.command("unpin", async ctx => {
+  if (!await requireGroupAdmin(ctx)) return;
+  try {
+    const target = ctx.message.reply_to_message;
+    if (target) await ctx.api.unpinChatMessage(ctx.chat.id, target.message_id);
+    else await ctx.api.unpinAllChatMessages(ctx.chat.id);
+    await ctx.reply(target ? "📌 Сообщение откреплено." : "📌 Все сообщения откреплены.");
+  } catch (error) {
+    await ctx.reply("❌ Не удалось открепить: " + String(error.description || error.message).slice(0, 300));
+  }
 });
 
 // ======================================================
