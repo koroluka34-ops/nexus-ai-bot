@@ -54,6 +54,31 @@ const MAX_IMAGE_BYTES = 14 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 18 * 1024 * 1024;
 const MAX_MEMORY_CHARS = 8000;
 
+// Премиум-эмодзи из набора пользователя — случайный значок в ответах NEXUS.
+const PREMIUM_CUSTOM_EMOJI_IDS = [
+  "5327994801423935198",
+  "5327772528276433468",
+  "5330197024430118581",
+  "5330403311709346103",
+  "5330380625692087194",
+  "5330402534320266945",
+  "5327988419102536023",
+  "5330126376513067488",
+  "5328306689064066460",
+  "5330458892881121176",
+  "5328240572337513589",
+  "5330445831885574041",
+  "5327870560904963813",
+  "5330372443779389127",
+  "5330130602760883752",
+  "5330176782249254424"
+];
+
+function premiumEmojiEntity() {
+  const id = PREMIUM_CUSTOM_EMOJI_IDS[Math.floor(Math.random() * PREMIUM_CUSTOM_EMOJI_IDS.length)];
+  return { type: "custom_emoji", offset: 0, length: 1, custom_emoji_id: id };
+}
+
 const histories = new Map();
 const longMemory = new Map();
 
@@ -1299,14 +1324,18 @@ async function sendSpeech(ctx, text) {
 
 async function sendLongMessage(ctx, text) {
   const maxLength = 3900;
+  let firstChunk = true;
 
   for (let i = 0; i < text.length; i += maxLength) {
-    await ctx.reply(
-      text.slice(i, i + maxLength),
-      {
-        link_preview_options: { is_disabled: true }
-      }
-    );
+    const chunk = text.slice(i, i + maxLength);
+    const options = { link_preview_options: { is_disabled: true } };
+    if (firstChunk && chunk.length) {
+      options.entities = [premiumEmojiEntity()];
+      await ctx.reply("⭐ " + chunk, options);
+      firstChunk = false;
+    } else {
+      await ctx.reply(chunk, options);
+    }
   }
 }
 
@@ -3122,6 +3151,7 @@ bot.on("message", async (ctx, next) => {
       uniqueIds.map(id => "<code>" + id + "</code>").join("\\n"),
       { parse_mode: "HTML", reply_parameters: { message_id: message.message_id } }
     );
+    return;
   }
 
   await next();
