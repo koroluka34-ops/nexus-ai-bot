@@ -1642,8 +1642,23 @@ async function runOverdrive(ctx, task) {
     }
   ];
 
-  const finalResult = await overdriveModel(judgeMessages);
-  const finalText = "⚡ NEXUS OVERDRIVE — ВЕРДИКТ\n\n" + finalResult.answer;
+  let finalAnswer;
+  try {
+    const finalResult = await overdriveModel(judgeMessages);
+    finalAnswer = String(finalResult.answer || "").trim();
+  } catch (error) {
+    console.error("OVERDRIVE judge fallback:", error.message);
+    // Если оба провайдера не ответили судье, не теряем уже готовую работу агентов.
+    const strategist = results.find(item => item.name.includes("СТРАТЕГ"));
+    const analyst = results.find(item => item.name.includes("АНАЛИТИК"));
+    const critic = results.find(item => item.name.includes("КРИТИК"));
+    finalAnswer =
+      "Вот итог по уже завершённым агентам. Судья временно недоступен, поэтому это краткая сборка их ответов.\n\n" +
+      "💡 Лучший вариант:\n" + (strategist?.answer || "Стратег не вернул ответ.") +
+      "\n\n🔍 Что важно учесть:\n" + (analyst?.answer || "Аналитик не вернул ответ.") +
+      "\n\n🧨 Риски и слабые места:\n" + (critic?.answer || "Критик не вернул ответ.");
+  }
+  const finalText = "⚡ NEXUS OVERDRIVE\n\n" + finalAnswer;
   if (finalText.length <= 3900) {
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, finalText)
       .catch(() => sendLongMessage(ctx, finalText));
