@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.04-touchpad-dc11"
+AGENT_VERSION = "2026.11.04-low-latency-1"
 import base64
 import json
 import os
@@ -191,7 +191,23 @@ def start_webrtc_stream(cfg, offer):
                     self.capture = mss.MSS()
                     self.monitor = self.capture.monitors[1]
                     self.frames = 0
+                    self.video_started = None
+                    self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
+                    print("WebRTC режим низкой задержки: 960x540, 20 FPS")
+
+                async def next_timestamp(self):
+                    # 20 FPS: меньше нагрузка на кодирование и сеть, без очереди старых кадров.
+                    import fractions
+                    if self.video_started is None:
+                        self.video_started = time.monotonic()
+                        self.video_pts = 0
+                    else:
+                        self.video_pts += 4500  # 90000 / 20 FPS
+                        target = self.video_started + self.video_pts / 90000
+                        await asyncio.sleep(max(0, target - time.monotonic()))
+                    return self.video_pts, fractions.Fraction(1, 90000)
+
                 async def recv(self):
                     try:
                         pts, time_base = await self.next_timestamp()
@@ -199,7 +215,7 @@ def start_webrtc_stream(cfg, offer):
                         raw = await asyncio.to_thread(self.capture.grab, self.monitor)
                         shot = np.array(raw)[:, :, :3]
                         height, width = shot.shape[:2]
-                        scale = min(1.0, 1280 / width, 720 / height)
+                        scale = min(1.0, 960 / width, 540 / height)
                         if scale < 1.0:
                             from PIL import Image
                             shot = np.array(Image.fromarray(shot[:, :, ::-1]).resize((int(width * scale), int(height * scale))))[:, :, ::-1]
