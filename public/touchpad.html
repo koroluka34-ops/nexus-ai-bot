@@ -45,7 +45,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
 <div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button></div></section>
 <div id="gamePicker" class="game-picker"><div class="game-picker-card"><h2>Во что играем?</h2><p>Выбери игру — откроется горизонтальный игровой экран с джойстиком.</p><div class="game-picker-options"><button type="button" data-select-game="minecraft"><span>⛏️</span>Minecraft</button><button type="button" data-select-game="roblox"><span>🎮</span>Roblox</button></div><button type="button" id="gamePickerCancel" class="game-picker-cancel">Отмена</button></div></div>
 <section id="gamePanel" class="game-panel">
- <div class="small">Джойстик — движение. Справа — действия. Удерживай кнопку, чтобы держать клавишу.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">135%</b></label><input id="sensitivity" type="range" min="30" max="250" step="5" value="135"></div>
+ <div class="small">Джойстик — движение. Справа — действия. Удерживай кнопку, чтобы держать клавишу.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">100%</b></label><input id="sensitivity" type="range" min="25" max="180" step="5" value="100"></div>
  <div class="game-layout">
   <div class="joystick-wrap"><div id="gameJoystick" class="joystick" aria-label="Игровой джойстик"><div id="joystickKnob" class="joystick-knob"></div></div><div class="joystick-caption">ДВИЖЕНИЕ</div></div>
   <div class="game-grid">
@@ -62,15 +62,15 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
 (()=>{
  const tg=window.Telegram?.WebApp,status=document.getElementById('status'),pad=document.getElementById('pad'),initData=tg?.initData||'',video=document.getElementById('liveVideo'),screenState=document.getElementById('screenState');
  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b1020');tg.setBackgroundColor('#0b1020');}
- let sensitivity=1.35;const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0,moveChannel=null;
+ let sensitivity=1.0;const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0,moveChannel=null;
  function sendMoveFast(dx,dy){if(moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){moveChannel.send(JSON.stringify({type:'move',dx,dy}));return true;}return false;}
  async function send(payload){
   if(!initData){status.textContent='Открой через кнопку Telegram';return;}
   try{const r=await fetch('/device/touchpad',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:JSON.stringify(payload),keepalive:true});if(!r.ok){let info={};try{info=await r.json();}catch{}status.textContent=r.status===401?'Нет доступа: '+(info.error||'unknown'):'Ошибка связи ('+r.status+')';return;}status.textContent='🟢 ПК управляется';return true;}
   catch{status.textContent='Нет связи с сервером';return false;}
  }
- function flush(){raf=0;if(moveX||moveY){const dx=Math.max(-120,Math.min(120,Math.round(moveX*sensitivity))),dy=Math.max(-120,Math.min(120,Math.round(moveY*sensitivity)));moveX=0;moveY=0;if(!sendMoveFast(dx,dy))send({type:'move',dx,dy});}}
- function queueMove(dx,dy){moveX=Math.max(-40,Math.min(40,moveX+dx));moveY=Math.max(-40,Math.min(40,moveY+dy));if(!raf)raf=requestAnimationFrame(flush);}
+ function flush(){raf=0;if(moveX||moveY){const dx=Math.max(-18,Math.min(18,Math.round(moveX*sensitivity))),dy=Math.max(-18,Math.min(18,Math.round(moveY*sensitivity)));moveX=0;moveY=0;if(!sendMoveFast(dx,dy))send({type:'move',dx,dy});}}
+ function queueMove(dx,dy){moveX=Math.max(-12,Math.min(12,moveX+dx));moveY=Math.max(-12,Math.min(12,moveY+dy));if(!raf)raf=requestAnimationFrame(flush);}
  async function startLiveVideo(){
  if(!initData||!window.RTCPeerConnection){screenState.textContent='Видео недоступно';return;}
  const sessionId=crypto.randomUUID();
