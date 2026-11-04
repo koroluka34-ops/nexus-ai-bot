@@ -231,7 +231,7 @@ async function handleDeviceHttp(req, res) {
     }
     const item = command ? null : queue.shift();
     if (!command && item) command = { id: item.id, action: item.action, args: item.args };
-    sendJson(res, 200, { ok: true, command, touchpadActive: touchpad.activeUntil > now, pollAfterMs: touchpad.activeUntil > now ? 80 : 1800 });
+    sendJson(res, 200, { ok: true, command, touchpadActive: touchpad.activeUntil > now, pollAfterMs: touchpad.activeUntil > now ? 40 : 1800 });
     return true;
   }
   if (req.method === "POST" && url.pathname === "/device/result") {
