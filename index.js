@@ -1932,6 +1932,169 @@ bot.command("video", async ctx => {
 
 
 // ======================================================
+// NEXUS MEDIA & BUILDER COMMANDS
+// ======================================================
+async function sendGeneratedFile(ctx, filename, source, caption) {
+  const bytes = Buffer.from(String(source || ""), "utf8");
+  if (!bytes.length || bytes.length > 18 * 1024 * 1024) throw new Error("Файл пустой или слишком большой.");
+  await ctx.replyWithDocument(new InputFile(bytes, filename), { caption });
+}
+
+bot.command("editphoto", async ctx => {
+  const prompt = String(ctx.match || "").trim();
+  const photo = ctx.message.reply_to_message?.photo?.at(-1);
+  if (!photo) return ctx.reply("Ответь командой /editphoto на фотографию и напиши, что изменить.");
+  if (!prompt) return ctx.reply("Пример: /editphoto замени фон на ночной город.");
+  if (!POLLINATIONS_API_KEY) return ctx.reply("Нужен POLLINATIONS_API_KEY в Render. У API возможна тарификация.");
+  if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+  busyUsers.add(ctx.from.id);
+  const status = await ctx.reply("🎨 Редактирую фото...");
+  try {
+    const source = await downloadTelegramFile(ctx, photo.file_id, MAX_IMAGE_BYTES);
+    const form = new FormData();
+    form.append("image", new Blob([source], { type: "image/jpeg" }), "source.jpg");
+    form.append("prompt", prompt); form.append("model", "kontext"); form.append("size", "1024x1024");
+    const response = await fetch("https://gen.pollinations.ai/v1/images/edits", { method: "POST", headers: { Authorization: "Bearer " + POLLINATIONS_API_KEY }, body: form, signal: AbortSignal.timeout(180000) });
+    if (!response.ok) throw new Error("Pollinations HTTP " + response.status + ": " + (await response.text()).slice(0, 600));
+    const type = String(response.headers.get("content-type") || "").toLowerCase();
+    let result;
+    if (type.startsWith("image/")) result = Buffer.from(await response.arrayBuffer());
+    else {
+      const data = await response.json();
+      const encoded = data?.data?.[0]?.b64_json || data?.b64_json;
+      if (encoded) result = Buffer.from(encoded, "base64");
+      else if (data?.data?.[0]?.url || data?.url) {
+        const url = new URL(data.data?.[0]?.url || data.url);
+        if (url.protocol !== "https:") throw new Error("Небезопасная ссылка результата.");
+        const img = await fetch(url, { signal: AbortSignal.timeout(90000) });
+        if (!img.ok) throw new Error("Не удалось скачать результат.");
+        result = Buffer.from(await img.arrayBuffer());
+      }
+    }
+    if (!result || !isImageBuffer(result)) throw new Error("Провайдер не вернул корректное изображение.");
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await ctx.replyWithPhoto(new InputFile(result, "nexus-edited.jpg"), { caption: "✨ Фото обработано ИИ." });
+  } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка редактирования: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+  finally { busyUsers.delete(ctx.from.id); }
+});
+
+bot.command("website", async ctx => {
+  const brief = String(ctx.match || "").trim();
+  if (!brief) return ctx.reply("Пример: /website адаптивный сайт кофейни с меню и контактами.");
+  if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+  busyUsers.add(ctx.from.id);
+  const status = await ctx.reply("🌐 Создаю сайт...");
+  try {
+    const result = await askAI(ctx.from.id, "Создай готовый одностраничный сайт. Верни только полный HTML в одном блоке html. Включи CSS и JS, адаптивность, семантику и доступность. Не используй платные зависимости. Не выдумывай адреса, цены и отзывы — неизвестное обозначай заглушками.\nТЗ:\n" + brief, false);
+    let html = String(result.answer || "").trim();
+    const match = html.match(/\x60\x60\x60(?:html)?\s*([\s\S]*?)\x60\x60\x60/i);
+    if (match) html = match[1].trim();
+    if (!/^<!doctype html|^<html[\s>]/i.test(html)) throw new Error("ИИ не вернул полноценный HTML. Уточни описание.");
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await sendGeneratedFile(ctx, "nexus-website.html", html, "Сайт готов. Скачай HTML и открой в браузере. Онлайн-публикация пока не выполняется.");
+  } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка создания сайта: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+  finally { busyUsers.delete(ctx.from.id); }
+});
+
+bot.command("createbot", async ctx => {
+  const brief = String(ctx.match || "").trim();
+  if (!brief) return ctx.reply("Пример: /createbot Telegram-магазин с каталогом и корзиной на grammY.");
+  if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+  busyUsers.add(ctx.from.id);
+  const status = await ctx.reply("🤖 Генерирую исходный код...");
+  try {
+    const result = await askAI(ctx.from.id, "Создай полный исходный код Telegram-бота на Node.js 22 и grammY. Верни только index.js в одном блоке js. Используй BOT_TOKEN из process.env, dotenv, валидацию и обработку ошибок. Не вставляй токены, не запускай и не разворачивай код.\nТЗ:\n" + brief, false);
+    let source = String(result.answer || "").trim();
+    const match = source.match(/\x60\x60\x60(?:js|javascript|node)?\s*([\s\S]*?)\x60\x60\x60/i);
+    if (match) source = match[1].trim();
+    if (source.length < 80) throw new Error("Не удалось получить полный исходный код.");
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await sendGeneratedFile(ctx, "telegram-bot-index.js", source, "Исходный код готов. Он не запущен и не опубликован.");
+  } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка генерации: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+  finally { busyUsers.delete(ctx.from.id); }
+});
+
+bot.command("windows", async ctx => {
+  const question = String(ctx.match || "").trim();
+  const replied = ctx.message.reply_to_message;
+  const photo = replied?.photo?.at(-1);
+  const document = replied?.document;
+  if (!question && !photo && !document) return ctx.reply("Отправь /windows описание ошибки или ответь командой на скриншот либо TXT/LOG-файл.");
+  if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+  busyUsers.add(ctx.from.id);
+  const status = await ctx.reply("🪟 Анализирую Windows...");
+  try {
+    let answer;
+    if (photo) {
+      const buffer = await downloadTelegramFile(ctx, photo.file_id, MAX_IMAGE_BYTES);
+      answer = await analyzeImageWithGroq(ctx.from.id, "Ты специалист Windows 10/11. Прочитай скриншот ошибки, объясни причину и дай безопасные шаги. Не выдумывай невидимый текст.", buffer, "image/jpeg");
+    } else if (document) {
+      const name = document.file_name || "windows.log", ext = path.extname(name).toLowerCase();
+      if (![".txt", ".log", ".md", ".csv", ".json", ".xml"].includes(ext)) throw new Error("Поддерживаются TXT, LOG, MD, CSV, JSON и XML.");
+      const buffer = await downloadTelegramFile(ctx, document.file_id, MAX_DOCUMENT_BYTES);
+      const logs = await extractDocumentText(buffer, ext);
+      answer = (await askAI(ctx.from.id, "Ты инженер Windows 10/11. Найди точные ошибки в логе, объясни причины и безопасные шаги. Не советуй сброс или удаление данных без крайней необходимости.\n\n" + logs.slice(0, 20000), false)).answer;
+    } else answer = (await askAI(ctx.from.id, "Ты инженер Windows 10/11. Диагностируй проблему. Дай безопасные шаги, команды PowerShell/CMD объясни и предупреди о рисках.\n\nПроблема: " + question, false)).answer;
+    await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+    await deliverAnswer(ctx, ctx.from.id, { answer, annotations: [], provider: "NEXUS Windows" });
+  } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка анализа: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+  finally { busyUsers.delete(ctx.from.id); }
+});
+
+bot.command("music", async ctx => {
+  const input = String(ctx.match || "").trim(), mode = input.split(/\s+/)[0]?.toLowerCase(), prompt = input.replace(/^\S+\s*/, "").trim();
+  if (!input || mode === "help") return ctx.reply("🎵 NEXUS MUSIC\n/music recognize — распознать трек, ответив командой на аудио/голосовое.\n/music generate описание — создать музыку.\nРаспознавание требует AUDD_API_TOKEN. Генерация требует POLLINATIONS_API_KEY и доступной квоты; бесплатность не гарантируется.");
+  if (mode === "recognize" || mode === "id") {
+    const replied = ctx.message.reply_to_message;
+    const media = replied?.audio || replied?.voice || (replied?.document?.mime_type?.startsWith("audio/") ? replied.document : null);
+    if (!media) return ctx.reply("Ответь /music recognize на аудиофайл или голосовое.");
+    if (!process.env.AUDD_API_TOKEN) return ctx.reply("Добавь AUDD_API_TOKEN в Render → Environment. Без ключа распознавание не подключено.");
+    if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+    busyUsers.add(ctx.from.id);
+    const status = await ctx.reply("🎧 Ищу композицию...");
+    try {
+      const buffer = await downloadTelegramFile(ctx, media.file_id, 20 * 1024 * 1024), form = new FormData();
+      form.append("api_token", process.env.AUDD_API_TOKEN); form.append("return", "spotify,apple_music");
+      form.append("file", new Blob([buffer], { type: media.mime_type || "audio/mpeg" }), media.file_name || "track.bin");
+      const response = await fetch("https://api.audd.io/", { method: "POST", body: form, signal: AbortSignal.timeout(90000) });
+      const data = await response.json();
+      if (!response.ok || data.status !== "success") throw new Error(data.error?.error_message || "Сервис распознавания вернул ошибку.");
+      if (!data.result) throw new Error("Трек не распознан. Попробуй более чистый фрагмент.");
+      const song = data.result;
+      let reply = "🎵 Найдено: " + String(song.title || "Без названия") + "\nИсполнитель: " + String(song.artist || "неизвестен");
+      if (song.album) reply += "\nАльбом: " + song.album;
+      if (song.release_date) reply += "\nДата: " + song.release_date;
+      const link = song.song_link || song.spotify?.external_urls?.spotify || song.apple_music?.url;
+      if (link && /^https:\/\//i.test(link)) reply += "\n" + link;
+      await ctx.api.editMessageText(ctx.chat.id, status.message_id, reply);
+    } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось распознать: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+    finally { busyUsers.delete(ctx.from.id); }
+    return;
+  }
+  if (mode === "generate" || mode === "create") {
+    if (!prompt) return ctx.reply("Пример: /music generate атмосферный синтвейв без вокала");
+    if (!POLLINATIONS_API_KEY) return ctx.reply("Добавь POLLINATIONS_API_KEY в Render. API может расходовать баланс.");
+    if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+    busyUsers.add(ctx.from.id);
+    const status = await ctx.reply("🎼 Создаю музыкальный трек...");
+    try {
+      const url = "https://gen.pollinations.ai/audio/" + encodeURIComponent(prompt) + "?model=elevenlabs%2Fmusic-v2";
+      const response = await fetch(url, { headers: { Authorization: "Bearer " + POLLINATIONS_API_KEY }, signal: AbortSignal.timeout(240000) });
+      if (!response.ok) throw new Error("Pollinations HTTP " + response.status + ": " + (await response.text()).slice(0, 600));
+      const type = String(response.headers.get("content-type") || "").toLowerCase();
+      if (!type.startsWith("audio/") && !type.includes("octet-stream")) throw new Error("Провайдер вернул не аудио: " + type);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (!bytes.length || bytes.length > 19 * 1024 * 1024) throw new Error("Аудиофайл пустой или слишком большой.");
+      await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
+      await ctx.replyWithAudio(new InputFile(bytes, "nexus-music.mp3"), { caption: "🎵 Музыка создана." });
+    } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось создать музыку: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+    finally { busyUsers.delete(ctx.from.id); }
+    return;
+  }
+  return ctx.reply("Неизвестный режим. Напиши /music help");
+});
+
+// ======================================================
 // NEXUS OVERDRIVE — MULTI-AGENT DEBATE
 // ======================================================
 
@@ -3900,6 +4063,11 @@ async function start() {
     { command: "remember", description: "Сохранить факт в память" },
     { command: "memory", description: "Посмотреть сохранённую память" },
     { command: "minecraft", description: "Анализ Minecraft-логов и конфигов" },
+    { command: "music", description: "Распознать или создать музыку" },
+    { command: "editphoto", description: "Изменить фото с помощью ИИ" },
+    { command: "website", description: "Создать HTML-сайт" },
+    { command: "windows", description: "Диагностика Windows" },
+    { command: "createbot", description: "Создать код Telegram-бота" },
     { command: "forget", description: "Удалить данные из памяти" },
     { command: "research", description: "Провести расширенное исследование" },
     { command: "team", description: "Получить командный ответ нескольких ИИ" },
