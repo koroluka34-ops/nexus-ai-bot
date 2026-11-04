@@ -27,7 +27,7 @@ button:active{background:#334155;transform:scale(.98)}.small{font-size:12px;colo
   try{const r=await fetch('/device/touchpad',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:JSON.stringify(payload),keepalive:true});if(!r.ok){let info={};try{info=await r.json();}catch{}status.textContent=r.status===401?'Нет доступа: '+(info.error||'unknown'):'Ошибка связи ('+r.status+')';return;}status.textContent='🟢 ПК управляется';return true;}
   catch{status.textContent='Нет связи с сервером';return false;}
  }
- async function drainMoves(){if(sendingMove)return;sendingMove=true;while(pendingMoveX||pendingMoveY){const dx=Math.round(pendingMoveX),dy=Math.round(pendingMoveY);if(!dx&&!dy)break;pendingMoveX-=dx;pendingMoveY-=dy;const ok=await send({type:'move',dx,dy});if(!ok){pendingMoveX=0;pendingMoveY=0;break;}}sendingMove=false;}
+ async function drainMoves(){if(sendingMove)return;sendingMove=true;while(pendingMoveX||pendingMoveY){const dx=Math.max(-400,Math.min(400,Math.round(pendingMoveX))),dy=Math.max(-400,Math.min(400,Math.round(pendingMoveY)));if(!dx&&!dy)break;pendingMoveX-=dx;pendingMoveY-=dy;const ok=await send({type:'move',dx,dy});if(!ok){pendingMoveX=0;pendingMoveY=0;break;}}sendingMove=false;}
  function flush(){raf=0;if(moveX||moveY){pendingMoveX+=moveX*4.0;pendingMoveY+=moveY*4.0;moveX=0;moveY=0;drainMoves();}}
  function queueMove(dx,dy){moveX+=dx;moveY+=dy;if(!raf)raf=requestAnimationFrame(flush);}
  setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});
