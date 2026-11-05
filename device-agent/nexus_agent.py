@@ -124,7 +124,11 @@ def execute(command):
             raise ValueError("Недопустимое название приложения")
         import re
         def norm(value):
-            return re.sub(r"[^a-zа-яё0-9]+", "", str(value).casefold())
+            value = str(value).casefold().replace("ё", "е")
+            # Транслитерация русской речи, если распознавание записало английское имя кириллицей.
+            translit = {"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"h","ц":"ts","ч":"ch","ш":"sh","щ":"sch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya"}
+            value = "".join(translit.get(ch, ch) for ch in value)
+            return re.sub(r"[^a-z0-9]+", "", value)
         wanted = norm(app)
         roots = [
             Path.home() / "AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
