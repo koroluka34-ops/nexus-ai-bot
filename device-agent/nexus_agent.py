@@ -283,9 +283,11 @@ def start_webrtc_stream(cfg, offer):
                         delay = target - now
                         if delay > 0:
                             await asyncio.sleep(delay)
-                        else:
-                            missed = int((-delay) / (1 / 30)) + 1
-                            self.video_pts += missed * 3000
+                        elif delay < -(1 / 30):
+                            # Пропускаем только реально потерянные интервалы;
+                            # небольшая задержка планировщика не должна резать FPS пополам.
+                            missed = int((-delay) / (1 / 30))
+                            self.video_pts += max(1, missed) * 3000
                     return self.video_pts, fractions.Fraction(1, 90000)
 
                 async def recv(self):
