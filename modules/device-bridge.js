@@ -223,7 +223,8 @@ function installDeviceBridge(bot) {
     const id = crypto.randomUUID();
     pending.set(id, { action, args, userId: String(ctx.from.id), chatId: ctx.chat.id });
     const labels = {
-      screenshot: "сделать скриншот",\n      inspect_ui: "прочитать названия элементов активного окна (только просмотр)",
+      screenshot: "сделать скриншот",
+      inspect_ui: "прочитать названия элементов активного окна (только просмотр)",
       open_url: "открыть сайт " + args.url,
       launch: "запустить " + args.app,
       type_text: "вставить указанный текст",
