@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-10"
+AGENT_VERSION = "2026.11.05-voice-pc-11"
 import base64
 import json
 import os
@@ -286,6 +286,94 @@ $lines | Select-Object -First 45
                 raise ValueError("Нашёл несколько похожих установленных программ: " + ", ".join(x[0] for x in found[:6]) + ". Уточни название.")
         except ImportError: pass
         raise ValueError("Не нашёл установленное приложение «" + app + "». Проверь название или произношение.")
+    if action == "close_app":
+        app = str(args.get("app", "")).strip()
+        if not app or len(app) > 80 or any(ch in app for ch in '\\/:*?"<>|'):
+            raise ValueError("Недопустимое название приложения")
+        import ctypes
+        import re
+        from ctypes import wintypes
+        from difflib import SequenceMatcher
+        def norm(value):
+            value = str(value).casefold().replace("ё", "е")
+            translit = {"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"h","ц":"ts","ч":"ch","ш":"sh","щ":"sch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya"}
+            value = "".join(translit.get(ch, ch) for ch in value)
+            return re.sub(r"[^a-z0-9]+", "", value)
+        aliases = {
+            "millidalauncher": ["меллида", "мелида", "миллида", "мильида", "меллида лаунчер", "мелида лаунчер", "миллида лаунчер", "мильида лаунчер"],
+            "telegram": ["телега", "телеграм", "телеграмма", "телеграмм"],
+            "discord": ["дискорд", "дискордик"],
+            "turbovpn": ["турбо впн", "турбовпн"],
+            "roblox": ["роблокс"],
+            "spotify": ["спотифай"],
+            "steam": ["стим"],
+        }
+        wanted = norm(app)
+        for canonical, variants in aliases.items():
+            if wanted == norm(canonical) or wanted in {norm(v) for v in variants}:
+                wanted = norm(canonical)
+                break
+        user32 = ctypes.windll.user32
+        WM_CLOSE = 0x0010
+        SMTO_ABORTIFHUNG = 0x0002
+        current_pid = os.getpid()
+        protected = {"explorer.exe", "dwm.exe", "sihost.exe", "startmenuexperiencehost.exe",
+            "shellexperiencehost.exe", "searchhost.exe", "textinputhost.exe", "lockapp.exe",
+            "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe", "wt.exe",
+            "conhost.exe", "openconsole.exe", "python.exe", "pythonw.exe"}
+        matches = []
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def enum_window(hwnd, _):
+            try:
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length <= 0:
+                    return True
+                title = ctypes.create_unicode_buffer(min(length + 1, 512))
+                user32.GetWindowTextW(hwnd, title, len(title))
+                pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value == current_pid:
+                    return True
+                handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid.value)
+                process_name = ""
+                if handle:
+                    try:
+                        image_path = ctypes.create_unicode_buffer(1024)
+                        size = wintypes.DWORD(len(image_path))
+                        if ctypes.windll.kernel32.QueryFullProcessImageNameW(handle, 0, image_path, ctypes.byref(size)):
+                            process_name = os.path.basename(image_path.value)
+                    finally:
+                        ctypes.windll.kernel32.CloseHandle(handle)
+                if process_name.lower() in protected:
+                    return True
+                candidates = [norm(title.value), norm(Path(process_name).stem)]
+                score = max((1.0 if candidate == wanted else
+                    max(SequenceMatcher(None, wanted, candidate).ratio(),
+                        0.91 if len(wanted) >= 5 and candidate.startswith(wanted) else 0.0,
+                        0.86 if len(wanted) >= 5 and wanted in candidate else 0.0)
+                    for candidate in candidates if candidate), default=0.0)
+                if score >= 0.76:
+                    matches.append((hwnd, title.value[:100], score))
+            except Exception:
+                pass
+            return True
+        callback = callback_type(enum_window)
+        user32.EnumWindows(callback, 0)
+        if not matches:
+            raise ValueError("Не нашёл открытое окно приложения «" + app + "».")
+        matches.sort(key=lambda item: item[2], reverse=True)
+        if len(matches) > 1 and matches[0][2] - matches[1][2] < 0.055:
+            distinct = list(dict.fromkeys(item[1] for item in matches[:5]))
+            if len(distinct) > 1:
+                raise ValueError("Нашёл несколько похожих окон: " + ", ".join(distinct) + ". Уточни название.")
+        best_score = matches[0][2]
+        targets = [item for item in matches if best_score - item[2] < 0.055]
+        for hwnd, _title, _score in targets:
+            result = wintypes.DWORD()
+            user32.SendMessageTimeoutW(hwnd, WM_CLOSE, 0, 0, SMTO_ABORTIFHUNG, 1500, ctypes.byref(result))
+        return {"result": "Отправил обычный запрос на закрытие приложения «" + app + "» (" + str(len(targets)) + " окно/окна). Несохранённые данные можно сохранить в самом приложении; принудительное завершение не выполнялось."}
     if action == "close_all_apps":
         # Graceful close only: WM_CLOSE lets each application show its own
         # unsaved-work prompt. Never force-kill processes or bypass dialogs.
