@@ -27,11 +27,11 @@ body.game-mode #gamePanel{display:block!important;position:absolute;inset:0;z-in
 body.game-mode #gamePanel>.small{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:65vw;padding:5px 9px;border-radius:8px;background:#02061788;color:#fff}
 body.game-mode .game-layout{display:contents}
 body.game-mode .joystick-wrap{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));pointer-events:auto}
-body.game-mode .joystick{width:clamp(118px,22vh,170px);height:clamp(118px,22vh,170px);background:radial-gradient(circle,#475569 0 4px,#334155 5px 42%,#0f172acc 72%);border-color:#cbd5e1aa}
-body.game-mode .joystick-knob{width:clamp(48px,8vh,64px);height:clamp(48px,8vh,64px);background:linear-gradient(145deg,#e2e8f0,#64748b)}
+body.game-mode .joystick{width:clamp(104px,18vh,138px);height:clamp(104px,18vh,138px);background:radial-gradient(circle,#475569 0 4px,#334155 5px 42%,#0f172acc 72%);border-color:#cbd5e1aa}
+body.game-mode .joystick-knob{width:clamp(42px,7vh,54px);height:clamp(42px,7vh,54px);background:linear-gradient(145deg,#e2e8f0,#64748b)}
 body.game-mode .joystick-caption{color:white;text-shadow:0 1px 3px #000}
-body.game-mode .game-grid{position:absolute;right:max(14px,env(safe-area-inset-right));top:12%;bottom:12%;width:min(50vw,520px);grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:10px;align-content:stretch;pointer-events:auto}
-body.game-mode .game-grid button{min-height:clamp(54px,12vh,100px);border-radius:22px;padding:8px;background:#172033dd;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(13px,2.5vh,20px);backdrop-filter:blur(5px)}
+body.game-mode .game-grid{position:absolute;right:max(10px,env(safe-area-inset-right));top:18%;bottom:18%;width:min(42vw,360px);grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:6px;align-content:stretch;pointer-events:auto}
+body.game-mode .game-grid button{min-height:0;border-radius:13px;padding:5px 3px;background:#172033dd;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(10px,1.8vh,14px);backdrop-filter:blur(4px)}
 body.game-mode .game-grid button:active{background:#475569ee}
 body.game-mode .game-grid button[data-game-key="space"]{background:#2563ebcc}
 body.game-mode .game-grid button[data-game-mouse="left"]{background:#b45309dd}
@@ -45,7 +45,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
 <div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button><button type="button" data-key="f11" class="wide">⛶ F11 · Полный экран ПК</button></div></section>
 <div id="gamePicker" class="game-picker"><div class="game-picker-card"><h2>Во что играем?</h2><p>Выбери игру — откроется горизонтальный игровой экран с джойстиком.</p><div class="game-picker-options"><button type="button" data-select-game="minecraft"><span>⛏️</span>Minecraft</button><button type="button" data-select-game="roblox"><span>🎮</span>Roblox</button><button type="button" data-select-game="cs2"><span>🔫</span>CS2</button></div><button type="button" id="gamePickerCancel" class="game-picker-cancel">Отмена</button></div></div>
 <section id="gamePanel" class="game-panel">
- <div class="small">Веди пальцем по изображению — поворот камеры. Джойстик слева — движение. Справа — действия.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">150%</b></label><input id="sensitivity" type="range" min="50" max="300" step="10" value="150"></div>
+ <div class="small">Курсор показан — камера не вращается. Спрячь курсор, чтобы вращать камеру пальцем по экрану.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">150%</b></label><input id="sensitivity" type="range" min="50" max="300" step="10" value="150"></div>
  <div class="game-layout">
   <div class="joystick-wrap"><div id="gameJoystick" class="joystick" aria-label="Игровой джойстик"><div id="joystickKnob" class="joystick-knob"></div></div><div class="joystick-caption">ДВИЖЕНИЕ</div></div>
   <div class="game-grid">
@@ -107,6 +107,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
  }
  pc.ontrack=e=>{
   const track=e.track;
+  try{const receiver=pc.getReceivers().find(r=>r.track===track);if(receiver&&("jitterBufferTarget" in receiver))receiver.jitterBufferTarget=50;}catch{}
   const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([track]);
   video.srcObject=stream;
   screenState.textContent='Видеодорожка получена · '+track.readyState;
@@ -136,7 +137,7 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function endPointer(e){if(!pointers.has(e.pointerId))return;const wasSingle=pointers.size===1&&e.pointerId===primary;pointers.delete(e.pointerId);if(wasSingle&&start&&!moved)send({type:'click',button:'left'});if(!pointers.size){primary=null;start=null;}}
  pad.addEventListener('pointerup',endPointer);pad.addEventListener('pointercancel',endPointer);
  const screenWrap=document.querySelector('.screen-wrap');let gameLookPointer=null,lastLookX=0,lastLookY=0;
- screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(e.target.closest('#gamePanel,#gameButton'))return;if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();send({type:'game-mouse',button:'right',state:'down'});});
+ screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(remoteCursorVisible)return;if(e.target.closest('#gamePanel,#gameButton'))return;if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();send({type:'game-mouse',button:'right',state:'down'});});
  screenWrap.addEventListener('pointermove',e=>{if(e.pointerId!==gameLookPointer)return;e.preventDefault();const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;queueMove(dx,dy);});
  function endGameLook(e){if(e.pointerId===gameLookPointer){gameLookPointer=null;send({type:'game-mouse',button:'right',state:'up'});}}
  screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
