@@ -133,7 +133,7 @@ def execute(command):
             "explorer": "explorer.exe",
             "проводник": "explorer.exe",
         }
-        if not app or len(app) > 80 or any(ch in app for ch in "\\\\/:*?\\"<>|"):
+        if not app or len(app) > 80 or any(ch in app for ch in '\\\\/:*?\"<>|'):
             raise ValueError("Недопустимое название приложения")
         if key in aliases:
             target = aliases[key]
