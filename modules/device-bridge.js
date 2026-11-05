@@ -159,7 +159,7 @@ function installDeviceBridge(bot) {
       return ctx.reply("🖥 Сенсорное управление ПК\nВоди пальцем по панели — курсор будет двигаться на компьютере. Один тап — клик, два пальца — прокрутка.", { reply_markup: keyboard });
     }
     if (!verb || verb === "help") {
-      return ctx.reply("🖥 NEXUS PC\n/pc touchpad — открыть сенсорную мышь в Telegram\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n/pc mouse drag 100 100 500 400 — перетащить мышь\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n/pc key f5 — функциональные клавиши F1–F12\n/pc hotkey ctrl+c — сочетание клавиш\n/pc hotkey alt+tab — переключить окно\n/pc hotkey win+d — показать рабочий стол\n/pc hotkey win+e — открыть Проводник\n/pc hotkey ctrl+shift+esc — Диспетчер задач\n/pc hotkey alt+f4 — закрыть активное окно\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
+      return ctx.reply("🖥 NEXUS PC\n/pc touchpad — открыть сенсорную мышь в Telegram\n/pc status — состояние подключения\n/pc screen — скриншот экрана\n/pc inspect — прочитать названия элементов активного окна\n/pc open https://... — открыть сайт\n/pc launch notepad — открыть программу\n/pc type текст — вставить текст\n\n🖱 Мышь:\n/pc mouse move 500 300 — переместить курсор\n/pc mouse click — левый щелчок\n/pc mouse click right — правый щелчок\n/pc mouse double — двойной щелчок\n/pc mouse scroll up 3 — прокрутка вверх\n/pc mouse drag 100 100 500 400 — перетащить мышь\n\n⌨️ Клавиатура:\n/pc key enter — нажать Enter\n/pc key esc — Escape\n/pc key tab — Tab\n/pc key up — стрелка вверх\n/pc key f5 — функциональные клавиши F1–F12\n/pc hotkey ctrl+c — сочетание клавиш\n/pc hotkey alt+tab — переключить окно\n/pc hotkey win+d — показать рабочий стол\n/pc hotkey win+e — открыть Проводник\n/pc hotkey ctrl+shift+esc — Диспетчер задач\n/pc hotkey alt+f4 — закрыть активное окно\n\nВсе действия требуют подтверждения кнопкой. Произвольные shell-команды не поддерживаются.");
     }
     if (verb === "status") {
       const d = devices.get("windows-main");
@@ -168,7 +168,7 @@ function installDeviceBridge(bot) {
         : "🔴 ПК не подключён. Запусти NEXUS Agent на Windows.");
     }
     let action, args = {};
-    if (verb === "screen") action = "screenshot";
+    if (verb === "screen") action = "screenshot";\n    else if (verb === "inspect") action = "inspect_ui";
     else if (verb === "open") {
       let url;
       try { url = new URL(arg); } catch { return ctx.reply("Формат: /pc open https://example.com"); }
@@ -222,7 +222,7 @@ function installDeviceBridge(bot) {
     const id = crypto.randomUUID();
     pending.set(id, { action, args, userId: String(ctx.from.id), chatId: ctx.chat.id });
     const labels = {
-      screenshot: "сделать скриншот",
+      screenshot: "сделать скриншот",\n      inspect_ui: "прочитать названия элементов активного окна (только просмотр)",
       open_url: "открыть сайт " + args.url,
       launch: "запустить " + args.app,
       type_text: "вставить указанный текст",
