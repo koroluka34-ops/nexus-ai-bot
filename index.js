@@ -4116,7 +4116,7 @@ async function interpretVoiceCommand(transcript) {
     "«отправ компьютер спать», «усыпи ноут», «переведи ПК в сон» => sleep_pc. «перезапусти/ребутни ноут» => restart_pc. «выруби компьютер» => shutdown_pc. «закрой всё» => close_all_apps.",
     "«закрой Discord», «закрой приложение Telegram», «выключи Millida Launcher» => close_app с app=название приложения. Не путай закрытие одного приложения с close_all_apps.",
     "«переведи ноут в режим блокировки», «заблокируй ноут», «поставь компьютер на блокировку» => lock_pc.",
-    "Установить громкость/звук на N процентов => set_volume с percent=N (целое от 0 до 100).",
+    "Установить/поставить/сделать громкость или звук на N процентов => set_volume mode=set, percent=N. Если сказано повысить/увеличить/прибавить/сделать громче => mode=up, amount=N или по умолчанию 10. Если уменьшить/убавить/сделать тише => mode=down, amount=N или по умолчанию 10. Фразы «установи звук на компьютере 25», «добавь звук на 40 процентов», «громче», «потише» — это управление громкостью, НЕ установка приложения.",
     "Понимай любые естественные варианты: открой, запусти, включи, можешь открыть, открой-ка, пожалуйста, и похожие формы.",
     "Если сказано найти/поищи что-то в интернете — search_google; если на YouTube — search_youtube. Если сказано просто открыть Google или YouTube — open_google/open_youtube.",
     "Для установки/скачивания приложения => install_app. Для удаления => uninstall_app. Извлеки только название приложения, исправляя ASR-ошибки.",
@@ -4155,9 +4155,17 @@ async function interpretVoiceCommand(transcript) {
     if (["open_app", "close_app", "uninstall_app"].includes(action) && (!app || !/^[\p{L}\p{N} ._()+'-]+$/u.test(app))) return null;
     if (action === "install_app" && !(app || query)) return null;
     if (action === "open_folder" && !folders.has(folder)) return null;
+    const percent = Number(parsed.percent);
+    const amount = Number(parsed.amount);
+    const volumeMode = String(parsed.mode || "set").toLowerCase();
+    if (action === "set_volume" && !(
+      (volumeMode === "set" && Number.isInteger(percent) && percent >= 0 && percent <= 100) ||
+      (["up", "down"].includes(volumeMode) && Number.isInteger(amount) && amount >= 1 && amount <= 100)
+    )) return null;
     return { action, args: ["open_app", "close_app", "uninstall_app"].includes(action) ? { app } :
       action === "install_app" ? { query: query || app } :
-      action === "open_folder" ? { folder } : { }, confidence };
+      action === "open_folder" ? { folder } :
+      action === "set_volume" ? (volumeMode === "set" ? { mode: "set", percent } : { mode: volumeMode, amount }) : { }, confidence };
   } catch (error) {
     console.warn("NEXUS voice interpreter returned invalid JSON:", String(raw).slice(0, 500));
     return null;
@@ -4270,13 +4278,27 @@ bot.on("message:voice", async ctx => {
       const app = apps.find(([, names]) => names.some(name => spoken.includes(name)));
       const wantsOpenKnownApp = Boolean(app && app[0] === "Millida Launcher" && !isSearch && !isDownload);
 
-      const volumeMatch = spoken.match(/(?:громкост\w*|звук)\s+(?:на\s+)?(\d{1,3})\s*(?:%|процент\w*)?/iu);
-      if (volumeMatch) {
-        const percent = Number(volumeMatch[1]);
+      // Volume intent has priority over generic install verbs such as «установи».
+      // Accept natural Russian word order, optional PC references, and omitted units.
+      const volumeContext = /(?:громкост\w*|звук)/iu.test(spoken);
+      const volumeSetMatch = volumeContext && spoken.match(/(?:громкост\w*|звук).*?(\d{1,3})\s*(?:%|процент\w*)?/iu);
+      const volumeUp = /(?:повыс\w*|увелич\w*|прибав\w*|добав\w*|подними|сделай\s+громче|громче)/iu.test(spoken);
+      const volumeDown = /(?:уменьш\w*|убав\w*|пониз\w*|сделай\s+тише|потише|тише)/iu.test(spoken);
+      if (volumeContext && (volumeUp || volumeDown)) {
+        const amount = volumeSetMatch ? Number(volumeSetMatch[1]) : 10;
+        if (amount >= 1 && amount <= 100) {
+          action = "set_volume";
+          args = { mode: volumeUp ? "up" : "down", amount };
+        }
+      } else if (volumeSetMatch) {
+        const percent = Number(volumeSetMatch[1]);
         if (percent >= 0 && percent <= 100) {
           action = "set_volume";
-          args = { percent };
+          args = { mode: "set", percent };
         }
+      } else if (volumeContext && /(?:установи|установить|поставь|поставить|выстави|сделай|добавь)/iu.test(spoken)) {
+        // ASR may omit the numeric value: don't accidentally interpret this as app install.
+        action = null;
       }
 
       const isShutdown = /(?:выключи|выключить|выруби|вырубить|отключи|отключить|заверши\s+работу|погаси)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken)
@@ -4315,7 +4337,7 @@ bot.on("message:voice", async ctx => {
         action = "uninstall_app";
         args = { app: cleanAppName(uninstallMatch[1]) };
       }
-      if (microsoftStore && isDownload) {
+      if (action === "set_volume") {\n        // Keep the already parsed volume command; do not route it to install_app.\n      } else if (microsoftStore && isDownload) {
         const query = storeProduct();
         if (query) {
           action = "install_store_app";
