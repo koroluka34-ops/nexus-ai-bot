@@ -206,13 +206,17 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
   setRemoteCursorVisible(game!=='roblox');
   gamePicker.classList.remove('open');document.body.classList.add('game-mode');gamePanel.classList.add('open');
   gameButton.textContent='✕';keyboardPanel.classList.remove('open');
-  try{if(tg?.requestFullscreen)await tg.requestFullscreen();else if(tg?.expand)tg.expand();}catch{try{tg?.expand?.();}catch{}}
-  try{if(tg?.lockOrientation)tg.lockOrientation();else if(screen.orientation?.lock)await screen.orientation.lock('landscape');}catch{}
+  try{if(tg?.requestFullscreen)await tg.requestFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else if(tg?.expand)tg.expand();}catch{try{tg?.expand?.();}catch{}}
+  // Блокируем именно альбомную ориентацию. Telegram lockOrientation()
+  // фиксирует текущую ориентацию, поэтому при входе из портретного режима
+  // его вызывать нельзя.
+  try{if(screen.orientation?.lock)await screen.orientation.lock('landscape');}catch{}
  }
  function exitGameMode(){
   document.body.classList.remove('game-mode');gamePanel.classList.remove('open');gamePicker.classList.remove('open');gameButton.textContent='🎮';
   try{if(screen.orientation?.unlock)screen.orientation.unlock();}catch{}
-  try{if(tg?.exitFullscreen)tg.exitFullscreen();}catch{}
+  try{if(tg?.unlockOrientation)tg.unlockOrientation();}catch{}
+  try{if(tg?.exitFullscreen)tg.exitFullscreen();else if(document.fullscreenElement)document.exitFullscreen();}catch{}
  }
  gameButton.addEventListener('click',()=>{if(document.body.classList.contains('game-mode'))exitGameMode();else gamePicker.classList.add('open');});
  document.querySelectorAll('[data-select-game]').forEach(btn=>btn.addEventListener('click',()=>enterGameMode(btn.dataset.selectGame)));
