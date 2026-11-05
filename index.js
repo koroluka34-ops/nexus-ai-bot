@@ -4119,48 +4119,49 @@ bot.on("message:voice", async ctx => {
       "📝 Распознано:\n" + transcript
     ).catch(() => {});
 
-    // Безопасные голосовые команды: только точные шаблоны и allowlist.
+    // Безопасные голосовые команды: Unicode-safe matching для русской речи.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (ownerId && String(userId) === ownerId) {
-      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
+      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\\s+/g, " ").trim();
+      const hasAny = (...phrases) => phrases.some(phrase => spoken.includes(phrase));
       let action = null;
       let args = {};
 
-      const appRules = [
-        [/\b(роблокс|roblox)\b/, "roblox"],
-        [/\b(дискорд|discord)\b/, "discord"],
-        [/\b(блокнот|notepad)\b/, "notepad"],
-        [/\b(калькулятор|calculator)\b/, "calculator"],
-        [/\b(пейнт|paint)\b/, "paint"],
-        [/\b(проводник|explorer)\b/, "explorer"]
+      const wantsOpen = hasAny("открой", "открывай", "запусти", "запускай", "покажи");
+      const apps = [
+        ["roblox", ["роблокс", "roblox"]],
+        ["discord", ["дискорд", "discord"]],
+        ["notepad", ["блокнот", "notepad"]],
+        ["calculator", ["калькулятор", "calculator"]],
+        ["paint", ["пейнт", "paint"]],
+        ["explorer", ["проводник", "explorer"]]
       ];
-      const folderRules = [
-        [/\b(загрузки|downloads)\b/, "downloads"],
-        [/\b(рабочий стол|desktop)\b/, "desktop"],
-        [/\b(документы|documents)\b/, "documents"],
-        [/\b(изображения|картинки|pictures)\b/, "pictures"],
-        [/\b(видео|videos)\b/, "videos"],
-        [/\b(музыка|music)\b/, "music"]
+      const folders = [
+        ["downloads", ["загрузки", "downloads"]],
+        ["desktop", ["рабочий стол", "desktop"]],
+        ["documents", ["документы", "documents"]],
+        ["pictures", ["изображения", "картинки", "pictures"]],
+        ["videos", ["видео", "videos"]],
+        ["music", ["музыка", "music"]]
       ];
+      const app = apps.find(([, names]) => hasAny(...names));
+      const folder = folders.find(([, names]) => hasAny(...names));
 
-      const wantsOpen = /\b(открой|открывай|запусти|запускай|покажи)\b/.test(spoken);
-      const appMatch = appRules.find(([pattern]) => pattern.test(spoken));
-      const folderMatch = folderRules.find(([pattern]) => pattern.test(spoken));
-
-      if (wantsOpen && appMatch) {
+      if (wantsOpen && app) {
         action = "open_app";
-        args = { app: appMatch[1] };
-      } else if (wantsOpen && folderMatch) {
+        args = { app: app[0] };
+      } else if (wantsOpen && folder) {
         action = "open_folder";
-        args = { folder: folderMatch[1] };
-      } else if (/\b(открой|запусти|перейди на)\b/.test(spoken) && /\b(youtube|ютуб|ю туб)\b/.test(spoken)) {
+        args = { folder: folder[0] };
+      } else if (wantsOpen && hasAny("youtube", "ютуб", "ю туб")) {
         action = "open_url";
         args = { url: "https://www.youtube.com/" };
-      } else if (/\b(найди|поищи|ищи)\b/.test(spoken) && /\b(youtube|ютуб|ю туб)\b/.test(spoken)) {
-        const query = transcript
-          .replace(/^(.*?)(найди|поищи|ищи)\s*/i, "")
-          .replace(/\b(на\s*)?(youtube|ютуб|ю\s*туб)\b/ig, "")
-          .replace(/[.,!?]/g, " ").trim();
+      } else if (hasAny("найди", "поищи", "ищи") && hasAny("youtube", "ютуб", "ю туб")) {
+        let query = spoken;
+        for (const phrase of ["найди", "поищи", "ищи", "на youtube", "youtube", "на ютубе", "на ютуб", "ютубе", "ютуб", "ю туб"]) {
+          query = query.replace(phrase, " ");
+        }
+        query = query.replace(/\\s+/g, " ").trim();
         if (query) {
           action = "open_url";
           args = { url: "https://www.youtube.com/results?search_query=" + encodeURIComponent(query) };
@@ -4168,7 +4169,7 @@ bot.on("message:voice", async ctx => {
       }
 
       if (action) {
-        const commandId = queueVoiceAction(action, args, userId, ctx.chat.id);
+        queueVoiceAction(action, args, userId, ctx.chat.id);
         const label = action === "open_app" ? "Запускаю " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
           : args.url.includes("/results?") ? "Ищу на YouTube: " + decodeURIComponent(args.url.split("search_query=")[1] || "")
