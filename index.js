@@ -4197,9 +4197,11 @@ bot.on("message:voice", async ctx => {
 
       if (action) {
         queueVoiceAction(action, args, userId, ctx.chat.id);
-        const label = action === "open_app" ? "Запускаю " + args.app
+        const label = action === "open_app" ? "Открываю приложение " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
+          : args.url.includes("google.com/search?q=") ? "Ищу в Google: " + decodeURIComponent(args.url.split("q=")[1] || "")
           : args.url.includes("/results?") ? "Ищу на YouTube: " + decodeURIComponent(args.url.split("search_query=")[1] || "")
+          : args.url.includes("google.com") ? "Открываю Google"
           : "Открываю YouTube";
         await ctx.api.editMessageText(ctx.chat.id, status.message_id, "⏳ " + label + ". Команда отправлена на подключённый ПК.").catch(() => {});
         return;
