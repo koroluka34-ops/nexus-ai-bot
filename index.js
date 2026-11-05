@@ -4396,6 +4396,24 @@ bot.on("message:voice", async ctx => {
         }
       }
 
+      // Unknown app names get a second, AI-assisted ASR correction pass.
+      // The Windows agent then verifies the corrected name against apps actually
+      // installed on this PC and uses fuzzy matching; it never launches an
+      // arbitrary program or a guessed web result.
+      if (action === "open_app" && args?.app && !app) {
+        try {
+          const corrected = await interpretVoiceCommand(transcript);
+          if (corrected?.action === "open_app" && corrected.args?.app &&
+              corrected.confidence >= 0.72) {
+            console.log("NEXUS corrected app name:", args.app, "=>", corrected.args.app,
+              "| confidence:", corrected.confidence);
+            args = { ...args, app: corrected.args.app };
+          }
+        } catch (correctionError) {
+          console.warn("NEXUS app-name correction failed:", correctionError.message);
+        }
+      }
+
       if (action) {
         if (action === "telegram_send_message") {
           const recipient = String(args.recipient || "").trim();
