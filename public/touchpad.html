@@ -141,9 +141,18 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  function endPointer(e){if(!pointers.has(e.pointerId))return;const wasSingle=pointers.size===1&&e.pointerId===primary;pointers.delete(e.pointerId);if(wasSingle&&start&&!moved)send({type:'click',button:'left'});if(!pointers.size){primary=null;start=null;}}
  pad.addEventListener('pointerup',endPointer);pad.addEventListener('pointercancel',endPointer);
  const screenWrap=document.querySelector('.screen-wrap');let gameLookPointer=null,lastLookX=0,lastLookY=0;
- screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(remoteCursorVisible)return;if(e.target.closest('#gamePanel,#gameButton'))return;if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();send({type:'game-mouse',button:'right',state:'down'});});
- screenWrap.addEventListener('pointermove',e=>{if(e.pointerId!==gameLookPointer)return;e.preventDefault();const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;queueMove(dx,dy);});
- function endGameLook(e){if(e.pointerId===gameLookPointer){gameLookPointer=null;send({type:'game-mouse',button:'right',state:'up'});}}
+ function sendAbsoluteCursor(clientX,clientY){
+  if(!moveChannel||moveChannel.readyState!=='open'||moveChannel.bufferedAmount>32768||!video.videoWidth||!video.videoHeight)return;
+  const rect=video.getBoundingClientRect(),videoRatio=video.videoWidth/video.videoHeight,boxRatio=rect.width/rect.height;
+  let left=rect.left,top=rect.top,width=rect.width,height=rect.height;
+  if(boxRatio>videoRatio){width=height*videoRatio;left+=(rect.width-width)/2;}else{height=width/videoRatio;top+=(rect.height-height)/2;}
+  const nx=(clientX-left)/width,ny=(clientY-top)/height;
+  if(nx<0||nx>1||ny<0||ny>1)return;
+  moveChannel.send(JSON.stringify({type:'cursor-position',x:nx,y:ny}));
+ }
+ screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(e.target.closest('#gamePanel,#gameButton'))return;if(remoteCursorVisible){sendAbsoluteCursor(e.clientX,e.clientY);return;}if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();sendRealtime({type:'game-mouse',button:'right',state:'down'},{type:'game-mouse',button:'right',state:'down'});});
+ screenWrap.addEventListener('pointermove',e=>{if(remoteCursorVisible){sendAbsoluteCursor(e.clientX,e.clientY);return;}if(e.pointerId!==gameLookPointer)return;e.preventDefault();const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;queueMove(dx,dy);});
+ function endGameLook(e){if(e.pointerId===gameLookPointer){gameLookPointer=null;sendRealtime({type:'game-mouse',button:'right',state:'up'},{type:'game-mouse',button:'right',state:'up'});}}
  screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
  function sendRealtime(payload,fallback){
   // Удержание ПКМ/ЛКМ отправляем через тот же быстрый WebRTC-канал,
