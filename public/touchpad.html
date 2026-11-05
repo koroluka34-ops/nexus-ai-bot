@@ -111,7 +111,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
  }
  pc.ontrack=e=>{
   const track=e.track;
-  try{const receiver=pc.getReceivers().find(r=>r.track===track);if(receiver&&("jitterBufferTarget" in receiver))receiver.jitterBufferTarget=20;}catch{}
+  try{const receiver=pc.getReceivers().find(r=>r.track===track);if(receiver&&("jitterBufferTarget" in receiver))receiver.jitterBufferTarget=50;}catch{}
   const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([track]);
   video.srcObject=stream;
   screenState.textContent='Видеодорожка получена · '+track.readyState;
