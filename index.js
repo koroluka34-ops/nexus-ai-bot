@@ -69,7 +69,7 @@ installUtilitySuite(bot);
 const { installQrSuite } = require("./modules/qr-suite");
 installQrSuite(bot);
 
-const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation } = require("./modules/device-bridge");
+const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
@@ -4126,7 +4126,7 @@ bot.on("message:voice", async ctx => {
     // Безопасные голосовые команды: Unicode-safe matching для русской речи.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (ownerId && String(userId) === ownerId) {
-      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\\s+/g, " ").trim();
+      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
       const hasAny = (...phrases) => phrases.some(phrase => spoken.includes(phrase));
       let action = null;
       let args = {};
@@ -4189,6 +4189,24 @@ bot.on("message:voice", async ctx => {
       ];
       const app = apps.find(([, names]) => hasAny(...names));
 
+      const isShutdown = /(?:выключи|выключить|заверши работу|отключи)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
+      const isRestart = /(?:перезагрузи|перезапусти|перезагрузить)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
+      const isSleep = /(?:спящ(?:ий|его)\s+режим|усыпи|уснуть|переведи.*(?:сон|спящ))/iu.test(spoken);
+      const isLock = /(?:заблокируй|блокируй|заблокировать)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
+      const uninstallMatch = spoken.match(/(?:удали|удалить|деинсталлируй|деинсталлировать)\s+(?:(?:приложение|программу)\s+)?(.{1,80})$/iu);
+      const cleanAppName = value => String(value || "").replace(/^(?:(?:приложение|программу)\s+)/iu, "").replace(/[.!?,]+$/g, "").trim();
+      if (isShutdown) {
+        action = "shutdown_pc";
+      } else if (isRestart) {
+        action = "restart_pc";
+      } else if (isSleep) {
+        action = "sleep_pc";
+      } else if (isLock) {
+        action = "lock_pc";
+      } else if (uninstallMatch && uninstallMatch[1]) {
+        action = "uninstall_app";
+        args = { app: cleanAppName(uninstallMatch[1]) };
+      }
       if (microsoftStore && isDownload) {
         const query = storeProduct();
         if (query) {
@@ -4243,6 +4261,18 @@ bot.on("message:voice", async ctx => {
         if (action === "install_store_app") {
           await requestVoiceStoreInstallConfirmation(ctx, args.query);
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + " в Telegram.").catch(() => {});
+          return;
+        }
+        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app"].includes(action)) {
+          const descriptions = {
+            shutdown_pc: "Выключить компьютер",
+            restart_pc: "Перезагрузить компьютер",
+            sleep_pc: "Перевести компьютер в спящий режим",
+            lock_pc: "Заблокировать компьютер",
+            uninstall_app: "Удалить приложение «" + args.app + "»"
+          };
+          await requestVoicePcConfirmation(ctx, action, args, descriptions[action]);
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение: " + descriptions[action] + ".").catch(() => {});
           return;
         }
         queueVoiceAction(action, args, userId, ctx.chat.id);
