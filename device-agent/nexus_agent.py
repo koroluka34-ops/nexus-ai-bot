@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-nexus-smooth-fix-2"
+AGENT_VERSION = "2026.11.05-nexus-cursor-fix-3"
 import base64
 import json
 import os
@@ -354,8 +354,10 @@ def start_webrtc_stream(cfg, offer):
             cursor_target = None
 
             async def smooth_remote_cursor():
-                # Сглаживаем абсолютные координаты, чтобы курсор не прыгал
-                # между редкими touch-событиями телефона.
+                # Сглаживаем движение, но не удерживаем курсор в старой
+                # удалённой позиции: после достижения цели отдаём управление
+                # локальной мыши Windows.
+                nonlocal cursor_target
                 import ctypes
                 from ctypes import wintypes
                 class CursorPoint(ctypes.Structure):
@@ -369,7 +371,7 @@ def start_webrtc_stream(cfg, offer):
                             dx, dy = target[0] - point.x, target[1] - point.y
                             distance = max(abs(dx), abs(dy))
                             if distance <= 2:
-                                user32.SetCursorPos(target[0], target[1])
+                                cursor_target = None
                             else:
                                 # Меньший коэффициент и ограничение шага убирают резкие скачки.
                                 step_x = max(-24, min(24, int(dx * 0.20)))
