@@ -4345,29 +4345,31 @@ bot.on("message:voice", async ctx => {
           args = { app: appName };
         }
       }
-      // AI semantic pass runs after fast phrase rules and can correct ASR typos,
-      // nicknames and noisy app names before anything reaches the Windows agent.
-      try {
-        const interpreted = await interpretVoiceCommand(transcript);
-        if (interpreted) {
-          action = interpreted.action;
-          args = interpreted.args;
-          if (action === "open_google") { action = "open_url"; args = { url: "https://www.google.com/" }; }
-          else if (action === "open_youtube") { action = "open_url"; args = { url: "https://www.youtube.com/" }; }
-          else if (action === "search_google" || action === "search_youtube") {
-            const q = String(args.query || "").trim();
-            const target = interpreted.action;
-            if (q) {
-              action = "open_url";
-              args = { url: target === "search_youtube"
-                ? "https://www.youtube.com/results?search_query=" + encodeURIComponent(q)
-                : "https://www.google.com/search?q=" + encodeURIComponent(q) };
-            } else action = null;
+      // Deterministic commands are already understood: skip the slower AI call.
+      // Use semantic interpretation only as a fallback for unclear/noisy phrases.
+      if (!action) {
+        try {
+          const interpreted = await interpretVoiceCommand(transcript);
+          if (interpreted) {
+            action = interpreted.action;
+            args = interpreted.args;
+            if (action === "open_google") { action = "open_url"; args = { url: "https://www.google.com/" }; }
+            else if (action === "open_youtube") { action = "open_url"; args = { url: "https://www.youtube.com/" }; }
+            else if (action === "search_google" || action === "search_youtube") {
+              const q = String(args.query || "").trim();
+              const target = interpreted.action;
+              if (q) {
+                action = "open_url";
+                args = { url: target === "search_youtube"
+                  ? "https://www.youtube.com/results?search_query=" + encodeURIComponent(q)
+                  : "https://www.google.com/search?q=" + encodeURIComponent(q) };
+              } else action = null;
+            }
+            console.log("NEXUS semantic voice intent:", interpreted.action, interpreted.confidence);
           }
-          console.log("NEXUS semantic voice intent:", interpreted.action, interpreted.confidence);
+        } catch (semanticError) {
+          console.warn("NEXUS semantic voice pass failed:", semanticError.message);
         }
-      } catch (semanticError) {
-        console.warn("NEXUS semantic voice pass failed:", semanticError.message);
       }
 
       if (action) {
