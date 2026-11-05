@@ -4191,8 +4191,8 @@ bot.on("message:voice", async ctx => {
 
       const isShutdown = /(?:выключи|выключить|заверши работу|отключи)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
       const isRestart = /(?:перезагрузи|перезапусти|перезагрузить)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
-      const isSleep = /(?:спящ(?:ий|его)\s+режим|усыпи|уснуть|переведи.*(?:сон|спящ))/iu.test(spoken);
-      const isLock = /(?:заблокируй|блокируй|заблокировать)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
+      const isSleep = /(?:спящ(?:ий|его)\s+режим|усыпи|уснуть|переведи.*(?:сон|спящ))/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+сон/iu.test(spoken);
+      const isLock = /(?:заблокируй|блокируй|заблокировать)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+блокировку/iu.test(spoken);
       const uninstallMatch = spoken.match(/(?:удали|удалить|деинсталлируй|деинсталлировать)\s+(?:(?:приложение|программу)\s+)?(.{1,80})$/iu);
       const cleanAppName = value => String(value || "").replace(/^(?:(?:приложение|программу)\s+)/iu, "").replace(/[.!?,]+$/g, "").trim();
       if (isShutdown) {
@@ -4251,7 +4251,12 @@ bot.on("message:voice", async ctx => {
         action = "open_url";
         args = { url: "https://www.youtube.com/" };
       } else if (wantsOpen) {
-        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\s+(?:(?:приложение|программу)\s+)?/iu, "").replace(/\s+(?:и|потом).*$/iu, "").trim();
+        const appName = spoken
+          .replace(/^(?:открой|открывай|запусти|запускай|покажи)\s+/iu, "")
+          .replace(/^(?:(?:мне|пожалуйста|к\s+примеру|например|просто)\s+)+/iu, "")
+          .replace(/^(?:(?:приложение|программу)\s+)+/iu, "")
+          .replace(/\s+(?:и\s+потом|потом).*$/iu, "")
+          .replace(/[.!?,]+$/g, "").trim();
         if (appName && appName.length <= 80 && !/^(google|гугл|гугле|youtube|ютуб)$/iu.test(appName)) {
           action = "open_app";
           args = { app: appName };
