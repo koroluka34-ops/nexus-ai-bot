@@ -348,14 +348,22 @@ $lines | Select-Object -First 45
                         ctypes.windll.kernel32.CloseHandle(handle)
                 if process_name.lower() in protected:
                     return True
-                candidates = [norm(title.value), norm(Path(process_name).stem)]
-                score = max((1.0 if candidate == wanted else
-                    max(SequenceMatcher(None, wanted, candidate).ratio(),
+                title_candidate = norm(title.value)
+                process_candidate = norm(Path(process_name).stem)
+                def candidate_score(candidate):
+                    if not candidate:
+                        return 0.0
+                    if candidate == wanted:
+                        return 1.0
+                    return max(SequenceMatcher(None, wanted, candidate).ratio(),
                         0.91 if len(wanted) >= 5 and candidate.startswith(wanted) else 0.0,
                         0.86 if len(wanted) >= 5 and wanted in candidate else 0.0)
-                    for candidate in candidates if candidate), default=0.0)
+                # Prefer the visible title; process name is only a fallback.
+                score = candidate_score(title_candidate)
+                if score < 0.76:
+                    score = candidate_score(process_candidate)
                 if score >= 0.76:
-                    matches.append((hwnd, title.value[:100], score))
+                    matches.append((hwnd, title.value[:100], score, pid.value))
             except Exception:
                 pass
             return True
@@ -363,14 +371,18 @@ $lines | Select-Object -First 45
         user32.EnumWindows(callback, 0)
         if not matches:
             raise ValueError("Не нашёл открытое окно приложения «" + app + "».")
-        matches.sort(key=lambda item: item[2], reverse=True)
+        # Collapse multiple top-level windows belonging to one process.
+        by_pid = {}
+        for item in matches:
+            if item[3] not in by_pid or item[2] > by_pid[item[3]][2]:
+                by_pid[item[3]] = item
+        matches = sorted(by_pid.values(), key=lambda item: item[2], reverse=True)
         if len(matches) > 1 and matches[0][2] - matches[1][2] < 0.055:
             distinct = list(dict.fromkeys(item[1] for item in matches[:5]))
-            if len(distinct) > 1:
-                raise ValueError("Нашёл несколько похожих окон: " + ", ".join(distinct) + ". Уточни название.")
+            raise ValueError("Нашёл несколько похожих приложений: " + ", ".join(distinct) + ". Уточни название.")
         best_score = matches[0][2]
         targets = [item for item in matches if best_score - item[2] < 0.055]
-        for hwnd, _title, _score in targets:
+        for hwnd, _title, _score, _pid in targets:
             result = wintypes.DWORD()
             user32.SendMessageTimeoutW(hwnd, WM_CLOSE, 0, 0, SMTO_ABORTIFHUNG, 1500, ctypes.byref(result))
         return {"result": "Отправил обычный запрос на закрытие приложения «" + app + "» (" + str(len(targets)) + " окно/окна). Несохранённые данные можно сохранить в самом приложении; принудительное завершение не выполнялось."}
