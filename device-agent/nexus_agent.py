@@ -599,6 +599,13 @@ $lines | Select-Object -First 85
         ps = r"""
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class NexusForegroundWindow {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+}
+'@
 $hwnd = [NexusForegroundWindow]::GetForegroundWindow()
 $root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
 if ($null -eq $root) { exit 3 }
