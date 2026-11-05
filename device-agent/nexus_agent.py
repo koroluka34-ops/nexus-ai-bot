@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-nexus-low-latency-1"
+AGENT_VERSION = "2026.11.05-nexus-mobile-smooth-1"
 import base64
 import json
 import os
@@ -256,6 +256,7 @@ def start_webrtc_stream(cfg, offer):
             import mss
             import numpy as np
             cursor_visible = True
+            mobile_client = False
             class ScreenVideoTrack(VideoStreamTrack):
                 kind = "video"
                 def __init__(self):
@@ -266,7 +267,7 @@ def start_webrtc_stream(cfg, offer):
                     self.video_started = None
                     self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
-                    print("WebRTC режим: до 854x480, цель 30 FPS (меньше задержка и нагрузка на сеть)")
+                    print("WebRTC режим: до 854x480 на ПК / 720x405 на телефоне, цель 30 FPS")
 
                 async def next_timestamp(self):
                     # 30 FPS: стабильный тайминг без накопления очереди старых кадров.
@@ -294,7 +295,8 @@ def start_webrtc_stream(cfg, offer):
                         from PIL import Image, ImageDraw
                         rgb_image = Image.frombytes("RGB", raw.size, raw.rgb)
                         width, height = rgb_image.size
-                        scale = min(1.0, 854 / width, 480 / height)
+                        max_width, max_height = (720, 405) if mobile_client else (854, 480)
+                        scale = min(1.0, max_width / width, max_height / height)
                         if scale < 1.0:
                             out_size = (max(1, int(width * scale)), max(1, int(height * scale)))
                             rgb_image = rgb_image.resize(out_size, Image.Resampling.BILINEAR)
@@ -349,12 +351,17 @@ def start_webrtc_stream(cfg, offer):
                 print("WebRTC канал управления открыт:", channel.label)
                 @channel.on("message")
                 def on_control_message(message):
-                    nonlocal cursor_visible
+                    nonlocal cursor_visible, mobile_client
                     try:
                         if isinstance(message, bytes):
                             message = message.decode("utf-8")
                         data = json.loads(message)
                         kind = data.get("type")
+                        if kind == "client-profile":
+                            if data.get("profile") == "mobile":
+                                mobile_client = True
+                                print("Профиль видео: телефон 720x405 / 30 FPS")
+                            return
                         if kind == "cursor-visibility":
                             cursor_visible = bool(data.get("visible", True))
                             print("Курсор в видеопотоке:", "показан" if cursor_visible else "скрыт")
