@@ -50,6 +50,9 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+const { installAstraVoice, synthesizeAstraSpeech } = require("./modules/astra-voice");
+installAstraVoice(bot);
+
 const { installSecurityMonitor } = require("./modules/security-monitor");
 installSecurityMonitor(bot);
 
@@ -1604,6 +1607,10 @@ async function transcribeVoice(ctx) {
 // ======================================================
 
 async function makeSpeech(text) {
+  // Если голос Астры уже создан и выбран, используем его; иначе сохраняем прежний Edge TTS.
+  const astraAudio = await synthesizeAstraSpeech(text);
+  if (astraAudio) return astraAudio;
+
   const filename = path.join(
     os.tmpdir(),
     `nexus-${crypto.randomUUID()}.mp3`
