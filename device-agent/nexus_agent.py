@@ -130,6 +130,24 @@ def execute(command):
             value = "".join(translit.get(ch, ch) for ch in value)
             return re.sub(r"[^a-z0-9]+", "", value)
         wanted = norm(app)
+        from difflib import SequenceMatcher
+        def best_matches(items, get_name, threshold=0.76, margin=0.055):
+            scored = []
+            for item in items:
+                candidate = norm(get_name(item))
+                if not candidate:
+                    continue
+                score = SequenceMatcher(None, wanted, candidate).ratio()
+                if candidate == wanted:
+                    score = 1.0
+                scored.append((score, item))
+            if not scored:
+                return []
+            scored.sort(key=lambda pair: pair[0], reverse=True)
+            top_score = scored[0][0]
+            if top_score < threshold:
+                return []
+            return [item for score, item in scored if score >= threshold and top_score - score < margin]
         roots = [
             Path.home() / "AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
             Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Microsoft/Windows/Start Menu/Programs",
@@ -139,13 +157,12 @@ def execute(command):
             if root.is_dir():
                 try: shortcuts.extend(p for p in root.rglob("*.lnk") if p.is_file())
                 except OSError: pass
-        exact = [p for p in shortcuts if norm(p.stem) == wanted]
-        matches = exact or [p for p in shortcuts if norm(p.stem) and wanted and (wanted in norm(p.stem) or norm(p.stem) in wanted)]
+        matches = best_matches(shortcuts, lambda p: p.stem)
         if len(matches) == 1:
             os.startfile(str(matches[0]))
             return {"result": "Открыто приложение: " + matches[0].stem}
         if len(matches) > 1:
-            raise ValueError("Нашёл несколько ярлыков: " + ", ".join(p.stem for p in matches[:6]) + ". Уточни название.")
+            raise ValueError("Нашёл несколько похожих ярлыков: " + ", ".join(p.stem for p in matches[:6]) + ". Уточни название.")
         # Получаем список приложений Windows безопасной фиксированной командой.
         ps = r"[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); $OutputEncoding = New-Object System.Text.UTF8Encoding($false); Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress"
         try:
@@ -153,13 +170,12 @@ def execute(command):
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, shell=False)
             rows = json.loads(proc.stdout) if proc.returncode == 0 and proc.stdout.strip() else []
             if isinstance(rows, dict): rows = [rows]
-            exact_apps = [x for x in rows if norm(x.get("Name", "")) == wanted]
-            matches = exact_apps or [x for x in rows if norm(x.get("Name", "")) and wanted and (wanted in norm(x.get("Name", "")) or norm(x.get("Name", "")) in wanted)]
+            matches = best_matches(rows, lambda x: x.get("Name", ""))
             if len(matches) == 1 and matches[0].get("AppID"):
                 subprocess.Popen(["explorer.exe", "shell:AppsFolder\\" + str(matches[0]["AppID"])], shell=False)
                 return {"result": "Открываю приложение: " + str(matches[0].get("Name", app))}
             if len(matches) > 1:
-                raise ValueError("Нашёл несколько приложений: " + ", ".join(str(x.get("Name", "")) for x in matches[:6]) + ". Уточни название.")
+                raise ValueError("Нашёл несколько похожих приложений: " + ", ".join(str(x.get("Name", "")) for x in matches[:6]) + ". Уточни название.")
         except subprocess.TimeoutExpired:
             print("Поиск приложений Windows превысил лимит времени.")
         # Резервный поиск exe в записях установленных программ.
@@ -178,7 +194,7 @@ def execute(command):
                             try:
                                 with winreg.OpenKey(parent, winreg.EnumKey(parent, i)) as item:
                                     display = str(winreg.QueryValueEx(item, "DisplayName")[0])
-                                    if wanted and norm(display) and (wanted in norm(display) or norm(display) in wanted):
+                                    if display:
                                         icon = str(winreg.QueryValueEx(item, "DisplayIcon")[0])
                                         exe = os.path.expandvars(icon.strip().strip('"').split(",")[0])
                                         path = Path(exe)
@@ -186,13 +202,12 @@ def execute(command):
                                             found.append((display, path))
                             except (OSError, ValueError): pass
                 except OSError: pass
-            exact_reg = [x for x in found if norm(x[0]) == wanted]
-            found = exact_reg or found
+            found = best_matches(found, lambda x: x[0])
             if len(found) == 1:
                 os.startfile(str(found[0][1]))
                 return {"result": "Открываю приложение: " + found[0][0]}
             if len(found) > 1:
-                raise ValueError("Нашёл несколько установленных программ: " + ", ".join(x[0] for x in found[:6]) + ". Уточни название.")
+                raise ValueError("Нашёл несколько похожих установленных программ: " + ", ".join(x[0] for x in found[:6]) + ". Уточни название.")
         except ImportError: pass
         raise ValueError("Не нашёл установленное приложение «" + app + "». Проверь название или произношение.")
     if action in ("shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"):
