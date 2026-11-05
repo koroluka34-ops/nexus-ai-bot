@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-19"
+AGENT_VERSION = "2026.11.05-voice-pc-20"
 import base64
 import json
 import os
@@ -1240,50 +1240,151 @@ def local_voice_command(text):
     return None
 
 def start_local_wake_listener():
-    """Use Windows built-in SAPI speech recognition; no audio is sent to Telegram/Render."""
-    ps = r"""
-$ErrorActionPreference = 'Stop'
-try {
-  Add-Type -AssemblyName System.Speech
-  $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
-  $engine.SetInputToDefaultAudioDevice()
-  $grammar = New-Object System.Speech.Recognition.DictationGrammar
-  $engine.LoadGrammar($grammar)
-  $engine.InitialSilenceTimeout = [TimeSpan]::FromSeconds(10)
-  $engine.EndSilenceTimeout = [TimeSpan]::FromSeconds(1.2)
-  $engine.EndSilenceTimeoutAmbiguous = [TimeSpan]::FromSeconds(1.8)
-  $engine.BabbleTimeout = [TimeSpan]::FromSeconds(4)
-  $engine.SpeechRecognized.Add({
-    param($sender, $event)
-    $phrase = [string]$event.Result.Text
-    if ($phrase) { [Console]::Out.WriteLine("РАСПОЗНАНО: " + $phrase); [Console]::Out.Flush() }
-  })
-  $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
-  while ($true) { Start-Sleep -Seconds 1 }
-} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 2 }
-"""
+    """Offline Russian wake-word listener using local faster-whisper and the default microphone."""
     def worker():
         try:
-            proc = subprocess.Popen(["powershell.exe","-NoProfile","-NonInteractive","-Command",ps],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1)
-            print("Голосовая активация: скажи «Астра» и команду. Микрофон обрабатывается локально.")
-            for line in proc.stdout:
-                phrase = line.strip()
-                if not phrase: continue
-                if phrase.startswith("РАСПОЗНАНО: "): phrase = phrase[len("РАСПОЗНАНО: "):].strip()
-                print("Астра услышала:", phrase)
-                command = local_voice_command(phrase)
-                if not command:
-                    continue
-                print("Локальная голосовая команда:", phrase, "->", command["action"])
+            import queue
+            import re
+            import numpy as np
+            import sounddevice as sd
+            from faster_whisper import WhisperModel
+
+            print("Астра: загружаю локальную модель Whisper (первый запуск может занять несколько минут)...")
+            model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=2, num_workers=1)
+            print("Астра: модель готова. Голос распознаётся локально; аудио не отправляется в Telegram или Render.")
+            audio_queue = queue.Queue(maxsize=16)
+            sample_rate = 16000
+            block_size = 4000  # 250 ms
+
+            def audio_callback(indata, frames, timing, status):
+                if status:
+                    print("Микрофон:", status)
                 try:
-                    result = execute(command)
-                    print("NEXUS:", result.get("result","Готово"))
-                except Exception as exc:
-                    print("NEXUS: команда не выполнена:", str(exc)[:300])
+                    audio_queue.put_nowait(indata[:, 0].copy())
+                except queue.Full:
+                    pass
+
+            def transcribe_audio(audio):
+                samples = np.concatenate(audio).astype(np.float32, copy=False)
+                if samples.size < int(sample_rate * 0.55):
+                    return ""
+                peak = float(np.max(np.abs(samples))) if samples.size else 0.0
+                rms = float(np.sqrt(np.mean(samples * samples))) if samples.size else 0.0
+                if peak < 0.0015 or rms < 0.0007:
+                    return ""
+                # Normalize quiet microphone input before local inference.
+                gain = min(18.0, 0.82 / max(peak, 0.0001))
+                samples = np.clip(samples * gain, -1.0, 1.0)
+                segments, info = model.transcribe(
+                    samples,
+                    language="ru",
+                    beam_size=1,
+                    best_of=1,
+                    temperature=0,
+                    condition_on_previous_text=False,
+                    vad_filter=False,
+                )
+                return " ".join(segment.text.strip() for segment in segments).strip()
+
+            pending_confirmation = None
+            noise_floor = 0.0015
+            pre_roll = []
+            captured = []
+            speaking = False
+            silence_blocks = 0
+            max_blocks = int(8.0 / (block_size / sample_rate))
+            silence_limit = int(1.0 / (block_size / sample_rate))
+            print("Астра слушает микрофон. Скажи: «Астра, открой ТикТок».")
+
+            with sd.InputStream(
+                samplerate=sample_rate,
+                channels=1,
+                dtype="float32",
+                blocksize=block_size,
+                callback=audio_callback,
+            ):
+                while True:
+                    chunk = audio_queue.get()
+                    level = float(np.sqrt(np.mean(chunk * chunk))) if chunk.size else 0.0
+                    threshold = max(0.0018, min(0.018, noise_floor * 2.2))
+                    if not speaking:
+                        noise_floor = noise_floor * 0.97 + level * 0.03
+                        pre_roll.append(chunk)
+                        if len(pre_roll) > 4:
+                            pre_roll.pop(0)
+                        if level >= threshold:
+                            speaking = True
+                            captured = list(pre_roll)
+                            silence_blocks = 0
+                    else:
+                        captured.append(chunk)
+                        if level < threshold:
+                            silence_blocks += 1
+                        else:
+                            silence_blocks = 0
+                        if silence_blocks >= silence_limit or len(captured) >= max_blocks:
+                            audio = captured
+                            speaking = False
+                            captured = []
+                            pre_roll = []
+                            silence_blocks = 0
+                            try:
+                                phrase = transcribe_audio(audio)
+                            except Exception as exc:
+                                print("Ошибка локального Whisper:", str(exc)[:250])
+                                continue
+                            if not phrase:
+                                continue
+                            print("Whisper услышал:", phrase)
+                            normalized = phrase.casefold().replace("ё", "е")
+                            wake = re.search(r"\b(?:астра|астро|ас тра|astra)\b", normalized)
+                            if not wake:
+                                continue
+                            command_text = phrase[wake.end():].strip(" ,.!?;:-")
+                            if not command_text:
+                                print("Астра активна. Скажи команду после слова «Астра».")
+                                continue
+
+                            if pending_confirmation:
+                                if re.search(r"\b(подтверждаю|да подтверждаю|выполняй)\b", command_text.casefold()):
+                                    command = pending_confirmation
+                                    pending_confirmation = None
+                                    print("Подтверждение получено. Выполняю:", command["action"])
+                                elif re.search(r"\b(отмена|отмени|не надо|нет)\b", command_text.casefold()):
+                                    pending_confirmation = None
+                                    print("Астра: действие отменено.")
+                                    continue
+                                else:
+                                    pending_confirmation = None
+                                    print("Астра: предыдущее действие отменено — подтверждение не получено.")
+                                    command = local_voice_command(phrase)
+                                    if not command:
+                                        continue
+                            else:
+                                command = local_voice_command(phrase)
+                                if not command:
+                                    print("Астра: не поняла команду. Попробуй сказать короче.")
+                                    continue
+
+                            protected = {"shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_app", "close_all_apps", "uninstall_app"}
+                            if command["action"] in protected:
+                                pending_confirmation = command
+                                print("Астра: это действие может закрыть программы или повлиять на данные.")
+                                print("Для выполнения скажи: «Астра, подтверждаю». Для отмены: «Астра, отмена».")
+                                continue
+                            print("Локальная голосовая команда:", phrase, "->", command["action"])
+                            try:
+                                result = execute(command)
+                                print("NEXUS:", result.get("result", "Готово"))
+                            except Exception as exc:
+                                print("NEXUS: команда не выполнена:", str(exc)[:300])
+        except ImportError as exc:
+            print("Голосовой режим не запустился: не установлены компоненты Whisper.")
+            print("В CMD выполни: python -m pip install --upgrade faster-whisper sounddevice numpy")
+            print("Подробности:", str(exc)[:250])
         except Exception as exc:
             print("Голосовой режим не запустился:", repr(exc))
-            print("Проверь, установлен ли в Windows русский пакет распознавания речи.")
+            print("Проверь микрофон и разрешение Windows для классических приложений.")
     threading.Thread(target=worker, daemon=True).start()
 
 def main():
