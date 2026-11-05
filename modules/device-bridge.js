@@ -70,9 +70,9 @@ function queueVoiceAction(action, args, userId, chatId) {
     args.app = appName;
   } else if (action === "open_folder" && !allowedFolders.has(String(args.folder || ""))) {
     throw new Error("Эта папка не входит в разрешённый список.");
-  } else if (action === "install_store_app") {
+  } else if (action === "install_store_app" || action === "install_app") {
     if (!query || query.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(query)) {
-      throw new Error("Название приложения для Microsoft Store некорректно.");
+      throw new Error("Название приложения для установки некорректно.");
     }
     args.query = query;
   } else if (action === "open_store_search") {
@@ -127,9 +127,13 @@ function requestVoiceStoreInstallConfirmation(ctx, query) {
 
 function requestVoicePcConfirmation(ctx, action, args, description) {
   if (!authorized(ctx)) throw new Error("Управление ПК доступно только владельцу.");
-  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps"]);
+  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "install_app"]);
   if (!allowed.has(action)) throw new Error("Это действие нельзя запросить через подтверждение.");
-  if (action === "uninstall_app") {
+  if (action === "install_app") {
+    const name = String(args.query || "").trim();
+    if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(name)) throw new Error("Название приложения для установки некорректно.");
+    args = { query: name };
+  } else if (action === "uninstall_app") {
     const name = String(args.app || "").trim();
     if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения для удаления некорректно.");
     args = { app: name };
