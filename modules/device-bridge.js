@@ -64,19 +64,19 @@ function queueVoiceAction(action, args, userId, chatId) {
   const query = String(args.query || "").trim();
   const allowedFolders = new Set(["downloads", "desktop", "documents", "pictures", "videos", "music"]);
   if (action === "open_app") {
-    if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()-]+$/u.test(appName)) {
+    if (!appName || appName.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(appName)) {
       throw new Error("Название приложения некорректно.");
     }
     args.app = appName;
   } else if (action === "open_folder" && !allowedFolders.has(String(args.folder || ""))) {
     throw new Error("Эта папка не входит в разрешённый список.");
   } else if (action === "install_store_app") {
-    if (!query || query.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(query)) {
+    if (!query || query.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(query)) {
       throw new Error("Название приложения для Microsoft Store некорректно.");
     }
     args.query = query;
   } else if (action === "open_store_search") {
-    if (!query || query.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(query)) {
+    if (!query || query.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(query)) {
       throw new Error("Название приложения для Microsoft Store некорректно.");
     }
     args.query = query;
