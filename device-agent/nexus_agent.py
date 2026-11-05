@@ -343,7 +343,8 @@ def start_webrtc_stream(cfg, offer):
             @pc.on("connectionstatechange")
             async def on_connection_state():
                 print("WebRTC connection:", pc.connectionState, "| ICE:", pc.iceConnectionState)
-            pc.addTrack(ScreenVideoTrack())
+            screen_track = ScreenVideoTrack()
+            pc.addTrack(screen_track)
 
             held_keys, held_buttons = set(), set()
             @pc.on("datachannel")
@@ -365,6 +366,16 @@ def start_webrtc_stream(cfg, offer):
                         if kind == "cursor-visibility":
                             cursor_visible = bool(data.get("visible", True))
                             print("Курсор в видеопотоке:", "показан" if cursor_visible else "скрыт")
+                            return
+                        if kind == "cursor-position":
+                            # Координаты нормализованы относительно видеокадра (0..1).
+                            monitor = screen_track.monitor
+                            nx = max(0.0, min(1.0, float(data.get("x", 0))))
+                            ny = max(0.0, min(1.0, float(data.get("y", 0))))
+                            px = int(monitor.get("left", 0) + nx * max(0, monitor["width"] - 1))
+                            py = int(monitor.get("top", 0) + ny * max(0, monitor["height"] - 1))
+                            import ctypes
+                            ctypes.windll.user32.SetCursorPos(px, py)
                             return
                         if kind == "move":
                             dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
