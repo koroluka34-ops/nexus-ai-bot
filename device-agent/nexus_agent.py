@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-15"
+AGENT_VERSION = "2026.11.05-voice-pc-16"
 import base64
 import json
 import os
@@ -452,6 +452,76 @@ $lines | Select-Object -First 85
         callback = callback_type(close_window)
         user32.EnumWindows(callback, 0)
         return {"result": "Отправил обычное закрытие для " + str(len(closed)) + " окон. Если в приложениях есть несохранённые данные, Windows покажет запрос на сохранение. Принудительное завершение не выполнялось."}
+    if action == "set_volume":
+        percent = args.get("percent")
+        if isinstance(percent, bool) or not isinstance(percent, (int, float)) or int(percent) != percent or not 0 <= int(percent) <= 100:
+            raise ValueError("Громкость должна быть от 0 до 100 процентов.")
+        ps_script = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+class MMDeviceEnumeratorComObject {}
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator {
+    int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+    int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+    int GetDevice(string id, out IMMDevice device);
+    int RegisterEndpointNotificationCallback(IntPtr client);
+    int UnregisterEndpointNotificationCallback(IntPtr client);
+}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice {
+    int Activate(ref Guid iid, int clsCtx, IntPtr activationParams, out IAudioEndpointVolume endpoint);
+    int OpenPropertyStore(int stgm, out IntPtr properties);
+    int GetId(out IntPtr id);
+    int GetState(out int state);
+}
+[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+    int RegisterControlChangeNotify(IntPtr notify);
+    int UnregisterControlChangeNotify(IntPtr notify);
+    int GetChannelCount(out uint count);
+    int SetMasterVolumeLevel(float level, Guid eventContext);
+    int SetMasterVolumeLevelScalar(float level, Guid eventContext);
+    int GetMasterVolumeLevel(out float level);
+    int GetMasterVolumeLevelScalar(out float level);
+    int SetChannelVolumeLevel(uint channel, float level, Guid eventContext);
+    int SetChannelVolumeLevelScalar(uint channel, float level, Guid eventContext);
+    int GetChannelVolumeLevel(uint channel, out float level);
+    int GetChannelVolumeLevelScalar(uint channel, out float level);
+    int SetMute(bool mute, Guid eventContext);
+    int GetMute(out bool mute);
+    int GetVolumeStepInfo(out uint step, out uint stepCount);
+    int VolumeStepUp(Guid eventContext);
+    int VolumeStepDown(Guid eventContext);
+    int QueryHardwareSupport(out uint hardwareSupportMask);
+    int GetVolumeRange(out float min, out float max, out float increment);
+}
+public static class NexusVolume {
+    public static void Set(float scalar) {
+        IMMDeviceEnumerator enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+        IMMDevice device;
+        Marshal.ThrowExceptionForHR(enumerator.GetDefaultAudioEndpoint(0, 1, out device));
+        Guid iid = typeof(IAudioEndpointVolume).GUID;
+        IAudioEndpointVolume volume;
+        Marshal.ThrowExceptionForHR(device.Activate(ref iid, 23, IntPtr.Zero, out volume));
+        Marshal.ThrowExceptionForHR(volume.SetMasterVolumeLevelScalar(scalar, Guid.Empty));
+    }
+}
+'@
+[NexusVolume]::Set(__PERCENT__ / 100.0)
+""".replace("__PERCENT__", str(int(percent)))
+        powershell = __import__("shutil").which("powershell.exe") or __import__("shutil").which("powershell")
+        if not powershell:
+            raise RuntimeError("Не найден Windows PowerShell.")
+        proc = subprocess.run([powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, shell=False)
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "неизвестная ошибка").strip()[-700:]
+            raise RuntimeError("Не удалось изменить системную громкость: " + detail)
+        return {"result": "Громкость Windows установлена на " + str(int(percent)) + "%."}
     if action in ("shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"):
         if action == "shutdown_pc":
             subprocess.Popen(["shutdown.exe", "/s", "/t", "0"], shell=False)
