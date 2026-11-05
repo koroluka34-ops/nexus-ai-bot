@@ -369,7 +369,7 @@ def start_webrtc_stream(cfg, offer):
                         pyautogui.PAUSE = 0
                         if kind == "game-key":
                             key, state = str(data.get("key", "")).lower(), data.get("state")
-                            allowed = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
+                            allowed = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","g","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
                             if key not in allowed or state not in ("down", "up"):
                                 return
                             if state == "down":
