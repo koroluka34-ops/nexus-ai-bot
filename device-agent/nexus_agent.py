@@ -198,7 +198,9 @@ $lines | Select-Object -First 45
                 break
         from difflib import SequenceMatcher
         def best_matches(items, get_name, threshold=0.76, margin=0.055):
-            scored = []
+            # Windows may expose the same shortcut twice (per-user and all-users
+            # Start Menu). Collapse identical display names before ambiguity checks.
+            unique = {}
             for item in items:
                 candidate = norm(get_name(item))
                 if not candidate:
@@ -211,7 +213,10 @@ $lines | Select-Object -First 45
                     score = max(score, 0.91)
                 elif len(wanted) >= 5 and wanted in candidate:
                     score = max(score, 0.86)
-                scored.append((score, item))
+                previous = unique.get(candidate)
+                if previous is None or score > previous[0]:
+                    unique[candidate] = (score, item)
+            scored = list(unique.values())
             if not scored:
                 return []
             scored.sort(key=lambda pair: pair[0], reverse=True)
