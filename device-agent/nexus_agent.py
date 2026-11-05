@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-nexus-cursor-fix-3"
+AGENT_VERSION = "2026.11.05-nexus-bloxstrike-1"
 import base64
 import json
 import os
@@ -426,7 +426,7 @@ def start_webrtc_stream(cfg, offer):
                         pyautogui.PAUSE = 0
                         if kind == "game-key":
                             key, state = str(data.get("key", "")).lower(), data.get("state")
-                            allowed = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","g","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
+                            allowed = {"w","a","s","d","space","shift","ctrl","alt","e","q","f","r","g","b","1","2","3","4","5","6","7","8","9","escape","tab","enter"}
                             if key not in allowed or state not in ("down", "up"):
                                 return
                             if state == "down":
