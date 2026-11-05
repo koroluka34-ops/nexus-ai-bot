@@ -4175,6 +4175,8 @@ bot.on("message:voice", async ctx => {
       };
 
       const apps = [
+        ["Melida Launcher", ["melida launcher", "millida launcher", "melidar launcher", "мелида лаунчер", "мелидо лаунчер", "меллида лаунчер", "мелидар лаунчер", "мелида", "мелидо", "меллида", "мелидар", "муда лаунчер", "мелуда лаунчер", "амелида лаунчер", "абелидо лаунчер"]],
+        ["TurboVPN", ["turbovpn", "turbo vpn", "турбовпн", "турбо впн", "турбо vpn"]],
         ["roblox", ["роблокс", "roblox"]],
         ["discord", ["дискорд", "discord"]],
         ["steam", ["стим", "steam"]],
@@ -4187,7 +4189,8 @@ bot.on("message:voice", async ctx => {
         ["paint", ["пейнт", "paint"]],
         ["explorer", ["проводник", "explorer"]]
       ];
-      const app = apps.find(([, names]) => hasAny(...names));
+      const app = apps.find(([, names]) => names.some(name => spoken.includes(name)));
+      const wantsOpenKnownApp = Boolean(app && app[0] === "Melida Launcher" && !isSearch && !isDownload);
 
       const isShutdown = /(?:выключи|выключить|заверши работу|отключи)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
       const isRestart = /(?:перезагрузи|перезапусти|перезагрузить)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
@@ -4241,7 +4244,7 @@ bot.on("message:voice", async ctx => {
       } else if (wantsOpen && folder) {
         action = "open_folder";
         args = { folder: folder[0] };
-      } else if (wantsOpen && app) {
+      } else if ((wantsOpen || wantsOpenKnownApp) && app) {
         action = "open_app";
         args = { app: app[0] };
       } else if (wantsOpen && google) {
