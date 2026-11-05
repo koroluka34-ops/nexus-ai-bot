@@ -137,20 +137,35 @@ if ($null -eq $root) { Write-Output ("Окно: " + $windowTitle + [Environment]
 $items = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add("Активное окно: " + $windowTitle)
-$count = [Math]::Min($items.Count, 100)
-for ($i=0; $i -lt $count; $i++) {
+$interesting = @("ControlType.Edit","ControlType.ComboBox","ControlType.Button","ControlType.TabItem","ControlType.CheckBox","ControlType.RadioButton","ControlType.Document","ControlType.SplitButton","ControlType.MenuItem")
+$controls = New-Object System.Collections.Generic.List[object]
+for ($i=0; $i -lt $items.Count; $i++) {
   $el = $items.Item($i)
-  $name = [string]$el.Current.Name
-  $type = [string]$el.Current.ControlType.ProgrammaticName
-  if ([string]::IsNullOrWhiteSpace($name)) { continue }
-  $r = $el.Current.BoundingRectangle
-  $bounds = ("x={0}, y={1}, w={2}, h={3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Height)
-  $enabled = if ($el.Current.IsEnabled) { "enabled" } else { "disabled" }
-  $safeName = $name.Replace([char]34, [char]39)
-  $lines.Add(("{0}: '{1}' [{2}] {3}" -f $type, $safeName, $bounds, $enabled))
+  try {
+    $type = [string]$el.Current.ControlType.ProgrammaticName
+    if ($interesting -notcontains $type) { continue }
+    $r = $el.Current.BoundingRectangle
+    $isOffscreen = [bool]$el.Current.IsOffscreen
+    $name = [string]$el.Current.Name
+    $focused = [bool]$el.Current.HasKeyboardFocus
+    $focusable = [bool]$el.Current.IsKeyboardFocusable
+    # Сохраняем элементы ввода даже если UIA считает их частично скрытыми.
+    if ($isOffscreen -and $type -ne "ControlType.Edit" -and $type -ne "ControlType.Document") { continue }
+    if ($r.Width -le 0 -or $r.Height -le 0) { continue }
+    $controls.Add([pscustomobject]@{Type=$type;Name=$name;X=[int]$r.X;Y=[int]$r.Y;W=[int]$r.Width;H=[int]$r.Height;Enabled=[bool]$el.Current.IsEnabled;Focused=$focused;Focusable=$focusable;Offscreen=$isOffscreen})
+  } catch {}
 }
-if ($lines.Count -eq 1) { $lines.Add("Именованные элементы интерфейса не обнаружены. Возможно, приложение рисует интерфейс без UI Automation.") }
-$lines | Select-Object -First 45
+# Сначала показываем поля ввода и элементы, имеющие фокус; сообщения переписки не выводим.
+$ordered = @($controls | Sort-Object @{Expression={ if ($_.Type -eq "ControlType.Edit" -or $_.Type -eq "ControlType.Document") {0} elseif ($_.Focused) {1} else {2} }}, Y, X)
+foreach ($c in ($ordered | Select-Object -First 80)) {
+  $safeName = ([string]$c.Name).Replace([char]34, [char]39)
+  if ($safeName.Length -gt 100) { $safeName = $safeName.Substring(0,100) }
+  $flags = "enabled=" + $c.Enabled + ", focused=" + $c.Focused + ", focusable=" + $c.Focusable + ", offscreen=" + $c.Offscreen
+  $bounds = "x={0}, y={1}, w={2}, h={3}" -f $c.X,$c.Y,$c.W,$c.H
+  $lines.Add(("{0}: '{1}' [{2}] {3}" -f $c.Type,$safeName,$bounds,$flags))
+}
+if ($controls.Count -eq 0) { $lines.Add("Интерактивные элементы UI Automation не обнаружены. Возможно, Telegram рисует поле ввода нестандартным способом.") }
+$lines | Select-Object -First 85
 """
         try:
             proc = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps],
