@@ -325,6 +325,23 @@ $lines | Select-Object -First 45
         if not ctypes.windll.user32.LockWorkStation():
             raise OSError("Windows не смогла заблокировать компьютер.")
         return {"result": "Компьютер заблокирован."}
+    if action == "install_app":
+        app_name = str(args.get("query", "")).strip()
+        if not app_name or len(app_name) > 80 or any(ch in app_name for ch in '\\/:*?"<>|'):
+            raise ValueError("Недопустимое название приложения для установки.")
+        winget = __import__("shutil").which("winget")
+        if not winget:
+            raise RuntimeError("Не найден winget (Установщик приложений).")
+        try:
+            proc = subprocess.run([winget, "install", "--name", app_name, "--exact", "--source", "winget",
+                "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, shell=False)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Установка «" + app_name + "» превысила лимит 15 минут.")
+        output = ((proc.stdout or "") + "\\n" + (proc.stderr or "")).strip()
+        if proc.returncode != 0:
+            raise RuntimeError("Не удалось установить «" + app_name + "». " + (output[-1000:] if output else "winget завершился с кодом " + str(proc.returncode)))
+        return {"result": "Приложение «" + app_name + "» установлено через winget."}
     if action == "uninstall_app":
         app_name = str(args.get("app", "")).strip()
         if not app_name or len(app_name) > 80 or any(ch in app_name for ch in '\\/:*?"<>|'):
