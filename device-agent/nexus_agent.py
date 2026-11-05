@@ -118,6 +118,43 @@ def execute(command):
         buf = BytesIO()
         shot.save(buf, format="PNG")
         return {"result": "Скриншот готов.", "image": base64.b64encode(buf.getvalue()).decode("ascii")}
+    if action == "open_app":
+        allowed = {
+            "roblox": "roblox://",
+            "discord": "discord://",
+            "notepad": "notepad.exe",
+            "calculator": "calc.exe",
+            "paint": "mspaint.exe",
+            "explorer": "explorer.exe",
+        }
+        app = str(args.get("app", "")).lower()
+        if app not in allowed:
+            raise ValueError("Application not allowed")
+        target = allowed[app]
+        if target.endswith("://"):
+            webbrowser.open(target, new=1)
+        else:
+            subprocess.Popen([target], shell=False)
+        return {"result": "Открываю приложение: " + app}
+
+    if action == "open_folder":
+        folders = {
+            "downloads": "Downloads",
+            "desktop": "Desktop",
+            "documents": "Documents",
+            "pictures": "Pictures",
+            "videos": "Videos",
+            "music": "Music",
+        }
+        name = str(args.get("folder", "")).lower()
+        if name not in folders:
+            raise ValueError("Folder not allowed")
+        folder_path = Path.home() / folders[name]
+        if not folder_path.is_dir():
+            raise ValueError("Папка не найдена: " + str(folder_path))
+        os.startfile(str(folder_path))
+        return {"result": "Открыта папка: " + folders[name]}
+
     if action == "open_url":
         url = args.get("url", "")
         if not url.startswith(("https://", "http://")): raise ValueError("URL rejected")
