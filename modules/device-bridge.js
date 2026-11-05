@@ -174,7 +174,7 @@ function requestVoicePcConfirmation(ctx, action, args, description) {
   const id = crypto.randomUUID();
   pending.set(id, { action, args, userId: String(ctx.from.id), chatId: ctx.chat.id });
   const keyboard = new InlineKeyboard().text("✅ Подтвердить", "pc_yes:" + id).text("❌ Отмена", "pc_no:" + id);
-  const safe = safeText(description, 140).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const safe = safeText(description, action === "telegram_send_message" ? 1250 : 140).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   return ctx.reply("⚠️ Подтверди действие на компьютере:\n\n<b>" + safe + "</b>", { parse_mode: "HTML", reply_markup: keyboard });
 }
 
