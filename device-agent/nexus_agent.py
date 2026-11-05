@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-18"
+AGENT_VERSION = "2026.11.05-voice-pc-19"
 import base64
 import json
 import os
@@ -1205,9 +1205,9 @@ def local_voice_command(text):
     s = str(text or "").casefold().replace("ё","е").strip()
     s = re.sub(r"[^a-zа-я0-9% ]+", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
-    s = re.sub(r"^(?:а\s+)?(?:астра|астро|ас тра|astra)\\s*", "", s).strip()
+    s = re.sub(r"^(?:а\s+)?(?:астра|астро|ас тра|astra)\s*", "", s).strip()
     if not s: return None
-    s = re.sub(r"^(?:пожалуйста|ну|давай|ка|бы)\\s+", "", s)
+    s = re.sub(r"^(?:пожалуйста|ну|давай|ка|бы)\s+", "", s)
     if any(x in s for x in ("скриншот","снимок экрана","сфотографируй экран")):
         return {"action":"screenshot","args":{}}
     if any(x in s for x in ("сколько батареи","заряд батареи","батарея","информация о компьютере","информация о пк","сколько оперативки","свободное место")):
@@ -1220,15 +1220,15 @@ def local_voice_command(text):
         return {"action":"media_control","args":{"command":"next"}}
     if any(x in s for x in ("предыдущ","прошл")) and any(x in s for x in ("трек","песн","видео")):
         return {"action":"media_control","args":{"command":"previous"}}
-    vol = re.search(r"(?:громкост|звук).{0,25}?(?:на|до)\\s*(\\d{1,3})\\s*%?", s)
-    if not vol: vol = re.search(r"(?:установи|поставь|сделай).{0,20}?(\\d{1,3})\\s*%?", s)
+    vol = re.search(r"(?:громкост|звук).{0,25}?(?:на|до)\s*(\d{1,3})\s*%?", s)
+    if not vol: vol = re.search(r"(?:установи|поставь|сделай).{0,20}?(\d{1,3})\s*%?", s)
     if vol:
         n=int(vol.group(1))
         if 0<=n<=100: return {"action":"set_volume","args":{"mode":"set","percent":n}}
     for verb in ("открой","запусти","включи"):
         if s.startswith(verb+" "):
             app=s[len(verb):].strip()
-            app=re.sub(r"^(?:приложение|программу|браузер)\\s+","",app)
+            app=re.sub(r"^(?:приложение|программу|браузер)\s+","",app)
             if app: return {"action":"open_app","args":{"app":app}}
     if s.startswith("закрой "):
         app=s[6:].strip()
@@ -1249,12 +1249,14 @@ try {
   $engine.SetInputToDefaultAudioDevice()
   $grammar = New-Object System.Speech.Recognition.DictationGrammar
   $engine.LoadGrammar($grammar)
-  $engine.InitialSilenceTimeout = [TimeSpan]::FromSeconds(5)
-  $engine.BabbleTimeout = [TimeSpan]::FromSeconds(2)
+  $engine.InitialSilenceTimeout = [TimeSpan]::FromSeconds(10)
+  $engine.EndSilenceTimeout = [TimeSpan]::FromSeconds(1.2)
+  $engine.EndSilenceTimeoutAmbiguous = [TimeSpan]::FromSeconds(1.8)
+  $engine.BabbleTimeout = [TimeSpan]::FromSeconds(4)
   $engine.SpeechRecognized.Add({
     param($sender, $event)
     $phrase = [string]$event.Result.Text
-    if ($phrase) { [Console]::Out.WriteLine($phrase); [Console]::Out.Flush() }
+    if ($phrase) { [Console]::Out.WriteLine("РАСПОЗНАНО: " + $phrase); [Console]::Out.Flush() }
   })
   $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
   while ($true) { Start-Sleep -Seconds 1 }
@@ -1268,6 +1270,8 @@ try {
             for line in proc.stdout:
                 phrase = line.strip()
                 if not phrase: continue
+                if phrase.startswith("РАСПОЗНАНО: "): phrase = phrase[len("РАСПОЗНАНО: "):].strip()
+                print("Астра услышала:", phrase)
                 command = local_voice_command(phrase)
                 if not command:
                     continue
