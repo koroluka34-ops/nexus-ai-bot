@@ -4146,18 +4146,26 @@ bot.on("message:voice", async ctx => {
       const isDownload = hasAny("скачай", "скачать", "загрузи", "загрузить", "установи", "установить");
       const youtube = hasAny("youtube", "ютуб", "ю туб", "на ютубе");
       const google = hasAny("google", "гугл", "гугле", "в интернете", "в гугле");
+      const microsoftStore = hasAny("microsoft store", "майкрософт стор", "майкрософт сторе", "микрософт стор", "microsoft store");
       const cleanQuery = (value) => value
-        .replace(/^(?:а ну |пожалуйста |мне |мне нужно |мне надо )+/iu, "")
-        .replace(/\\b(?:открой|открывай|найди|найти|поищи|поищите|ищи|загугли|отыщи|подбери|скачай|скачать|загрузи|загрузить|установи|установить|google|гугл|гугле|youtube|ютуб|ю туб|в интернете|в гугле|на ютубе|на ютуб|и|мне|пожалуйста)\\b/giu, " ")
-        .replace(/\\s+/g, " ").trim();
+        .replace(/^(?:а ну |пожалуйста |мне |мне нужно |мне надо |оттуда |там )+/iu, "")
+        .replace(/\b(?:открой|открывай|найди|найти|поищи|поищите|ищи|загугли|отыщи|подбери|скачай|скачать|загрузи|загрузить|установи|установить|google|гугл|гугле|youtube|ютуб|ю туб|в интернете|в гугле|на ютубе|на ютуб|microsoft|store|майкрософт|микрософт|стор|сторе|и|мне|пожалуйста|оттуда|там|из него)\b/giu, " ")
+        .replace(/\s+/g, " ").trim();
       const searchTail = () => {
         const markers = [...searchVerbs, "скачай", "скачать", "загрузи", "загрузить", "установи", "установить"];
-        let pos = -1;
-        for (const marker of markers) {
-          const found = spoken.indexOf(marker);
-          if (found >= 0 && (pos < 0 || found < pos)) pos = found;
+        let pos = -1, marker = "";
+        for (const item of markers) {
+          const found = spoken.indexOf(item);
+          if (found >= 0 && (pos < 0 || found < pos)) { pos = found; marker = item; }
         }
-        return pos >= 0 ? cleanQuery(spoken.slice(pos + (spoken.slice(pos).match(/^(?:найди|найти|поищи|поищите|ищи|загугли|отыщи|подбери|скачай|скачать|загрузи|загрузить|установи|установить)/u)?.[0].length || 0))) : "";
+        return pos >= 0 ? cleanQuery(spoken.slice(pos + marker.length)) : "";
+      };
+      const storeProduct = () => {
+        const match = spoken.match(/(?:скачай|скачать|загрузи|загрузить|установи|установить)\s+(.+)$/iu);
+        if (!match) return "";
+        return cleanQuery(match[1]
+          .replace(/\b(?:из|в|через)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)\b.*$/iu, "")
+          .replace(/^(?:оттуда|там|из него|в microsoft store|из microsoft store)\s+/iu, ""));
       };
 
       const apps = [
@@ -4175,7 +4183,16 @@ bot.on("message:voice", async ctx => {
       ];
       const app = apps.find(([, names]) => hasAny(...names));
 
-      if (youtube && isSearch) {
+      if (microsoftStore && isDownload) {
+        const query = storeProduct();
+        if (query) {
+          action = "open_store_search";
+          args = { query };
+        }
+      } else if (microsoftStore && wantsOpen) {
+        action = "open_store";
+        args = {};
+      } else if (youtube && isSearch) {
         const query = searchTail();
         if (query) {
           action = "open_url";
@@ -4210,17 +4227,18 @@ bot.on("message:voice", async ctx => {
         action = "open_url";
         args = { url: "https://www.youtube.com/" };
       } else if (wantsOpen) {
-        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\\s+(?:(?:приложение|программу)\\s+)?/iu, "").replace(/\\s+(?:и|потом).*$/iu, "").trim();
+        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\s+(?:(?:приложение|программу)\s+)?/iu, "").replace(/\s+(?:и|потом).*$/iu, "").trim();
         if (appName && appName.length <= 80 && !/^(google|гугл|гугле|youtube|ютуб)$/iu.test(appName)) {
           action = "open_app";
           args = { app: appName };
         }
       }
-
       if (action) {
         queueVoiceAction(action, args, userId, ctx.chat.id);
         const label = action === "open_app" ? "Открываю приложение " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
+          : action === "open_store_search" ? "Открываю Microsoft Store и ищу: " + args.query
+          : action === "open_store" ? "Открываю Microsoft Store"
           : args.url.includes("google.com/search?q=") ? "Ищу в Google: " + decodeURIComponent(args.url.split("q=")[1] || "")
           : args.url.includes("/results?") ? "Ищу на YouTube: " + decodeURIComponent(args.url.split("search_query=")[1] || "")
           : args.url.includes("google.com") ? "Открываю Google"
