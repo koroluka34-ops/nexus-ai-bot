@@ -111,9 +111,16 @@ function queueVoiceAction(action, args, userId, chatId) {
   } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_all_apps"].includes(action)) {
     args = {};
   } else if (action === "set_volume") {
-    const percent = Number(args.percent);
-    if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("Громкость должна быть целым числом от 0 до 100.");
-    args = { percent };
+    const mode = String(args.mode || "set").toLowerCase();
+    if (mode === "set") {
+      const percent = Number(args.percent);
+      if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("Громкость должна быть целым числом от 0 до 100.");
+      args = { mode: "set", percent };
+    } else if (mode === "up" || mode === "down") {
+      const amount = Number(args.amount ?? 10);
+      if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new Error("Шаг изменения громкости должен быть от 1 до 100.");
+      args = { mode, amount };
+    } else throw new Error("Неизвестный режим изменения громкости.");
   } else if (action === "open_store") {
     args = {};
   } else if (action === "open_url") {
