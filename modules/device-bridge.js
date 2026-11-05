@@ -54,7 +54,29 @@ function enqueue(action, args, userId, chatId, messageId) {
   const id = crypto.randomUUID();
   queue.push({ id, action, args, userId: String(userId), chatId, messageId, createdAt: Date.now() });
   results.set(id, { chatId, userId: String(userId) });
+  // Wake the Windows agent's held long-poll immediately instead of waiting
+  // for its 20-second timeout before delivering a newly queued command.
+  wakeDevicePoller();
   return id;
+}
+function wakeDevicePoller() {
+  const waiter = pollWaiters.values().next().value;
+  if (!waiter) return;
+  pollWaiters.delete(waiter);
+  clearTimeout(waiter.timer);
+  const item = queue.shift();
+  if (!item) {
+    if (!waiter.res.writableEnded) sendJson(waiter.res, 200, { ok: true, command: null, touchpadActive: false, pollAfterMs: 0 });
+    return;
+  }
+  if (!waiter.res.writableEnded) {
+    sendJson(waiter.res, 200, {
+      ok: true,
+      command: { id: item.id, action: item.action, args: item.args },
+      touchpadActive: touchpad.activeUntil > Date.now(),
+      pollAfterMs: 0
+    });
+  }
 }
 function queueVoiceAction(action, args, userId, chatId) {
   if (!OWNER_ID || String(userId) !== OWNER_ID) {
