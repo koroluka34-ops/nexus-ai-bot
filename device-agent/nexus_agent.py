@@ -441,14 +441,20 @@ def start_webrtc_stream(cfg, offer):
                             button = str(data.get("button", "left"))
                             if button not in ("left", "right"):
                                 return
+                            # Use PyAutoGUI's Windows mouse backend for game clicks.
+                            # Keep held state so touch controls support continuous fire/hold.
                             if kind == "game-click":
-                                _send_windows_input("mouse", button, True)
-                                _send_windows_input("mouse", button, False)
+                                pyautogui.click(button=button)
+                                print("Игровая мышь: клик", button)
                             elif data.get("state") == "down":
                                 if button not in held_buttons:
-                                    _send_windows_input("mouse", button, True); held_buttons.add(button)
+                                    pyautogui.mouseDown(button=button)
+                                    held_buttons.add(button)
+                                    print("Игровая мышь: нажата", button)
                             elif data.get("state") == "up" and button in held_buttons:
-                                _send_windows_input("mouse", button, False); held_buttons.discard(button)
+                                pyautogui.mouseUp(button=button)
+                                held_buttons.discard(button)
+                                print("Игровая мышь: отпущена", button)
                     except Exception as control_exc:
                         print("Ошибка быстрого управления:", repr(control_exc))
 
