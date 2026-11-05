@@ -266,7 +266,7 @@ def start_webrtc_stream(cfg, offer):
                     self.video_started = None
                     self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
-                    print("WebRTC режим: до 960x540, цель 30 FPS (меньше нагрузка, чётче 480p)")
+                    print("WebRTC режим: до 854x480, цель 30 FPS (меньше задержка и нагрузка на сеть)")
 
                 async def next_timestamp(self):
                     # 30 FPS: стабильный тайминг без накопления очереди старых кадров.
@@ -294,7 +294,7 @@ def start_webrtc_stream(cfg, offer):
                         from PIL import Image, ImageDraw
                         rgb_image = Image.frombytes("RGB", raw.size, raw.rgb)
                         width, height = rgb_image.size
-                        scale = min(1.0, 960 / width, 540 / height)
+                        scale = min(1.0, 854 / width, 480 / height)
                         if scale < 1.0:
                             out_size = (max(1, int(width * scale)), max(1, int(height * scale)))
                             rgb_image = rgb_image.resize(out_size, Image.Resampling.BILINEAR)
