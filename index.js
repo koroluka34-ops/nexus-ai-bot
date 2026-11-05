@@ -69,7 +69,7 @@ installUtilitySuite(bot);
 const { installQrSuite } = require("./modules/qr-suite");
 installQrSuite(bot);
 
-const { installDeviceBridge, handleDeviceHttp, queueVoiceAction } = require("./modules/device-bridge");
+const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
@@ -4231,10 +4231,14 @@ bot.on("message:voice", async ctx => {
         }
       }
       if (action) {
+        if (action === "install_store_app") {
+          await requestVoiceStoreInstallConfirmation(ctx, args.query);
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + " в Telegram.").catch(() => {});
+          return;
+        }
         queueVoiceAction(action, args, userId, ctx.chat.id);
         const label = action === "open_app" ? "Открываю приложение " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
-          : action === "install_store_app" ? "Устанавливаю из Microsoft Store: " + args.query
           : action === "open_store" ? "Открываю Microsoft Store"
           : args.url.includes("google.com/search?q=") ? "Ищу в Google: " + decodeURIComponent(args.url.split("q=")[1] || "")
           : args.url.includes("/results?") ? "Ищу на YouTube: " + decodeURIComponent(args.url.split("search_query=")[1] || "")
