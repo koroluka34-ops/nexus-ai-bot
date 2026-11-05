@@ -4233,9 +4233,8 @@ bot.on("message:voice", async ctx => {
       } else if (isDownload) {
         const query = searchTail();
         if (query) {
-          const downloadQuery = query + " официальный сайт скачать";
-          action = "open_url";
-          args = { url: "https://www.google.com/search?q=" + encodeURIComponent(downloadQuery) };
+          action = "install_app";
+          args = { query };
         }
       } else if (isSearch || (google && hasAny("найди", "найти", "поищи", "ищи"))) {
         const query = searchTail();
@@ -4271,9 +4270,10 @@ bot.on("message:voice", async ctx => {
         }
       }
       if (action) {
-        if (action === "install_store_app") {
-          await requestVoiceStoreInstallConfirmation(ctx, args.query);
-          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + " в Telegram.").catch(() => {});
+        if (action === "install_store_app" || action === "install_app") {
+          const description = "Установить «" + args.query + "» через winget";
+          await requestVoicePcConfirmation(ctx, action, args, description);
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + ".").catch(() => {});
           return;
         }
         if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps"].includes(action)) {
