@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-13"
+AGENT_VERSION = "2026.11.05-voice-pc-14"
 import base64
 import json
 import os
@@ -580,6 +580,90 @@ $lines | Select-Object -First 85
         if app not in allowed: raise ValueError("Application not allowed")
         subprocess.Popen([allowed[app]], shell=False)
         return {"result": "Запущено: " + app}
+    if action == "telegram_send_message":
+        recipient = str(args.get("recipient", "")).strip()
+        message = str(args.get("text", "")).strip()
+        if not recipient or len(recipient) > 80 or not message or len(message) > 1000:
+            raise ValueError("Некорректный контакт или текст сообщения Telegram")
+        # Строгая проверка активного окна: не отправлять сообщение в другой чат.
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        hwnd = user32.GetForegroundWindow()
+        title_buf = ctypes.create_unicode_buffer(512)
+        user32.GetWindowTextW(hwnd, title_buf, 512)
+        window_title = title_buf.value
+        if not window_title or recipient.casefold() not in window_title.casefold():
+            raise RuntimeError("Открыт не тот чат Telegram. Ожидался контакт «" + recipient + "», активное окно: " + (window_title or "не определено") + ". Открой нужный чат и повтори.")
+        # Находим именно поле «Сообщение...» средствами UI Automation, не используем догаданные координаты.
+        ps = r"""
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$hwnd = [NexusForegroundWindow]::GetForegroundWindow()
+$root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+if ($null -eq $root) { exit 3 }
+$items = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+$found = $null
+for ($i=0; $i -lt $items.Count; $i++) {
+  $el = $items.Item($i)
+  try {
+    if ([string]$el.Current.ControlType.ProgrammaticName -eq "ControlType.Edit" -and [string]$el.Current.Name -eq "Сообщение..." -and -not $el.Current.IsOffscreen -and $el.Current.IsEnabled) {
+      $r = $el.Current.BoundingRectangle
+      if ($r.Width -gt 0 -and $r.Height -gt 0) { $found = $el; break }
+    }
+  } catch {}
+}
+if ($null -eq $found) { Write-Output "Поле ввода Telegram «Сообщение...» не найдено."; exit 4 }
+try { $found.SetFocus() } catch {}
+$r = $found.Current.BoundingRectangle
+Write-Output ("{0},{1},{2},{3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Height)
+"""
+        try:
+            proc = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, shell=False)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Поиск поля Telegram превысил 15 секунд.")
+        raw = (proc.stdout or "").strip()
+        if proc.returncode != 0:
+            raise RuntimeError(raw or "Не удалось безопасно найти поле ввода Telegram.")
+        try:
+            x, y, w, h = [int(v) for v in raw.splitlines()[-1].split(",")]
+        except Exception:
+            raise RuntimeError("Windows вернула некорректные координаты поля Telegram.")
+        import pyautogui
+        pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0
+        pyautogui.click(x + max(2, min(w - 2, 12)), y + h // 2)
+        # Unicode-ввод через SendInput; после полного ввода отправляем Enter.
+        ULONG_PTR = ctypes.c_size_t
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
+                        ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
+                        ("dwExtraInfo", ULONG_PTR)]
+        class INPUTUNION(ctypes.Union):
+            _fields_ = [("ki", KEYBDINPUT)]
+        class INPUT(ctypes.Structure):
+            _fields_ = [("type", wintypes.DWORD), ("union", INPUTUNION)]
+        KEYEVENTF_KEYUP = 0x0002
+        KEYEVENTF_UNICODE = 0x0004
+        encoded = message.encode("utf-16-le")
+        inputs = []
+        for i in range(0, len(encoded), 2):
+            code = int.from_bytes(encoded[i:i+2], "little")
+            down, up = INPUT(), INPUT()
+            down.type = up.type = 1
+            down.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
+            up.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
+            inputs.extend((down, up))
+        array_type = INPUT * len(inputs)
+        input_array = array_type(*inputs)
+        user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int]
+        user32.SendInput.restype = wintypes.UINT
+        sent = user32.SendInput(len(inputs), input_array, ctypes.sizeof(INPUT))
+        if sent != len(inputs):
+            raise OSError("Windows ввела не весь текст; сообщение НЕ отправлено.")
+        pyautogui.press("enter")
+        return {"result": "Сообщение отправлено в Telegram контакту «" + recipient + "»."}
     if action == "type_text":
         text = str(args.get("text", ""))
         if len(text) > 1000: raise ValueError("Text too long")
