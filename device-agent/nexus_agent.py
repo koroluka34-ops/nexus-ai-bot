@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-4"
+AGENT_VERSION = "2026.11.05-voice-pc-5"
 import base64
 import json
 import os
@@ -120,53 +120,106 @@ def execute(command):
         return {"result": "Скриншот готов.", "image": base64.b64encode(buf.getvalue()).decode("ascii")}
     if action == "open_app":
         app = str(args.get("app", "")).strip()
-        key = app.casefold()
-        aliases = {
-            "roblox": "roblox://",
-            "discord": "discord://",
-            "notepad": "notepad.exe",
-            "блокнот": "notepad.exe",
-            "calculator": "calc.exe",
-            "калькулятор": "calc.exe",
-            "paint": "mspaint.exe",
-            "пейнт": "mspaint.exe",
-            "explorer": "explorer.exe",
-            "проводник": "explorer.exe",
-        }
-        if not app or len(app) > 80 or any(ch in app for ch in '\\\\/:*?\"<>|'):
+        if not app or len(app) > 80 or any(ch in app for ch in '\\/:*?"<>|'):
             raise ValueError("Недопустимое название приложения")
-        if key in aliases:
-            target = aliases[key]
-            if target.endswith("://"):
-                webbrowser.open(target, new=1)
-            else:
-                subprocess.Popen([target], shell=False)
-            return {"result": "Открываю приложение: " + app}
-
-        # Ищем только ярлыки в меню «Пуск» текущего пользователя и всех пользователей.
+        import re
+        def norm(value):
+            return re.sub(r"[^a-zа-яё0-9]+", "", str(value).casefold())
+        wanted = norm(app)
         roots = [
             Path.home() / "AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
-            Path(os.environ.get("PROGRAMDATA", r"C:\\ProgramData")) / "Microsoft/Windows/Start Menu/Programs",
+            Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Microsoft/Windows/Start Menu/Programs",
         ]
         shortcuts = []
         for root in roots:
             if root.is_dir():
+                try: shortcuts.extend(p for p in root.rglob("*.lnk") if p.is_file())
+                except OSError: pass
+        exact = [p for p in shortcuts if norm(p.stem) == wanted]
+        matches = exact or [p for p in shortcuts if wanted in norm(p.stem) or norm(p.stem) in wanted]
+        if len(matches) == 1:
+            os.startfile(str(matches[0]))
+            return {"result": "Открыто приложение: " + matches[0].stem}
+        if len(matches) > 1:
+            raise ValueError("Нашёл несколько ярлыков: " + ", ".join(p.stem for p in matches[:6]) + ". Уточни название.")
+        # Получаем список приложений Windows безопасной фиксированной командой.
+        ps = r"Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress"
+        try:
+            proc = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, shell=False)
+            rows = json.loads(proc.stdout) if proc.returncode == 0 and proc.stdout.strip() else []
+            if isinstance(rows, dict): rows = [rows]
+            exact_apps = [x for x in rows if norm(x.get("Name", "")) == wanted]
+            matches = exact_apps or [x for x in rows if wanted in norm(x.get("Name", "")) or norm(x.get("Name", "")) in wanted]
+            if len(matches) == 1 and matches[0].get("AppID"):
+                subprocess.Popen(["explorer.exe", "shell:AppsFolder\\" + str(matches[0]["AppID"])], shell=False)
+                return {"result": "Открываю приложение: " + str(matches[0].get("Name", app))}
+            if len(matches) > 1:
+                raise ValueError("Нашёл несколько приложений: " + ", ".join(str(x.get("Name", "")) for x in matches[:6]) + ". Уточни название.")
+        except subprocess.TimeoutExpired:
+            print("Поиск приложений Windows превысил лимит времени.")
+        # Резервный поиск exe в записях установленных программ.
+        try:
+            import winreg
+            locations = [
+                (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+                (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+                (winreg.HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+            ]
+            found = []
+            for hive, key_path in locations:
                 try:
-                    shortcuts.extend(p for p in root.rglob("*.lnk") if p.is_file())
-                except OSError:
-                    pass
-        wanted = app.casefold()
-        exact = [p for p in shortcuts if p.stem.casefold() == wanted]
-        partial = [p for p in shortcuts if wanted in p.stem.casefold()]
-        matches = exact or partial
-        if not matches:
-            raise ValueError("Не нашёл ярлык приложения «" + app + "» в меню Пуск.")
-        if len(matches) > 1 and not exact:
-            names = ", ".join(p.stem for p in matches[:5])
-            raise ValueError("Нашёл несколько совпадений: " + names + ". Назови приложение точнее.")
-        os.startfile(str(matches[0]))
-        return {"result": "Открыто приложение: " + matches[0].stem}
-
+                    with winreg.OpenKey(hive, key_path) as parent:
+                        for i in range(winreg.QueryInfoKey(parent)[0]):
+                            try:
+                                with winreg.OpenKey(parent, winreg.EnumKey(parent, i)) as item:
+                                    display = str(winreg.QueryValueEx(item, "DisplayName")[0])
+                                    if wanted and (wanted in norm(display) or norm(display) in wanted):
+                                        icon = str(winreg.QueryValueEx(item, "DisplayIcon")[0])
+                                        exe = os.path.expandvars(icon.strip().strip('"').split(",")[0])
+                                        path = Path(exe)
+                                        if path.is_file() and path.suffix.lower() == ".exe":
+                                            found.append((display, path))
+                            except (OSError, ValueError): pass
+                except OSError: pass
+            exact_reg = [x for x in found if norm(x[0]) == wanted]
+            found = exact_reg or found
+            if len(found) == 1:
+                os.startfile(str(found[0][1]))
+                return {"result": "Открываю приложение: " + found[0][0]}
+            if len(found) > 1:
+                raise ValueError("Нашёл несколько установленных программ: " + ", ".join(x[0] for x in found[:6]) + ". Уточни название.")
+        except ImportError: pass
+        raise ValueError("Не нашёл установленное приложение «" + app + "». Проверь название или произношение.")
+    if action in ("shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"):
+        if action == "shutdown_pc":
+            subprocess.Popen(["shutdown.exe", "/s", "/t", "0"], shell=False)
+            return {"result": "Компьютер выключается."}
+        if action == "restart_pc":
+            subprocess.Popen(["shutdown.exe", "/r", "/t", "0"], shell=False)
+            return {"result": "Компьютер перезагружается."}
+        if action == "sleep_pc":
+            import ctypes
+            ctypes.windll.powrprof.SetSuspendState(False, True, False)
+            return {"result": "Компьютер переводится в спящий режим."}
+        import ctypes
+        if not ctypes.windll.user32.LockWorkStation():
+            raise OSError("Windows не смогла заблокировать компьютер.")
+        return {"result": "Компьютер заблокирован."}
+    if action == "uninstall_app":
+        app_name = str(args.get("app", "")).strip()
+        if not app_name or len(app_name) > 80 or any(ch in app_name for ch in '\\/:*?"<>|'):
+            raise ValueError("Недопустимое название приложения для удаления.")
+        winget = __import__("shutil").which("winget")
+        if not winget:
+            raise RuntimeError("Не найден winget (Установщик приложений).")
+        proc = subprocess.run([winget, "uninstall", "--name", app_name, "--exact",
+            "--accept-source-agreements", "--disable-interactivity"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, shell=False)
+        output = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
+        if proc.returncode != 0:
+            raise RuntimeError("Не удалось удалить «" + app_name + "». " + (output[-1000:] if output else "winget завершился с кодом " + str(proc.returncode)))
+        return {"result": "Команда удаления приложения «" + app_name + "» выполнена."}
     if action == "open_folder":
         folders = {
             "downloads": "Downloads",
