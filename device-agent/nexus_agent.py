@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-7"
+AGENT_VERSION = "2026.11.05-voice-pc-8"
 import base64
 import json
 import os
@@ -111,6 +111,53 @@ def _send_windows_input(kind, code, down=True):
 
 def execute(command):
     action, args = command["action"], command.get("args", {})
+    if action == "inspect_ui":
+        # Только чтение доступных имён элементов активного окна; никаких кликов/ввода.
+        ps = r"""
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class NexusForegroundWindow {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
+}
+'@
+$hwnd = [NexusForegroundWindow]::GetForegroundWindow()
+$sb = New-Object System.Text.StringBuilder 512
+[NexusForegroundWindow]::GetWindowText($hwnd, $sb, $sb.Capacity) | Out-Null
+$windowTitle = $sb.ToString()
+if ($hwnd -eq [IntPtr]::Zero) { Write-Output "Не удалось определить активное окно."; exit 0 }
+$root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+if ($null -eq $root) { Write-Output ("Окно: " + $windowTitle + [Environment]::NewLine + "UI Automation недоступна для этого окна."); exit 0 }
+$items = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+$lines = New-Object System.Collections.Generic.List[string]
+$lines.Add("Активное окно: " + $windowTitle)
+$count = [Math]::Min($items.Count, 100)
+for ($i=0; $i -lt $count; $i++) {
+  $el = $items.Item($i)
+  $name = [string]$el.Current.Name
+  $type = [string]$el.Current.ControlType.ProgrammaticName
+  if ([string]::IsNullOrWhiteSpace($name)) { continue }
+  $r = $el.Current.BoundingRectangle
+  $bounds = ("x={0}, y={1}, w={2}, h={3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Height)
+  $enabled = if ($el.Current.IsEnabled) { "enabled" } else { "disabled" }
+  $lines.Add(("{0}: ""{1}"" [{2}] {3}" -f $type, $name.Replace("""", "'"), $bounds, $enabled))
+}
+if ($lines.Count -eq 1) { $lines.Add("Именованные элементы интерфейса не обнаружены. Возможно, приложение рисует интерфейс без UI Automation.") }
+$lines | Select-Object -First 45
+"""
+        try:
+            proc = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, shell=False)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Проверка интерфейса превысила 20 секунд.")
+        output = (proc.stdout or "").strip()
+        if proc.returncode != 0:
+            detail = (proc.stderr or output or "неизвестная ошибка").strip()
+            raise RuntimeError("Windows UI Automation: " + detail[-700:])
+        return {"result": output[:5000] or "Windows не вернула список элементов. Открой TurboVPN и повтори проверку."}
     if action == "screenshot":
         import pyautogui
         shot = pyautogui.screenshot()
