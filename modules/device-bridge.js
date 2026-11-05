@@ -110,6 +110,10 @@ function queueVoiceAction(action, args, userId, chatId) {
     args = { app: appName };
   } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_all_apps"].includes(action)) {
     args = {};
+  } else if (action === "set_volume") {
+    const percent = Number(args.percent);
+    if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("Громкость должна быть целым числом от 0 до 100.");
+    args = { percent };
   } else if (action === "open_store") {
     args = {};
   } else if (action === "open_url") {
