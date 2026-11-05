@@ -4270,7 +4270,7 @@ bot.on("message:voice", async ctx => {
       const app = apps.find(([, names]) => names.some(name => spoken.includes(name)));
       const wantsOpenKnownApp = Boolean(app && app[0] === "Millida Launcher" && !isSearch && !isDownload);
 
-      const volumeMatch = spoken.match(/(?:громкост\\w*|звук)\\s+(?:на\\s+)?(\\d{1,3})\\s*(?:%|процент\\w*)?/iu);
+      const volumeMatch = spoken.match(/(?:громкост\w*|звук)\s+(?:на\s+)?(\d{1,3})\s*(?:%|процент\w*)?/iu);
       if (volumeMatch) {
         const percent = Number(volumeMatch[1]);
         if (percent >= 0 && percent <= 100) {
