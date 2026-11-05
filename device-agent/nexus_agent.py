@@ -1253,8 +1253,10 @@ def start_local_wake_listener():
             model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=2, num_workers=1)
             print("Астра: модель готова. Голос распознаётся локально; аудио не отправляется в Telegram или Render.")
             audio_queue = queue.Queue(maxsize=16)
+            mic_info = sd.query_devices(kind="input")
+            mic_rate = int(mic_info.get("default_samplerate") or 48000)
+            block_size = max(1024, int(mic_rate * 0.25))  # 250 ms
             sample_rate = 16000
-            block_size = 4000  # 250 ms
 
             def audio_callback(indata, frames, timing, status):
                 if status:
@@ -1266,7 +1268,7 @@ def start_local_wake_listener():
 
             def transcribe_audio(audio):
                 samples = np.concatenate(audio).astype(np.float32, copy=False)
-                if samples.size < int(sample_rate * 0.55):
+                if samples.size < int(mic_rate * 0.55):
                     return ""
                 peak = float(np.max(np.abs(samples))) if samples.size else 0.0
                 rms = float(np.sqrt(np.mean(samples * samples))) if samples.size else 0.0
@@ -1275,6 +1277,14 @@ def start_local_wake_listener():
                 # Normalize quiet microphone input before local inference.
                 gain = min(18.0, 0.82 / max(peak, 0.0001))
                 samples = np.clip(samples * gain, -1.0, 1.0)
+                # Resample the device's native rate (often 44.1/48 kHz) to Whisper's 16 kHz.
+                if mic_rate != sample_rate:
+                    target_len = max(1, int(round(samples.size * sample_rate / mic_rate)))
+                    samples = np.interp(
+                        np.linspace(0, samples.size - 1, target_len, dtype=np.float32),
+                        np.arange(samples.size, dtype=np.float32),
+                        samples,
+                    ).astype(np.float32)
                 segments, info = model.transcribe(
                     samples,
                     language="ru",
@@ -1292,12 +1302,12 @@ def start_local_wake_listener():
             captured = []
             speaking = False
             silence_blocks = 0
-            max_blocks = int(8.0 / (block_size / sample_rate))
-            silence_limit = int(1.0 / (block_size / sample_rate))
+            max_blocks = int(8.0 / (block_size / mic_rate))
+            silence_limit = int(1.0 / (block_size / mic_rate))
             print("Астра слушает микрофон. Скажи: «Астра, открой ТикТок».")
 
             with sd.InputStream(
-                samplerate=sample_rate,
+                samplerate=mic_rate,
                 channels=1,
                 dtype="float32",
                 blocksize=block_size,
@@ -1345,10 +1355,12 @@ def start_local_wake_listener():
                                 print("Астра активна. Скажи команду после слова «Астра».")
                                 continue
 
+                            confirmed = False
                             if pending_confirmation:
                                 if re.search(r"\b(подтверждаю|да подтверждаю|выполняй)\b", command_text.casefold()):
                                     command = pending_confirmation
                                     pending_confirmation = None
+                                    confirmed = True
                                     print("Подтверждение получено. Выполняю:", command["action"])
                                 elif re.search(r"\b(отмена|отмени|не надо|нет)\b", command_text.casefold()):
                                     pending_confirmation = None
@@ -1367,7 +1379,7 @@ def start_local_wake_listener():
                                     continue
 
                             protected = {"shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_app", "close_all_apps", "uninstall_app"}
-                            if command["action"] in protected:
+                            if command["action"] in protected and not confirmed:
                                 pending_confirmation = command
                                 print("Астра: это действие может закрыть программы или повлиять на данные.")
                                 print("Для выполнения скажи: «Астра, подтверждаю». Для отмены: «Астра, отмена».")
