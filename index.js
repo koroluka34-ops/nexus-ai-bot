@@ -4131,7 +4131,7 @@ bot.on("message:voice", async ctx => {
       let action = null;
       let args = {};
 
-      const wantsOpen = hasAny("открой", "открывай", "запусти", "запускай", "покажи");
+      const wantsOpen = hasAny("открой", "открывай", "откроем", "запусти", "запускай", "покажи") || /(?:можешь|мог\s+бы)\s+открыть/iu.test(spoken);
       const folders = [
         ["downloads", ["загрузки", "downloads"]],
         ["desktop", ["рабочий стол", "desktop"]],
@@ -4252,7 +4252,7 @@ bot.on("message:voice", async ctx => {
         args = { url: "https://www.youtube.com/" };
       } else if (wantsOpen) {
         const appName = spoken
-          .replace(/^(?:открой|открывай|запусти|запускай|покажи)\s+/iu, "")
+          .replace(/^(?:(?:можешь|мог\s+бы)\s+)?(?:открой|открывай|откроем|открыть|запусти|запускай|покажи)\s+/iu, "")
           .replace(/^(?:(?:мне|пожалуйста|к\s+примеру|например|просто)\s+)+/iu, "")
           .replace(/^(?:(?:приложение|программу)\s+)+/iu, "")
           .replace(/\s+(?:и\s+потом|потом).*$/iu, "")
