@@ -106,7 +106,7 @@ function queueVoiceAction(action, args, userId, chatId) {
 function requestVoiceStoreInstallConfirmation(ctx, query) {
   if (!authorized(ctx)) throw new Error("Голосовая установка доступна только владельцу.");
   const safeQuery = String(query || "").trim();
-  if (!safeQuery || safeQuery.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(safeQuery)) {
+  if (!safeQuery || safeQuery.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(safeQuery)) {
     throw new Error("Название приложения для Microsoft Store некорректно.");
   }
   if (!TOKEN || TOKEN.length < 32) throw new Error("Мост ПК не настроен в Render.");
