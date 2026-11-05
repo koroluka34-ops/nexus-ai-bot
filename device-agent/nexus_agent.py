@@ -1204,7 +1204,7 @@ def local_voice_command(text):
     import re
     s = str(text or "").casefold().replace("ё","е").strip()
     s = re.sub(r"[^a-zа-я0-9% ]+", " ", s)
-    s = re.sub(r"\\s+", " ", s).strip()
+    s = re.sub(r"\s+", " ", s).strip()
     s = re.sub(r"^(?:а\s+)?(?:астра|астро|ас тра|astra)\\s*", "", s).strip()
     if not s: return None
     s = re.sub(r"^(?:пожалуйста|ну|давай|ка|бы)\\s+", "", s)
