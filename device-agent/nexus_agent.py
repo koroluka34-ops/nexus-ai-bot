@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-6"
+AGENT_VERSION = "2026.11.05-voice-pc-7"
 import base64
 import json
 import os
