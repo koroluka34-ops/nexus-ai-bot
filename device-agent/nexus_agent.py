@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-2"
+AGENT_VERSION = "2026.11.05-voice-pc-3"
 import base64
 import json
 import os
@@ -185,6 +185,17 @@ def execute(command):
         os.startfile(str(folder_path))
         return {"result": "Открыта папка: " + folders[name]}
 
+    if action == "open_store":
+        subprocess.Popen(["explorer.exe", "ms-windows-store://home"], shell=False)
+        return {"result": "Открыт Microsoft Store."}
+    if action == "open_store_search":
+        query = str(args.get("query", "")).strip()
+        if not query or len(query) > 80 or any(ch in query for ch in '\\\\/:*?"<>|'):
+            raise ValueError("Недопустимое название приложения для Microsoft Store.")
+        from urllib.parse import quote
+        store_uri = "ms-windows-store://search/?query=" + quote(query)
+        subprocess.Popen(["explorer.exe", store_uri], shell=False)
+        return {"result": "Microsoft Store открыт. Поиск приложения: " + query + ". Нажми «Получить» или «Установить» в самом Store."}
     if action == "open_url":
         url = args.get("url", "")
         if not url.startswith(("https://", "http://")): raise ValueError("URL rejected")
