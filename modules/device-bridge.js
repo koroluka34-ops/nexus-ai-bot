@@ -60,19 +60,23 @@ function queueVoiceAction(action, args, userId, chatId) {
   if (!OWNER_ID || String(userId) !== OWNER_ID) {
     throw new Error("Голосовое управление ПК доступно только владельцу.");
   }
-  const allowedApps = new Set(["roblox", "discord", "notepad", "calculator", "paint", "explorer"]);
+  const appName = String(args.app || "").trim();
   const allowedFolders = new Set(["downloads", "desktop", "documents", "pictures", "videos", "music"]);
-  if (action === "open_app" && !allowedApps.has(String(args.app || ""))) {
-    throw new Error("Это приложение не входит в разрешённый список.");
-  }
-  if (action === "open_folder" && !allowedFolders.has(String(args.folder || ""))) {
+  if (action === "open_app") {
+    if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()-]+$/u.test(appName)) {
+      throw new Error("Название приложения некорректно.");
+    }
+    args.app = appName;
+  } else if (action === "open_folder" && !allowedFolders.has(String(args.folder || ""))) {
     throw new Error("Эта папка не входит в разрешённый список.");
-  }
-  if (action === "open_url") {
+  } else if (action === "open_url") {
     let url;
     try { url = new URL(String(args.url || "")); } catch { throw new Error("Некорректная ссылка."); }
-    if (url.protocol !== "https:" || url.hostname !== "www.youtube.com" || !["/","/results"].includes(url.pathname)) {
-      throw new Error("Голосом разрешено открывать только YouTube.");
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || url.username || url.password ||
+        !["google.com", "www.google.com", "youtube.com", "www.youtube.com"].includes(host) ||
+        !["/", "/search", "/results"].includes(url.pathname)) {
+      throw new Error("Голосом разрешены Google и YouTube по HTTPS.");
     }
     args.url = url.toString();
   } else if (!["open_app", "open_folder"].includes(action)) {
