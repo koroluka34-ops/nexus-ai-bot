@@ -4122,28 +4122,28 @@ bot.on("message:voice", async ctx => {
     // Безопасные голосовые команды: только точные шаблоны и allowlist.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (ownerId && String(userId) === ownerId) {
-      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\\s+/g, " ").trim();
+      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
       let action = null;
       let args = {};
 
       const appRules = [
-        [/\\b(роблокс|roblox)\\b/, "roblox"],
-        [/\\b(дискорд|discord)\\b/, "discord"],
-        [/\\b(блокнот|notepad)\\b/, "notepad"],
-        [/\\b(калькулятор|calculator)\\b/, "calculator"],
-        [/\\b(пейнт|paint)\\b/, "paint"],
-        [/\\b(проводник|explorer)\\b/, "explorer"]
+        [/\b(роблокс|roblox)\b/, "roblox"],
+        [/\b(дискорд|discord)\b/, "discord"],
+        [/\b(блокнот|notepad)\b/, "notepad"],
+        [/\b(калькулятор|calculator)\b/, "calculator"],
+        [/\b(пейнт|paint)\b/, "paint"],
+        [/\b(проводник|explorer)\b/, "explorer"]
       ];
       const folderRules = [
-        [/\\b(загрузки|downloads)\\b/, "downloads"],
-        [/\\b(рабочий стол|desktop)\\b/, "desktop"],
-        [/\\b(документы|documents)\\b/, "documents"],
-        [/\\b(изображения|картинки|pictures)\\b/, "pictures"],
-        [/\\b(видео|videos)\\b/, "videos"],
-        [/\\b(музыка|music)\\b/, "music"]
+        [/\b(загрузки|downloads)\b/, "downloads"],
+        [/\b(рабочий стол|desktop)\b/, "desktop"],
+        [/\b(документы|documents)\b/, "documents"],
+        [/\b(изображения|картинки|pictures)\b/, "pictures"],
+        [/\b(видео|videos)\b/, "videos"],
+        [/\b(музыка|music)\b/, "music"]
       ];
 
-      const wantsOpen = /\\b(открой|открывай|запусти|запускай|покажи)\\b/.test(spoken);
+      const wantsOpen = /\b(открой|открывай|запусти|запускай|покажи)\b/.test(spoken);
       const appMatch = appRules.find(([pattern]) => pattern.test(spoken));
       const folderMatch = folderRules.find(([pattern]) => pattern.test(spoken));
 
@@ -4153,13 +4153,13 @@ bot.on("message:voice", async ctx => {
       } else if (wantsOpen && folderMatch) {
         action = "open_folder";
         args = { folder: folderMatch[1] };
-      } else if (/\\b(открой|запусти|перейди на)\\b/.test(spoken) && /\\b(youtube|ютуб|ю туб)\\b/.test(spoken)) {
+      } else if (/\b(открой|запусти|перейди на)\b/.test(spoken) && /\b(youtube|ютуб|ю туб)\b/.test(spoken)) {
         action = "open_url";
         args = { url: "https://www.youtube.com/" };
-      } else if (/\\b(найди|поищи|ищи)\\b/.test(spoken) && /\\b(youtube|ютуб|ю туб)\\b/.test(spoken)) {
+      } else if (/\b(найди|поищи|ищи)\b/.test(spoken) && /\b(youtube|ютуб|ю туб)\b/.test(spoken)) {
         const query = transcript
-          .replace(/^(.*?)(найди|поищи|ищи)\\s*/i, "")
-          .replace(/\\b(на\\s*)?(youtube|ютуб|ю\\s*туб)\\b/ig, "")
+          .replace(/^(.*?)(найди|поищи|ищи)\s*/i, "")
+          .replace(/\b(на\s*)?(youtube|ютуб|ю\s*туб)\b/ig, "")
           .replace(/[.,!?]/g, " ").trim();
         if (query) {
           action = "open_url";
