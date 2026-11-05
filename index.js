@@ -1280,31 +1280,31 @@ async function handleVideoPrompt(ctx, prompt) {
 // ======================================================
 
 async function downloadTelegramFile(ctx, fileId, maxBytes) {
-  const file = await ctx.api.getFile(fileId);
-
-  if (!file.file_path) {
-    throw new Error("Не удалось получить путь файла.");
+  let file;
+  try {
+    file = await ctx.api.getFile(fileId);
+  } catch (error) {
+    console.error("Telegram getFile failed:", error.cause?.code || error.cause?.message || error.message);
+    throw new Error("Не удалось получить голосовое из Telegram. Проверь соединение Render с api.telegram.org.");
   }
 
-  if (file.file_size && file.file_size > maxBytes) {
-    throw new Error("Файл слишком большой.");
+  if (!file.file_path) throw new Error("Telegram не вернул путь голосового файла.");
+  if (file.file_size && file.file_size > maxBytes) throw new Error("Файл слишком большой.");
+
+  let response;
+  try {
+    response = await fetch(
+      `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`,
+      { signal: AbortSignal.timeout(60000) }
+    );
+  } catch (error) {
+    console.error("Telegram file download failed:", error.cause?.code || error.cause?.message || error.message);
+    throw new Error("Не удалось скачать голосовое из Telegram (ошибка сети Render).");
   }
 
-  const response = await fetch(
-    `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`,
-    { signal: AbortSignal.timeout(60000) }
-  );
-
-  if (!response.ok) {
-    throw new Error("Ошибка скачивания файла.");
-  }
-
+  if (!response.ok) throw new Error("Telegram вернул HTTP " + response.status + " при скачивании голосового.");
   const buffer = Buffer.from(await response.arrayBuffer());
-
-  if (buffer.length > maxBytes) {
-    throw new Error("Файл превышает допустимый размер.");
-  }
-
+  if (buffer.length > maxBytes) throw new Error("Файл превышает допустимый размер.");
   return buffer;
 }
 
@@ -1570,17 +1570,21 @@ async function transcribeVoice(ctx) {
   form.append("model", "whisper-large-v3-turbo");
   form.append("response_format", "json");
 
-  const response = await fetch(
-    "https://api.groq.com/openai/v1/audio/transcriptions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`
-      },
-      body: form,
-      signal: AbortSignal.timeout(90000)
-    }
-  );
+  let response;
+  try {
+    response = await fetch(
+      "https://api.groq.com/openai/v1/audio/transcriptions",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: form,
+        signal: AbortSignal.timeout(90000)
+      }
+    );
+  } catch (error) {
+    console.error("Groq Whisper fetch failed:", error.cause?.code || error.cause?.message || error.message);
+    throw new Error("Не удалось связаться с Groq Whisper. Проверь соединение Render с api.groq.com.");
+  }
 
   const data = await response.json();
 
