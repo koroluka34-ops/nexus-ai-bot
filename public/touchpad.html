@@ -31,11 +31,11 @@ body.game-mode #gamePanel{display:block!important;position:absolute;inset:0;z-in
 body.game-mode #gamePanel>.small{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:65vw;padding:5px 9px;border-radius:8px;background:#02061788;color:#fff}
 body.game-mode .game-layout{display:contents}
 body.game-mode .joystick-wrap{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));pointer-events:auto}
-body.game-mode .joystick{width:clamp(104px,18vh,138px);height:clamp(104px,18vh,138px);background:radial-gradient(circle,#475569 0 4px,#334155 5px 42%,#0f172acc 72%);border-color:#cbd5e1aa}
-body.game-mode .joystick-knob{width:clamp(42px,7vh,54px);height:clamp(42px,7vh,54px);background:linear-gradient(145deg,#e2e8f0,#64748b)}
+body.game-mode .joystick{width:clamp(88px,15vh,116px);height:clamp(88px,15vh,116px);background:radial-gradient(circle,#475569 0 4px,#334155 5px 42%,#0f172acc 72%);border-color:#cbd5e1aa}
+body.game-mode .joystick-knob{width:clamp(36px,6vh,46px);height:clamp(36px,6vh,46px);background:linear-gradient(145deg,#e2e8f0,#64748b)}
 body.game-mode .joystick-caption{color:white;text-shadow:0 1px 3px #000}
-body.game-mode .game-grid{position:absolute;right:max(10px,env(safe-area-inset-right));top:18%;bottom:18%;width:min(42vw,360px);grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:6px;align-content:stretch;pointer-events:auto}
-body.game-mode .game-grid button{min-height:0;border-radius:13px;padding:5px 3px;background:#172033dd;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(10px,1.8vh,14px);backdrop-filter:blur(4px)}
+body.game-mode .game-grid{position:absolute;right:max(10px,env(safe-area-inset-right));top:20%;bottom:20%;width:min(34vw,280px);grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:4px;align-content:stretch;pointer-events:auto}
+body.game-mode .game-grid button{min-height:0;border-radius:10px;padding:3px 2px;background:#172033dd;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(9px,1.45vh,12px);backdrop-filter:blur(4px)}
 body.game-mode .game-grid button:active{background:#475569ee}
 body.game-mode .game-grid button[data-game-key="space"]{background:#2563ebcc}
 body.game-mode .game-grid button[data-game-mouse="left"]{background:#b45309dd}
@@ -111,7 +111,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
  }
  pc.ontrack=e=>{
   const track=e.track;
-  try{const receiver=pc.getReceivers().find(r=>r.track===track);if(receiver&&("jitterBufferTarget" in receiver))receiver.jitterBufferTarget=50;}catch{}
+  try{const receiver=pc.getReceivers().find(r=>r.track===track);if(receiver&&("jitterBufferTarget" in receiver))receiver.jitterBufferTarget=20;}catch{}
   const stream=e.streams&&e.streams[0]?e.streams[0]:new MediaStream([track]);
   video.srcObject=stream;
   screenState.textContent='Видеодорожка получена · '+track.readyState;
