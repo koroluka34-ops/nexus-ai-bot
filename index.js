@@ -69,7 +69,7 @@ installUtilitySuite(bot);
 const { installQrSuite } = require("./modules/qr-suite");
 installQrSuite(bot);
 
-const { installDeviceBridge, handleDeviceHttp } = require("./modules/device-bridge");
+const { installDeviceBridge, handleDeviceHttp, queueVoiceAction } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
