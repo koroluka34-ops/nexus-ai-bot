@@ -4256,6 +4256,7 @@ bot.on("message:voice", async ctx => {
         ["discord", ["дискорд", "discord"]],
         ["steam", ["стим", "steam"]],
         ["spotify", ["спотифай", "spotify"]],
+        ["TikTok", ["tiktok", "тик ток", "тикток", "т кток", "ткток", "приложение тикток", "положение тикток"]],
         ["chrome", ["хром", "chrome", "гугл хром"]],
         ["firefox", ["фаерфокс", "firefox"]],
         ["edge", ["эдж", "edge"]],
