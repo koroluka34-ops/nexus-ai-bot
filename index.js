@@ -4160,13 +4160,10 @@ bot.on("message:voice", async ctx => {
         }
         return pos >= 0 ? cleanQuery(spoken.slice(pos + marker.length)) : "";
       };
-      const storeProduct = () => {
-        const match = spoken.match(/(?:скачай|скачать|загрузи|загрузить|установи|установить)\s+(.+)$/iu);
-        if (!match) return "";
-        return cleanQuery(match[1]
-          .replace(/\b(?:из|в|через)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)\b.*$/iu, "")
-          .replace(/^(?:оттуда|там|из него|в microsoft store|из microsoft store)\s+/iu, ""));
-      };
+      const storeProduct = () => cleanQuery(spoken
+        .replace(/\b(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)\b/giu, " ")
+        .replace(/\b(?:открой|открывай|найди|найти|поищи|поищите|скачай|скачать|загрузи|загрузить|установи|установить|запусти|запустить|запускай|и|его|ее|её|оттуда|там|из|в|через|пожалуйста|приложение)\b/giu, " ")
+        .replace(/[,:;.!?]+/g, " "));
 
       const apps = [
         ["roblox", ["роблокс", "roblox"]],
@@ -4186,7 +4183,7 @@ bot.on("message:voice", async ctx => {
       if (microsoftStore && isDownload) {
         const query = storeProduct();
         if (query) {
-          action = "open_store_search";
+          action = "install_store_app";
           args = { query };
         }
       } else if (microsoftStore && wantsOpen) {
@@ -4237,7 +4234,7 @@ bot.on("message:voice", async ctx => {
         queueVoiceAction(action, args, userId, ctx.chat.id);
         const label = action === "open_app" ? "Открываю приложение " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
-          : action === "open_store_search" ? "Открываю Microsoft Store и ищу: " + args.query
+          : action === "install_store_app" ? "Устанавливаю из Microsoft Store: " + args.query
           : action === "open_store" ? "Открываю Microsoft Store"
           : args.url.includes("google.com/search?q=") ? "Ищу в Google: " + decodeURIComponent(args.url.split("q=")[1] || "")
           : args.url.includes("/results?") ? "Ищу на YouTube: " + decodeURIComponent(args.url.split("search_query=")[1] || "")
