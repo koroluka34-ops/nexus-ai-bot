@@ -168,7 +168,8 @@ function installDeviceBridge(bot) {
         : "🔴 ПК не подключён. Запусти NEXUS Agent на Windows.");
     }
     let action, args = {};
-    if (verb === "screen") action = "screenshot";\n    else if (verb === "inspect") action = "inspect_ui";
+    if (verb === "screen") action = "screenshot";
+    else if (verb === "inspect") action = "inspect_ui";
     else if (verb === "open") {
       let url;
       try { url = new URL(arg); } catch { return ctx.reply("Формат: /pc open https://example.com"); }
