@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-22"
+AGENT_VERSION = "2026.11.06-voice-pc-23"
 import base64
 import json
 import os
@@ -1183,7 +1183,9 @@ def start_webrtc_stream(cfg, offer):
     threading.Thread(target=worker, daemon=True).start()
 
 def webrtc_offer_listener(cfg):
-    """Check WebRTC offers independently from the long-polling command loop."""
+    """Check WebRTC slowly and back off on Windows/network permission errors."""
+    delay = 10
+    last_error = None
     while True:
         try:
             offer_data = request(cfg, "/device/webrtc/offer")
@@ -1191,14 +1193,83 @@ def webrtc_offer_listener(cfg):
             if offer:
                 print("Получено предложение WebRTC:", offer.get("sessionId"))
                 start_webrtc_stream(cfg, offer)
-            else:
-                time.sleep(0.25)
+            last_error = None
+            delay = 10
+            time.sleep(delay)
         except Exception as exc:
-            print("Ошибка проверки WebRTC:", str(exc)[:250])
-            time.sleep(3)
+            message = str(exc)[:250]
+            denied = getattr(exc, "winerror", None) == 10013 or "WinError 10013" in message
+            if message != last_error:
+                if denied:
+                    print("WebRTC: Windows блокирует сетевой сокет (10013). Проверку повторю позже; команды агента работают отдельно.")
+                else:
+                    print("Ошибка проверки WebRTC:", message)
+                last_error = message
+            delay = min(60, max(15, delay * 2))
+            time.sleep(delay)
 
 
+def speak_local(text):
+    """Speak a short reply through Windows built-in speech synthesis."""
+    import base64
+    import subprocess
+    message = str(text or "").strip()[:240]
+    if not message:
+        return
+    payload = base64.b64encode(message.encode("utf-8")).decode("ascii")
+    script = (
+        "$ErrorActionPreference='Stop'; "
+        "Add-Type -AssemblyName System.Speech; "
+        "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+        "$v=$s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -like 'ru-*' } | Select-Object -First 1; "
+        "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) } "
+        "else { Write-Output 'NEXUS_NO_RUSSIAN_VOICE' }; "
+        "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + payload + "')); "
+        "$s.Speak($t); $s.Dispose()"
+    )
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+            capture_output=True, text=True, timeout=20, creationflags=flags
+        )
+        if result.returncode != 0:
+            print("Астра: не удалось произнести ответ:", (result.stderr or result.stdout or "ошибка TTS")[:180])
+        elif "NEXUS_NO_RUSSIAN_VOICE" in (result.stdout or ""):
+            print("Астра: русский голос Windows не найден. Установи русский голосовой пакет: Параметры → Время и язык → Речь.")
+    except Exception as exc:
+        print("Астра: ошибка голосового ответа:", str(exc)[:180])
 
+
+def find_wake_word(phrase):
+    """Recognize Astra even when Whisper slightly distorts the wake word."""
+    import difflib
+    import re
+    normalized = str(phrase or "").casefold().replace("ё", "е")
+    tokens = list(re.finditer(r"[a-zа-я]+", normalized))
+    if not tokens:
+        return None
+    index = 0
+    while index < len(tokens) and tokens[index].group(0) in {"а", "ну", "эй"}:
+        index += 1
+    if index >= len(tokens):
+        return None
+    first = tokens[index]
+    word = first.group(0)
+    aliases = {"астра", "астро", "астан", "астар", "остра", "острат", "астрат", "астраа", "astra"}
+    matched = word in aliases or (
+        4 <= len(word) <= 7 and
+        difflib.SequenceMatcher(None, word, "астра").ratio() >= 0.72
+    )
+    if matched:
+        return first.end()
+    if index + 1 < len(tokens) and word == "ас" and tokens[index + 1].group(0) == "тра":
+        return tokens[index + 1].end()
+    return None
+
+
+def local_voice_command(text):
 def local_voice_command(text):
     """Small, allowlisted Russian command interpreter for the local wake-word listener."""
     import re
@@ -1210,11 +1281,13 @@ def local_voice_command(text):
     s = re.sub(r"^(?:пожалуйста|ну|давай|ка|бы)\s+", "", s)
     # Исправляем частые ошибки Whisper в коротких голосовых командах.
     s = re.sub(r"^(?:подкрой|покрой|вткрой|аткрой|отрой|отройте|откройка|откройте)\s+", "открой ", s)
-    s = re.sub(r"^(?:запусти ка|запустика)\\s+", "запусти ", s)
-    s = re.sub(r"^(?:включи ка|включика)\\s+", "включи ", s)
-    s = re.sub(r"^(?:закройка)\\s+", "закрой ", s)
+    s = re.sub(r"^(?:запусти ка|запустика)\s+", "запусти ", s)
+    s = re.sub(r"^(?:включи ка|включика)\s+", "включи ", s)
+    s = re.sub(r"^(?:закройка)\s+", "закрой ", s)
+    if s in {"ротик только", "откройтил тук", "акрой тек ток", "открой киптокрой"}:
+        s = "открой тикток"
     if s.startswith(("открой ", "запусти ", "включи ")):
-        s = re.sub(r"\b(?:вток|ток ток|тик ток|ткток|к доку|к ток|кдоку|доку)\b", "тикток", s)
+        s = re.sub(r"\b(?:вток|ток ток|тик ток|ткток|к доку|к ток|кдоку|доку|только)\b", "тикток", s)
     # Whisper иногда склеивает имя помощника со следующим словом.
     s = re.sub(r"^(?:ткоидик|ткоидик док|тиктоидик док)$", "открой тикток", s)
     if any(x in s for x in ("скриншот","снимок экрана","сфотографируй экран")):
@@ -1301,9 +1374,27 @@ def start_local_wake_listener():
                     best_of=1,
                     temperature=0,
                     condition_on_previous_text=False,
-                    vad_filter=False,
+                    vad_filter=True,
+                    vad_parameters={
+                        "threshold": 0.58,
+                        "min_speech_duration_ms": 250,
+                        "min_silence_duration_ms": 350,
+                        "speech_pad_ms": 180,
+                    },
                 )
-                return " ".join(segment.text.strip() for segment in segments).strip()
+                accepted = []
+                for segment in segments:
+                    text_part = segment.text.strip()
+                    if not text_part:
+                        continue
+                    if getattr(segment, "no_speech_prob", 0.0) > 0.62:
+                        continue
+                    if getattr(segment, "avg_logprob", 0.0) < -1.15:
+                        continue
+                    if getattr(segment, "compression_ratio", 0.0) > 2.6:
+                        continue
+                    accepted.append(text_part)
+                return " ".join(accepted).strip()
 
             pending_confirmation = None
             noise_floor = 0.0008
@@ -1355,9 +1446,14 @@ def start_local_wake_listener():
                             if not phrase:
                                 continue
                             print("Whisper услышал:", phrase)
-                            normalized = phrase.casefold().replace("ё", "е")
-                            wake = re.search(r"\b(?:астра|астро|ас тра|astra)\b", normalized)
-                            if not wake:
+                            wake_end = find_wake_word(phrase)
+                            if wake_end is None:
+                                continue
+                            command_text = phrase[wake_end:].strip(" ,.!?;:-")
+                            if not command_text:
+                                print("Астра активна. Скажи команду после слова «Астра».")
+                                speak_local("Я слушаю.")
+                                continue
                                 continue
                             command_text = phrase[wake.end():].strip(" ,.!?;:-")
                             if not command_text:
@@ -1374,17 +1470,20 @@ def start_local_wake_listener():
                                 elif re.search(r"\b(отмена|отмени|не надо|нет)\b", command_text.casefold()):
                                     pending_confirmation = None
                                     print("Астра: действие отменено.")
+                                    speak_local("Хорошо, отменяю.")
                                     continue
                                 else:
                                     pending_confirmation = None
                                     print("Астра: предыдущее действие отменено — подтверждение не получено.")
-                                    command = local_voice_command(phrase)
+                                    speak_local("Подтверждение не получено. Действие отменено.")
+                                    command = local_voice_command(command_text)
                                     if not command:
                                         continue
                             else:
-                                command = local_voice_command(phrase)
+                                command = local_voice_command(command_text)
                                 if not command:
                                     print("Астра: не поняла команду. Попробуй сказать короче.")
+                                    speak_local("Не поняла команду. Повтори, пожалуйста.")
                                     continue
 
                             protected = {"shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_app", "close_all_apps", "uninstall_app"}
@@ -1392,11 +1491,14 @@ def start_local_wake_listener():
                                 pending_confirmation = command
                                 print("Астра: это действие может закрыть программы или повлиять на данные.")
                                 print("Для выполнения скажи: «Астра, подтверждаю». Для отмены: «Астра, отмена».")
+                                speak_local("Это действие требует подтверждения. Скажи: Астра, подтверждаю.")
                                 continue
                             print("Локальная голосовая команда:", phrase, "->", command["action"])
                             try:
                                 result = execute(command)
-                                print("NEXUS:", result.get("result", "Готово"))
+                                reply = str(result.get("result", "Готово"))
+                                print("NEXUS:", reply)
+                                speak_local(reply)
                             except Exception as exc:
                                 print("NEXUS: команда не выполнена:", str(exc)[:300])
         except ImportError as exc:
@@ -1436,7 +1538,13 @@ def main():
             print("HTTP", exc.code, "— проверь PC_AGENT_TOKEN в Render и agent-config.json")
             time.sleep(8)
         except Exception as exc:
-            print("Связь недоступна:", str(exc)[:250])
+            message = str(exc)[:250]
+            if getattr(exc, "winerror", None) == 10013 or "WinError 10013" in message:
+                print("Связь с NEXUS заблокирована Windows (WinError 10013). Проверь брандмауэр/антивирус; повтор через 30 секунд.")
+                time.sleep(30)
+            else:
+                print("Связь недоступна:", message)
+                time.sleep(12)
             time.sleep(8)
 
 if __name__ == "__main__":
