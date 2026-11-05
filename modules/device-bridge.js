@@ -80,6 +80,12 @@ function queueVoiceAction(action, args, userId, chatId) {
       throw new Error("Название приложения для Microsoft Store некорректно.");
     }
     args.query = query;
+  } else if (action === "uninstall_app") {
+    const name = String(args.app || "").trim();
+    if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения для удаления некорректно.");
+    args = { app: name };
+  } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"].includes(action)) {
+    args = {};
   } else if (action === "open_store") {
     args = {};
   } else if (action === "open_url") {
@@ -116,6 +122,26 @@ function requestVoiceStoreInstallConfirmation(ctx, query) {
   pending.set(id, { action: "install_store_app", args: { query: safeQuery }, userId: String(ctx.from.id), chatId: ctx.chat.id });
   const keyboard = new InlineKeyboard().text("✅ Да, установить", "pc_yes:" + id).text("❌ Отмена", "pc_no:" + id);
   return ctx.reply("📦 Подтверди установку приложения из Microsoft Store:\n\n<b>" + safeText(safeQuery, 80).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) + "</b>\n\nПосле подтверждения NEXUS запустит установку на этом ПК и попробует открыть приложение.", { parse_mode: "HTML", reply_markup: keyboard });
+}
+
+
+function requestVoicePcConfirmation(ctx, action, args, description) {
+  if (!authorized(ctx)) throw new Error("Управление ПК доступно только владельцу.");
+  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app"]);
+  if (!allowed.has(action)) throw new Error("Это действие нельзя запросить через подтверждение.");
+  if (action === "uninstall_app") {
+    const name = String(args.app || "").trim();
+    if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения для удаления некорректно.");
+    args = { app: name };
+  } else args = {};
+  if (!TOKEN || TOKEN.length < 32) throw new Error("Мост ПК не настроен в Render.");
+  const device = devices.get("windows-main");
+  if (!device || Date.now() - device.lastSeen > 45000) throw new Error("ПК не подключён. Сначала запусти NEXUS Agent на Windows.");
+  const id = crypto.randomUUID();
+  pending.set(id, { action, args, userId: String(ctx.from.id), chatId: ctx.chat.id });
+  const keyboard = new InlineKeyboard().text("✅ Подтвердить", "pc_yes:" + id).text("❌ Отмена", "pc_no:" + id);
+  const safe = safeText(description, 140).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  return ctx.reply("⚠️ Подтверди действие на компьютере:\n\n<b>" + safe + "</b>", { parse_mode: "HTML", reply_markup: keyboard });
 }
 
 function installDeviceBridge(bot) {
@@ -440,4 +466,4 @@ async function handleDeviceHttp(req, res) {
   return true;
 }
 
-module.exports = { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation };
+module.exports = { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation };
