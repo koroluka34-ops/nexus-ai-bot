@@ -270,20 +270,22 @@ def start_webrtc_stream(cfg, offer):
                     print("WebRTC режим: до 854x480 на ПК / 720x405 на телефоне, цель 30 FPS")
 
                 async def next_timestamp(self):
-                    # 30 FPS: стабильный тайминг без накопления очереди старых кадров.
+                    # 30 FPS с пропуском опоздавших слотов: не выдаём пачку кадров
+                    # подряд после медленного захвата/кодирования.
                     import fractions
+                    now = time.monotonic()
                     if self.video_started is None:
-                        self.video_started = time.monotonic()
+                        self.video_started = now
                         self.video_pts = 0
                     else:
                         self.video_pts += 3000  # 90000 / 30 FPS
                         target = self.video_started + self.video_pts / 90000
-                        delay = target - time.monotonic()
+                        delay = target - now
                         if delay > 0:
                             await asyncio.sleep(delay)
-                        elif delay < -0.15:
-                            # Не пытаемся догонять пропущенные кадры серией.
-                            self.video_started = time.monotonic() - self.video_pts / 90000
+                        else:
+                            missed = int((-delay) / (1 / 30)) + 1
+                            self.video_pts += missed * 3000
                     return self.video_pts, fractions.Fraction(1, 90000)
 
                 async def recv(self):
@@ -347,12 +349,41 @@ def start_webrtc_stream(cfg, offer):
             pc.addTrack(screen_track)
 
             held_keys, held_buttons = set(), set()
+            cursor_target = None
+
+            async def smooth_remote_cursor():
+                # Сглаживаем абсолютные координаты, чтобы курсор не прыгал
+                # между редкими touch-событиями телефона.
+                import ctypes
+                from ctypes import wintypes
+                class CursorPoint(ctypes.Structure):
+                    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+                point = CursorPoint()
+                user32 = ctypes.windll.user32
+                while True:
+                    try:
+                        target = cursor_target
+                        if target is not None and user32.GetCursorPos(ctypes.byref(point)):
+                            dx, dy = target[0] - point.x, target[1] - point.y
+                            if abs(dx) <= 1 and abs(dy) <= 1:
+                                user32.SetCursorPos(target[0], target[1])
+                            else:
+                                user32.SetCursorPos(
+                                    int(point.x + dx * 0.45),
+                                    int(point.y + dy * 0.45)
+                                )
+                    except Exception as cursor_smooth_exc:
+                        print("Ошибка сглаживания курсора:", repr(cursor_smooth_exc))
+                    await asyncio.sleep(1 / 60)
+
+            cursor_smooth_task = asyncio.create_task(smooth_remote_cursor())
+
             @pc.on("datachannel")
             def on_datachannel(channel):
                 print("WebRTC канал управления открыт:", channel.label)
                 @channel.on("message")
                 def on_control_message(message):
-                    nonlocal cursor_visible, mobile_client
+                    nonlocal cursor_visible, mobile_client, cursor_target
                     try:
                         if isinstance(message, bytes):
                             message = message.decode("utf-8")
@@ -374,8 +405,7 @@ def start_webrtc_stream(cfg, offer):
                             ny = max(0.0, min(1.0, float(data.get("y", 0))))
                             px = int(monitor.get("left", 0) + nx * max(0, monitor["width"] - 1))
                             py = int(monitor.get("top", 0) + ny * max(0, monitor["height"] - 1))
-                            import ctypes
-                            ctypes.windll.user32.SetCursorPos(px, py)
+                            cursor_target = (px, py)
                             return
                         if kind == "move":
                             dx, dy = int(data.get("dx", 0)), int(data.get("dy", 0))
