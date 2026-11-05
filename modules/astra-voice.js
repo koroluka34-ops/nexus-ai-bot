@@ -90,7 +90,7 @@ async function selectPreview(ctx) {
 
   const selected = previews[n - 1];
   await ctx.reply("Сохраняю выбранный голос Астры…");
-  await request(API + "/text-to-voice", {
+  const createdVoice = await request(API + "/text-to-voice", {
     voice_name: "Астра",
     voice_description: DESCRIPTION,
     generated_voice_id: selected.generated_voice_id,
@@ -101,7 +101,8 @@ async function selectPreview(ctx) {
   });
 
   const state = await readState();
-  state.voice_id = selected.generated_voice_id;
+  state.voice_id = createdVoice.voice_id || createdVoice.voice?.voice_id; 
+  if (!state.voice_id) throw new Error("Голос создан, но сервис не вернул voice_id.");
   state.voice_name = "Астра";
   await writeState(state);
   await ctx.reply("❤️ Голос Астры сохранён! Теперь /say текст озвучивается выбранным голосом.");
