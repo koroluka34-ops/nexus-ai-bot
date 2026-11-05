@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-17"
+AGENT_VERSION = "2026.11.05-voice-pc-18"
 import base64
 import json
 import os
@@ -177,6 +177,46 @@ $lines | Select-Object -First 85
             detail = (proc.stderr or output or "неизвестная ошибка").strip()
             raise RuntimeError("Windows UI Automation: " + detail[-700:])
         return {"result": output[:5000] or "Windows не вернула список элементов. Открой TurboVPN и повтори проверку."}
+
+    if action == "pc_info":
+        import psutil
+        battery = None
+        try:
+            b = psutil.sensors_battery()
+            if b is not None: battery = {"percent": round(b.percent), "plugged": bool(b.power_plugged)}
+        except Exception: pass
+        mem = psutil.virtual_memory()
+        disks = []
+        for part in psutil.disk_partitions(all=False):
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+                disks.append({"drive": part.device, "free_gb": round(usage.free / (1024**3), 1), "total_gb": round(usage.total / (1024**3), 1)})
+            except Exception: pass
+        cpu = psutil.cpu_percent(interval=0.25)
+        lines = ["CPU: " + str(cpu) + "%", "ОЗУ: " + str(round(mem.percent)) + "% (" + str(round(mem.used/(1024**3),1)) + "/" + str(round(mem.total/(1024**3),1)) + " ГБ)"]
+        if battery: lines.append("Батарея: " + str(battery["percent"]) + "%" + (" (заряжается)" if battery["plugged"] else ""))
+        if disks: lines.append("Диски: " + "; ".join(x["drive"] + " свободно " + str(x["free_gb"]) + " из " + str(x["total_gb"]) + " ГБ" for x in disks[:4]))
+        return {"result": " | ".join(lines)}
+    if action == "media_control":
+        command = str(args.get("command", "")).lower()
+        keys = {"play_pause": 0xB3, "next": 0xB0, "previous": 0xB1, "stop": 0xB2}
+        if command not in keys: raise ValueError("Неизвестная команда медиаплеера.")
+        import ctypes
+        from ctypes import wintypes
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+        class INPUTUNION(ctypes.Union): _fields_ = [("ki", KEYBDINPUT), ("padding", ctypes.c_byte * 32)]
+        class INPUT(ctypes.Structure): _fields_ = [("type", wintypes.DWORD), ("union", INPUTUNION)]
+        inp = INPUT(); inp.type = 1; inp.union.ki = KEYBDINPUT(keys[command], 0, 0, 0, 0)
+        ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT))
+        return {"result": {"play_pause":"Пауза/воспроизведение","next":"Следующий трек","previous":"Предыдущий трек","stop":"Остановка"}[command] + " выполнено."}
+    if action == "show_desktop":
+        import ctypes
+        ctypes.windll.user32.keybd_event(0x5B, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(0x44, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(0x44, 0, 2, 0)
+        ctypes.windll.user32.keybd_event(0x5B, 0, 2, 0)
+        return {"result": "Рабочий стол показан."}
     if action == "screenshot":
         import pyautogui
         shot = pyautogui.screenshot()
@@ -1158,12 +1198,97 @@ def webrtc_offer_listener(cfg):
             time.sleep(3)
 
 
+
+def local_voice_command(text):
+    """Small, allowlisted Russian command interpreter for the local wake-word listener."""
+    import re
+    s = str(text or "").casefold().replace("ё","е").strip()
+    s = re.sub(r"[^a-zа-я0-9% ]+", " ", s)
+    s = re.sub(r"\\s+", " ", s).strip()
+    s = re.sub(r"^(?:а\s+)?(?:астра|астро|ас тра|astra)\\s*", "", s).strip()
+    if not s: return None
+    s = re.sub(r"^(?:пожалуйста|ну|давай|ка|бы)\\s+", "", s)
+    if any(x in s for x in ("скриншот","снимок экрана","сфотографируй экран")):
+        return {"action":"screenshot","args":{}}
+    if any(x in s for x in ("сколько батареи","заряд батареи","батарея","информация о компьютере","информация о пк","сколько оперативки","свободное место")):
+        return {"action":"pc_info","args":{}}
+    if any(x in s for x in ("покажи рабочий стол","сверни все окна","свернуть все окна")):
+        return {"action":"show_desktop","args":{}}
+    if any(x in s for x in ("пауза","продолжи видео","воспроизведение","включи видео")):
+        return {"action":"media_control","args":{"command":"play_pause"}}
+    if "следующ" in s and any(x in s for x in ("трек","песн","видео")):
+        return {"action":"media_control","args":{"command":"next"}}
+    if any(x in s for x in ("предыдущ","прошл")) and any(x in s for x in ("трек","песн","видео")):
+        return {"action":"media_control","args":{"command":"previous"}}
+    vol = re.search(r"(?:громкост|звук).{0,25}?(?:на|до)\\s*(\\d{1,3})\\s*%?", s)
+    if not vol: vol = re.search(r"(?:установи|поставь|сделай).{0,20}?(\\d{1,3})\\s*%?", s)
+    if vol:
+        n=int(vol.group(1))
+        if 0<=n<=100: return {"action":"set_volume","args":{"mode":"set","percent":n}}
+    for verb in ("открой","запусти","включи"):
+        if s.startswith(verb+" "):
+            app=s[len(verb):].strip()
+            app=re.sub(r"^(?:приложение|программу|браузер)\\s+","",app)
+            if app: return {"action":"open_app","args":{"app":app}}
+    if s.startswith("закрой "):
+        app=s[6:].strip()
+        if app: return {"action":"close_app","args":{"app":app}}
+    if any(x in s for x in ("выключи компьютер","заверши работу")): return {"action":"shutdown_pc","args":{}}
+    if any(x in s for x in ("перезагрузи компьютер","перезагрузка")): return {"action":"restart_pc","args":{}}
+    if any(x in s for x in ("усыпи компьютер","спящий режим","отправь компьютер спать")): return {"action":"sleep_pc","args":{}}
+    if any(x in s for x in ("заблокируй компьютер","блокировка компьютера")): return {"action":"lock_pc","args":{}}
+    return None
+
+def start_local_wake_listener():
+    """Use Windows built-in SAPI speech recognition; no audio is sent to Telegram/Render."""
+    ps = r"""
+$ErrorActionPreference = 'Stop'
+try {
+  Add-Type -AssemblyName System.Speech
+  $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
+  $engine.SetInputToDefaultAudioDevice()
+  $grammar = New-Object System.Speech.Recognition.DictationGrammar
+  $engine.LoadGrammar($grammar)
+  $engine.InitialSilenceTimeout = [TimeSpan]::FromSeconds(5)
+  $engine.BabbleTimeout = [TimeSpan]::FromSeconds(2)
+  $engine.SpeechRecognized.Add({
+    param($sender, $event)
+    $phrase = [string]$event.Result.Text
+    if ($phrase) { [Console]::Out.WriteLine($phrase); [Console]::Out.Flush() }
+  })
+  $engine.RecognizeAsync([System.Speech.Recognition.RecognizeMode]::Multiple)
+  while ($true) { Start-Sleep -Seconds 1 }
+} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 2 }
+"""
+    def worker():
+        try:
+            proc = subprocess.Popen(["powershell.exe","-NoProfile","-NonInteractive","-Command",ps],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1)
+            print("Голосовая активация: скажи «Астра» и команду. Микрофон обрабатывается локально.")
+            for line in proc.stdout:
+                phrase = line.strip()
+                if not phrase: continue
+                command = local_voice_command(phrase)
+                if not command:
+                    continue
+                print("Локальная голосовая команда:", phrase, "->", command["action"])
+                try:
+                    result = execute(command)
+                    print("NEXUS:", result.get("result","Готово"))
+                except Exception as exc:
+                    print("NEXUS: команда не выполнена:", str(exc)[:300])
+        except Exception as exc:
+            print("Голосовой режим не запустился:", repr(exc))
+            print("Проверь, установлен ли в Windows русский пакет распознавания речи.")
+    threading.Thread(target=worker, daemon=True).start()
+
 def main():
     cfg = load_config()
     print("NEXUS Agent", AGENT_VERSION, "| файл:", __file__)
     print("NEXUS Agent подключается к", cfg["server"])
     print("Остановка: Ctrl+C. Агент не принимает произвольные shell-команды.")
     threading.Thread(target=webrtc_offer_listener, args=(cfg,), daemon=True).start()
+    start_local_wake_listener()
     print("Проверка WebRTC запущена отдельно от команд.")
     while True:
         try:
