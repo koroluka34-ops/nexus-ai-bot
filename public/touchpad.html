@@ -68,12 +68,12 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
 (()=>{
  const tg=window.Telegram?.WebApp,status=document.getElementById('status'),pad=document.getElementById('pad'),initData=tg?.initData||'',video=document.getElementById('liveVideo'),screenState=document.getElementById('screenState');
  if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0b1020');tg.setBackgroundColor('#0b1020');}
- let sensitivity=1.5;const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0,moveChannel=null;
+ let sensitivity=1.5;const pointers=new Map();let primary=null,start=null,moved=false,moveX=0,moveY=0,raf=0,sendingMove=false,pendingMoveX=0,pendingMoveY=0,moveChannel=null,movementChannel=null;
  function sendMoveFast(dx,dy){
   // Камера требует частого относительного движения; DataChannel отправляет
   // его напрямую агенту, без задержки HTTP-поллинга.
-  if(moveChannel&&moveChannel.readyState==='open'&&moveChannel.bufferedAmount<16384){
-   moveChannel.send(JSON.stringify({type:'move',dx,dy}));return true;
+  if(movementChannel&&movementChannel.readyState==='open'&&movementChannel.bufferedAmount<2048){
+   movementChannel.send(JSON.stringify({type:'move',dx,dy}));return true;
   }
   return false;
  }
@@ -89,8 +89,12 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
  const sessionId=crypto.randomUUID();
  const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
  moveChannel=pc.createDataChannel('nexus-input');
- moveChannel.onopen=()=>{status.textContent='🟢 ПК управляется · быстрое управление';};
+ movementChannel=pc.createDataChannel('nexus-move',{ordered:false,maxRetransmits:0});
+ const mobileClient=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.matchMedia('(pointer:coarse)').matches;
+ moveChannel.onopen=()=>{status.textContent='🟢 ПК управляется · быстрое управление';if(mobileClient)moveChannel.send(JSON.stringify({type:'client-profile',profile:'mobile'}));};
  moveChannel.onclose=()=>{status.textContent='Видео подключено · резервное управление';};
+ movementChannel.onopen=()=>{};
+ movementChannel.onclose=()=>{};
  moveChannel.onerror=()=>{status.textContent='Ошибка канала управления';};
  pc.addTransceiver('video',{direction:'recvonly'});
  let renderedFrames=0,frameWatchStarted=false;
