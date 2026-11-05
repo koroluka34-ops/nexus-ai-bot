@@ -1270,7 +1270,6 @@ def find_wake_word(phrase):
 
 
 def local_voice_command(text):
-def local_voice_command(text):
     """Small, allowlisted Russian command interpreter for the local wake-word listener."""
     import re
     s = str(text or "").casefold().replace("ё","е").strip()
@@ -1454,12 +1453,6 @@ def start_local_wake_listener():
                                 print("Астра активна. Скажи команду после слова «Астра».")
                                 speak_local("Я слушаю.")
                                 continue
-                                continue
-                            command_text = phrase[wake.end():].strip(" ,.!?;:-")
-                            if not command_text:
-                                print("Астра активна. Скажи команду после слова «Астра».")
-                                continue
-
                             confirmed = False
                             if pending_confirmation:
                                 if re.search(r"\b(подтверждаю|да подтверждаю|выполняй)\b", command_text.casefold()):
@@ -1545,7 +1538,6 @@ def main():
             else:
                 print("Связь недоступна:", message)
                 time.sleep(12)
-            time.sleep(8)
 
 if __name__ == "__main__":
     try: main()
