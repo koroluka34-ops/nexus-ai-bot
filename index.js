@@ -4280,7 +4280,7 @@ bot.on("message:voice", async ctx => {
 
       // Volume intent has priority over generic install verbs such as «установи».
       // Accept natural Russian word order, optional PC references, and omitted units.
-      const volumeContext = /(?:громкост\w*|звук)/iu.test(spoken);
+      const volumeContext = /(?:громкост\w*|звук|громче|тише|потише)/iu.test(spoken);
       const volumeSetMatch = volumeContext && spoken.match(/(?:громкост\w*|звук).*?(\d{1,3})\s*(?:%|процент\w*)?/iu);
       const volumeUp = /(?:повыс\w*|увелич\w*|прибав\w*|добав\w*|подними|сделай\s+громче|громче)/iu.test(spoken);
       const volumeDown = /(?:уменьш\w*|убав\w*|пониз\w*|сделай\s+тише|потише|тише)/iu.test(spoken);
@@ -4296,10 +4296,9 @@ bot.on("message:voice", async ctx => {
           action = "set_volume";
           args = { mode: "set", percent };
         }
-      } else if (volumeContext && /(?:установи|установить|поставь|поставить|выстави|сделай|добавь)/iu.test(spoken)) {
-        // ASR may omit the numeric value: don't accidentally interpret this as app install.
-        action = null;
       }
+      const wantsVolumeValue = volumeContext && !volumeSetMatch && !volumeUp && !volumeDown &&
+        /(?:установи|установить|поставь|поставить|выстави|сделай)/iu.test(spoken);
 
       const isShutdown = /(?:выключи|выключить|выруби|вырубить|отключи|отключить|заверши\s+работу|погаси)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken)
         || /(?:заверши|завершить)\s+работу/iu.test(spoken);
@@ -4352,7 +4351,7 @@ bot.on("message:voice", async ctx => {
           action = "open_url";
           args = { url: "https://www.youtube.com/results?search_query=" + encodeURIComponent(query) };
         }
-      } else if (isDownload) {
+      } else if (isDownload && !volumeContext) {
         const query = searchTail();
         if (query) {
           action = "install_app";
@@ -4391,6 +4390,12 @@ bot.on("message:voice", async ctx => {
           args = { app: appName };
         }
       }
+      if (wantsVolumeValue && !action) {
+        await ctx.api.editMessageText(ctx.chat.id, status.message_id,
+          "🔊 Уточни уровень громкости: скажи, например, «установи громкость на 25 процентов» или «повысить на 10 процентов».").catch(() => {});
+        return;
+      }
+
       // Deterministic commands are already understood: skip the slower AI call.
       // Use semantic interpretation only as a fallback for unclear/noisy phrases.
       if (!action) {
