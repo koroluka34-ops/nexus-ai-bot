@@ -158,7 +158,14 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  screenWrap.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('game-mode'))return;if(e.target.closest('#gamePanel,#gameButton'))return;if(remoteCursorVisible){sendAbsoluteCursor(e.clientX,e.clientY);return;}if(gameLookPointer!==null)return;gameLookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{screenWrap.setPointerCapture(e.pointerId);}catch{}e.preventDefault();sendRealtime({type:'game-mouse',button:'right',state:'down'},{type:'game-mouse',button:'right',state:'down'});});
  screenWrap.addEventListener('pointermove',e=>{if(remoteCursorVisible){sendAbsoluteCursor(e.clientX,e.clientY);return;}if(e.pointerId!==gameLookPointer)return;e.preventDefault();const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;queueMove(dx,dy);});
  function endGameLook(e){if(e.pointerId===gameLookPointer){gameLookPointer=null;sendRealtime({type:'game-mouse',button:'right',state:'up'},{type:'game-mouse',button:'right',state:'up'});}}
- screenWrap.addEventListener('pointerup',endGameLook);screenWrap.addEventListener('pointercancel',endGameLook);
+ screenWrap.addEventListener('pointerup',e=>{
+  if(remoteCursorVisible&&document.body.classList.contains('game-mode')&&!e.target.closest('#gamePanel,#gameButton,#fullscreenButton')){
+   sendAbsoluteCursor(e.clientX,e.clientY);
+   sendRealtime({type:'game-click',button:'left'},{type:'click',button:'left'});
+  }
+  endGameLook(e);
+ });
+ screenWrap.addEventListener('pointercancel',endGameLook);
  function sendRealtime(payload,fallback){
   // Удержание ПКМ/ЛКМ отправляем через тот же быстрый WebRTC-канал,
   // что и движение камеры: HTTP-поллинг мог доставить отпускание позже движения.
