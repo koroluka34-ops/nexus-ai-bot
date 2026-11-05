@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-3"
+AGENT_VERSION = "2026.11.05-voice-pc-4"
 import base64
 import json
 import os
@@ -196,6 +196,48 @@ def execute(command):
         store_uri = "ms-windows-store://search/?query=" + quote(query)
         subprocess.Popen(["explorer.exe", store_uri], shell=False)
         return {"result": "Microsoft Store открыт. Поиск приложения: " + query + ". Нажми «Получить» или «Установить» в самом Store."}
+    if action == "install_store_app":
+        app_name = str(args.get("query", "")).strip()
+        if not app_name or len(app_name) > 80 or any(ch in app_name for ch in '\\\\/:*?"<>|'):
+            raise ValueError("Недопустимое название приложения.")
+        winget = __import__("shutil").which("winget")
+        if not winget:
+            raise RuntimeError("На компьютере не найден winget. Обнови или установи «Установщик приложений» (App Installer) из Microsoft Store.")
+        print("Поиск точного приложения в Microsoft Store через winget:", app_name)
+        try:
+            proc = subprocess.run(
+                [winget, "install", "--name", app_name, "--source", "msstore", "--exact",
+                 "--accept-source-agreements", "--accept-package-agreements"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=900, shell=False
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Установка не завершилась за 15 минут. Проверь Microsoft Store и подключение к интернету.")
+        output = ((proc.stdout or "") + "\\n" + (proc.stderr or "")).strip()
+        if proc.returncode != 0:
+            detail = output[-1200:] if output else "winget завершился с кодом " + str(proc.returncode)
+            raise RuntimeError("Не удалось установить «" + app_name + "» из Microsoft Store. " + detail)
+        print("Установка завершена. Ищу ярлык приложения для запуска:", app_name)
+        roots = [
+            Path.home() / "AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
+            Path(os.environ.get("PROGRAMDATA", r"C:\\ProgramData")) / "Microsoft/Windows/Start Menu/Programs",
+        ]
+        shortcuts = []
+        for root in roots:
+            if root.is_dir():
+                try:
+                    shortcuts.extend(p for p in root.rglob("*.lnk") if p.is_file())
+                except OSError:
+                    pass
+        exact = [p for p in shortcuts if p.stem.casefold() == app_name.casefold()]
+        partial = [p for p in shortcuts if app_name.casefold() in p.stem.casefold()]
+        matches = exact or partial
+        if len(matches) == 1:
+            os.startfile(str(matches[0]))
+            return {"result": "Приложение «" + app_name + "» установлено и запущено."}
+        if len(matches) > 1:
+            return {"result": "Приложение «" + app_name + "» установлено, но найдено несколько ярлыков. Открой его через меню «Пуск»."}
+        return {"result": "Приложение «" + app_name + "» установлено. Ярлык для автоматического запуска не найден — открой его через меню «Пуск»."}
     if action == "open_url":
         url = args.get("url", "")
         if not url.startswith(("https://", "http://")): raise ValueError("URL rejected")
