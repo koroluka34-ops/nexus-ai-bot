@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-roblox-scancode"
+AGENT_VERSION = "2026.11.05-nexus-optimized-1"
 import base64
 import json
 import os
@@ -266,67 +266,67 @@ def start_webrtc_stream(cfg, offer):
                     self.video_started = None
                     self.video_pts = 0
                     print("WebRTC монитор:", self.monitor.get("width"), "x", self.monitor.get("height"))
-                    print("WebRTC режим: 854x480, цель до 60 FPS")
+                    print("WebRTC режим: до 960x540, цель 30 FPS (меньше нагрузка, чётче 480p)")
 
                 async def next_timestamp(self):
-                    # До 100 FPS: фиксированный шаг RTP timestamp, без очереди старых кадров.
+                    # 30 FPS: стабильный тайминг без накопления очереди старых кадров.
                     import fractions
                     if self.video_started is None:
                         self.video_started = time.monotonic()
                         self.video_pts = 0
                     else:
-                        self.video_pts += 1500  # 90000 / 60 FPS
+                        self.video_pts += 3000  # 90000 / 30 FPS
                         target = self.video_started + self.video_pts / 90000
-                        await asyncio.sleep(max(0, target - time.monotonic()))
+                        delay = target - time.monotonic()
+                        if delay > 0:
+                            await asyncio.sleep(delay)
+                        elif delay < -0.15:
+                            # Не пытаемся догонять пропущенные кадры серией.
+                            self.video_started = time.monotonic() - self.video_pts / 90000
                     return self.video_pts, fractions.Fraction(1, 90000)
 
                 async def recv(self):
                     try:
                         pts, time_base = await self.next_timestamp()
-                        # MSS capture may block; run it outside the asyncio event loop.
+                        # Захват вне event loop; создаём RGB напрямую, избегая лишних
+                        # BGRA -> BGR -> RGB преобразований и повторной упаковки PIL.
                         raw = await asyncio.to_thread(self.capture.grab, self.monitor)
-                        shot = np.array(raw)[:, :, :3]
-                        height, width = shot.shape[:2]
-                        scale = min(1.0, 854 / width, 480 / height)
+                        from PIL import Image, ImageDraw
+                        rgb_image = Image.frombytes("RGB", raw.size, raw.rgb)
+                        width, height = rgb_image.size
+                        scale = min(1.0, 960 / width, 540 / height)
                         if scale < 1.0:
-                            from PIL import Image
-                            shot = np.array(Image.fromarray(shot[:, :, ::-1]).resize((int(width * scale), int(height * scale))))[:, :, ::-1]
+                            out_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+                            rgb_image = rgb_image.resize(out_size, Image.Resampling.BILINEAR)
 
-                        # MSS does not include the Windows pointer in screen captures.
-                        # Draw a small visible pointer into each outgoing video frame.
+                        # Рисуем указатель в том же RGB-буфере, без второго PIL/NumPy цикла.
                         try:
                             import ctypes
                             from ctypes import wintypes
-                            from PIL import Image, ImageDraw
                             class CursorPoint(ctypes.Structure):
                                 _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
                             cursor = CursorPoint()
                             if cursor_visible and ctypes.windll.user32.GetCursorPos(ctypes.byref(cursor)):
                                 cx = int((cursor.x - int(self.monitor.get("left", 0))) * scale)
                                 cy = int((cursor.y - int(self.monitor.get("top", 0))) * scale)
-                                if 0 <= cx < shot.shape[1] and 0 <= cy < shot.shape[0]:
-                                    rgb_image = Image.fromarray(shot[:, :, ::-1])
+                                if 0 <= cx < rgb_image.width and 0 <= cy < rgb_image.height:
                                     draw = ImageDraw.Draw(rgb_image)
                                     k = max(0.8, scale)
-                                    pointer = [
-                                        (cx, cy),
-                                        (cx, cy + int(17 * k)),
-                                        (cx + int(4 * k), cy + int(13 * k)),
-                                        (cx + int(8 * k), cy + int(21 * k)),
-                                        (cx + int(11 * k), cy + int(19 * k)),
-                                        (cx + int(7 * k), cy + int(12 * k)),
-                                        (cx + int(14 * k), cy + int(12 * k)),
-                                    ]
-                                    draw.polygon(pointer, fill=(255, 255, 255), outline=(0, 0, 0), width=2)
-                                    shot = np.array(rgb_image)[:, :, ::-1]
+                                    pointer = [(cx, cy), (cx, cy + int(17*k)),
+                                        (cx + int(4*k), cy + int(13*k)),
+                                        (cx + int(8*k), cy + int(21*k)),
+                                        (cx + int(11*k), cy + int(19*k)),
+                                        (cx + int(7*k), cy + int(12*k)),
+                                        (cx + int(14*k), cy + int(12*k))]
+                                    draw.polygon(pointer, fill=(255,255,255), outline=(0,0,0), width=2)
                         except Exception as cursor_exc:
                             if self.frames == 0:
                                 print("Не удалось нарисовать курсор в видео:", repr(cursor_exc))
 
                         self.frames += 1
-                        if self.frames == 1 or self.frames % 15 == 0:
-                            print("WebRTC кадр", self.frames, "|", shot.shape[1], "x", shot.shape[0], "| пиксели", int(shot.min()), "-", int(shot.max()))
-                        rgb = np.ascontiguousarray(shot[:, :, ::-1])
+                        if self.frames == 1 or self.frames % 30 == 0:
+                            print("WebRTC кадр", self.frames, "|", rgb_image.width, "x", rgb_image.height)
+                        rgb = np.asarray(rgb_image)
                         frame = VideoFrame.from_ndarray(rgb, format="rgb24")
                         frame.pts = pts
                         frame.time_base = time_base
