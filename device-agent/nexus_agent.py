@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-nexus-smooth-fix-1"
+AGENT_VERSION = "2026.11.05-nexus-smooth-fix-2"
 import base64
 import json
 import os
@@ -367,13 +367,18 @@ def start_webrtc_stream(cfg, offer):
                         target = cursor_target
                         if target is not None and user32.GetCursorPos(ctypes.byref(point)):
                             dx, dy = target[0] - point.x, target[1] - point.y
-                            if abs(dx) <= 1 and abs(dy) <= 1:
+                            distance = max(abs(dx), abs(dy))
+                            if distance <= 2:
                                 user32.SetCursorPos(target[0], target[1])
                             else:
-                                user32.SetCursorPos(
-                                    int(point.x + dx * 0.45),
-                                    int(point.y + dy * 0.45)
-                                )
+                                # Меньший коэффициент и ограничение шага убирают резкие скачки.
+                                step_x = max(-24, min(24, int(dx * 0.20)))
+                                step_y = max(-24, min(24, int(dy * 0.20)))
+                                if step_x == 0 and dx:
+                                    step_x = 1 if dx > 0 else -1
+                                if step_y == 0 and dy:
+                                    step_y = 1 if dy > 0 else -1
+                                user32.SetCursorPos(point.x + step_x, point.y + step_y)
                     except Exception as cursor_smooth_exc:
                         print("Ошибка сглаживания курсора:", repr(cursor_smooth_exc))
                     await asyncio.sleep(1 / 60)
