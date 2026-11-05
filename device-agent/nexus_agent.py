@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-8"
+AGENT_VERSION = "2026.11.05-voice-pc-9"
 import base64
 import json
 import os
@@ -114,6 +114,9 @@ def execute(command):
     if action == "inspect_ui":
         # Только чтение доступных имён элементов активного окна; никаких кликов/ввода.
         ps = r"""
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type @'
