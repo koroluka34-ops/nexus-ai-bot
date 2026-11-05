@@ -4106,7 +4106,7 @@ async function interpretVoiceCommand(transcript) {
   const allowed = new Set([
     "open_app", "open_folder", "open_google", "search_google",
     "open_youtube", "search_youtube", "install_app", "uninstall_app",
-    "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"
+    "close_app", "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"
   ]);
   const system = [
     "Ты — семантический парсер голосовых команд Windows-ассистента NEXUS.",
@@ -4114,6 +4114,8 @@ async function interpretVoiceCommand(transcript) {
     "Восстанови наиболее вероятный смысл фразы, а не требуй точного совпадения. Учитывай разговорные названия и транслитерацию.",
     "Примеры: «телега», «телеграм», «телеграмма» в контексте запуска приложения => open_app app=Telegram; «дискорд», «дискордик», «дискорд с ошибками» => Discord; «дискорд» написанный как «дискорд» всё равно Discord; «турбо впн», «турбовпн» => TurboVPN; «стим» => Steam; «ютуб» => YouTube.",
     "«отправ компьютер спать», «усыпи ноут», «переведи ПК в сон» => sleep_pc. «перезапусти/ребутни ноут» => restart_pc. «выруби компьютер» => shutdown_pc. «закрой всё» => close_all_apps.",
+    "«закрой Discord», «закрой приложение Telegram», «выключи Millida Launcher» => close_app с app=название приложения. Не путай закрытие одного приложения с close_all_apps.",
+    "«переведи ноут в режим блокировки», «заблокируй ноут», «поставь компьютер на блокировку» => lock_pc.",
     "Понимай любые естественные варианты: открой, запусти, включи, можешь открыть, открой-ка, пожалуйста, и похожие формы.",
     "Если сказано найти/поищи что-то в интернете — search_google; если на YouTube — search_youtube. Если сказано просто открыть Google или YouTube — open_google/open_youtube.",
     "Для установки/скачивания приложения => install_app. Для удаления => uninstall_app. Извлеки только название приложения, исправляя ASR-ошибки.",
@@ -4149,10 +4151,10 @@ async function interpretVoiceCommand(transcript) {
     const query = String(parsed.query || "").trim().slice(0, 80);
     const folders = new Set(["downloads", "desktop", "documents", "pictures", "videos", "music"]);
     const folder = String(parsed.folder || "").trim().toLowerCase();
-    if (action === "open_app" && (!app || !/^[\p{L}\p{N} ._()+'-]+$/u.test(app))) return null;
-    if ((action === "install_app" || action === "uninstall_app") && !(app || query)) return null;
+    if (["open_app", "close_app", "uninstall_app"].includes(action) && (!app || !/^[\p{L}\p{N} ._()+'-]+$/u.test(app))) return null;
+    if (action === "install_app" && !(app || query)) return null;
     if (action === "open_folder" && !folders.has(folder)) return null;
-    return { action, args: action === "open_app" || action === "uninstall_app" ? { app } :
+    return { action, args: ["open_app", "close_app", "uninstall_app"].includes(action) ? { app } :
       action === "install_app" ? { query: query || app } :
       action === "open_folder" ? { folder } : { }, confidence };
   } catch (error) {
@@ -4262,11 +4264,17 @@ bot.on("message:voice", async ctx => {
         || /(?:заверши|завершить)\s+работу/iu.test(spoken);
       const isRestart = /(?:перезагрузи|перезапусти|перезагрузить|перезапустить|ребутни|сделай\s+ребут)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)?/iu.test(spoken);
       const isSleep = /(?:спящ(?:ий|его)\s+режим|усыпи(?:ть)?|усни|отправ(?:ь|ьте)?\s+(?:(?:мне|мой)\s+)?(?:компьютер|комп|пк|ноутбук|ноут)?\s*(?:его\s+)?(?:спать|в\s+спячку)|переведи.*(?:сон|спящ)|пусть\s+(?:ноутбук|компьютер|он)\s+поспит|положи\s+(?:компьютер|ноутбук|ноут)\s+спать|(?:компьютер|комп|пк|ноутбук|ноут)\s+спать)/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер|ноутбук|ноут)?\s*в\s+сон/iu.test(spoken);
-      const isLock = /(?:заблокируй|блокируй|заблокировать|запри)\s+(?:(?:мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+блокировку/iu.test(spoken);
+      const isLock = /(?:заблокируй|блокируй|заблокировать|запри)\s+(?:(?:мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken)
+        || /(?:введи|переведи)\s+(?:(?:компьютер|ноутбук|ноут|пк)\s+)?в\s+(?:режим\s+)?блокировк/iu.test(spoken)
+        || /(?:поставь|переведи)\s+(?:компьютер|ноутбук|ноут|пк)\s+на\s+блокировк/iu.test(spoken);
       const uninstallMatch = spoken.match(/(?:удали|удалить|деинсталлируй|деинсталлировать)\s+(?:(?:приложение|программу)\s+)?(.{1,80})$/iu);
-      const cleanAppName = value => String(value || "").replace(/^(?:(?:приложение|программу)\s+)/iu, "").replace(/[.!?,]+$/g, "").trim();
+      const cleanAppName = value => String(value || "").replace(/^(?:(?:приложение|программу|окно)\s+)/iu, "").replace(/[.!?,]+$/g, "").trim();
+      const closeOneMatch = spoken.match(/(?:закрой|закрывай|закройте|заверши|завершить|закрыть|прикрой|выключи|выключить)\s+(?:(?:мне|пожалуйста)\s+)?(?:(?:приложение|программу|окно)\s+)?(.{2,80})$/iu);
       if (closeAll) {
         action = "close_all_apps";
+      } else if (closeOneMatch && closeOneMatch[1] && !/^(?:все|всё|все приложения|все программы|все окна)$/iu.test(closeOneMatch[1].trim())) {
+        action = "close_app";
+        args = { app: cleanAppName(closeOneMatch[1]) };
       } else if (isShutdown) {
         action = "shutdown_pc";
       } else if (isRestart) {
@@ -4365,14 +4373,15 @@ bot.on("message:voice", async ctx => {
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + ".").catch(() => {});
           return;
         }
-        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps"].includes(action)) {
+        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "close_app"].includes(action)) {
           const descriptions = {
             close_all_apps: "Закрыть все открытые приложения (несохранённые изменения могут быть потеряны)",
             shutdown_pc: "Выключить компьютер",
             restart_pc: "Перезагрузить компьютер",
             sleep_pc: "Перевести компьютер в спящий режим",
             lock_pc: "Заблокировать компьютер",
-            uninstall_app: "Удалить приложение «" + args.app + "»"
+            uninstall_app: "Удалить приложение «" + args.app + "»",
+            close_app: "Закрыть приложение «" + args.app + "» (несохранённые данные можно сохранить в приложении)"
           };
           await requestVoicePcConfirmation(ctx, action, args, descriptions[action]);
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение: " + descriptions[action] + ".").catch(() => {});
@@ -4380,6 +4389,7 @@ bot.on("message:voice", async ctx => {
         }
         queueVoiceAction(action, args, userId, ctx.chat.id);
         const label = action === "open_app" ? "Открываю приложение " + args.app
+          : action === "close_app" ? "Запрашиваю закрытие приложения " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
           : action === "open_store" ? "Открываю Microsoft Store"
           : args.url.includes("google.com/search?q=") ? "Ищу в Google: " + decodeURIComponent(args.url.split("q=")[1] || "")
