@@ -63,7 +63,7 @@ function queueVoiceAction(action, args, userId, chatId) {
   const appName = String(args.app || "").trim();
   const query = String(args.query || "").trim();
   const allowedFolders = new Set(["downloads", "desktop", "documents", "pictures", "videos", "music"]);
-  if (action === "open_app") {
+  if (action === "open_app" || action === "close_app") {
     if (!appName || appName.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(appName)) {
       throw new Error("Название приложения некорректно.");
     }
@@ -84,6 +84,8 @@ function queueVoiceAction(action, args, userId, chatId) {
     const name = String(args.app || "").trim();
     if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения для удаления некорректно.");
     args = { app: name };
+  } else if (action === "close_app") {
+    args = { app: appName };
   } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_all_apps"].includes(action)) {
     args = {};
   } else if (action === "open_store") {
@@ -127,15 +129,15 @@ function requestVoiceStoreInstallConfirmation(ctx, query) {
 
 function requestVoicePcConfirmation(ctx, action, args, description) {
   if (!authorized(ctx)) throw new Error("Управление ПК доступно только владельцу.");
-  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "install_app"]);
+  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "close_app", "install_app"]);
   if (!allowed.has(action)) throw new Error("Это действие нельзя запросить через подтверждение.");
   if (action === "install_app") {
     const name = String(args.query || "").trim();
     if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(name)) throw new Error("Название приложения для установки некорректно.");
     args = { query: name };
-  } else if (action === "uninstall_app") {
+  } else if (action === "uninstall_app" || action === "close_app") {
     const name = String(args.app || "").trim();
-    if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения для удаления некорректно.");
+    if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения некорректно.");
     args = { app: name };
   } else args = {};
   if (!TOKEN || TOKEN.length < 32) throw new Error("Мост ПК не настроен в Render.");
