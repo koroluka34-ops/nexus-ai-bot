@@ -1,10 +1,12 @@
 // modules/astra-voice.js
-// Custom Russian voice for NEXUS. Requires ELEVENLABS_API_KEY.
+// Russian voice for Astra/NEXUS. Uses the approved Lisa library voice by default.
 const fs = require("fs/promises");
 const path = require("path");
 const { InputFile } = require("grammy");
 
 const API = "https://api.elevenlabs.io/v1";
+// Lisa — Soft and Emotional (young female voice, standard Russian accent).
+const DEFAULT_VOICE_ID = "CamFZN2KIaqnyvcaFe3E";
 const STATE_FILE = path.join(process.cwd(), "astra-voice.json");
 const DESCRIPTION =
   "A young adult female voice, around 18 years old. Very cute, gentle, warm, soft and sweet, " +
@@ -110,10 +112,10 @@ async function selectPreview(ctx) {
 
 async function synthesizeAstraSpeech(text) {
   const state = await readState();
-  if (!state.voice_id) return null;
+  const voiceId = state.voice_id || DEFAULT_VOICE_ID;
 
   const response = await fetch(
-    API + "/text-to-speech/" + encodeURIComponent(state.voice_id) + "?output_format=mp3_44100_128",
+    API + "/text-to-speech/" + encodeURIComponent(voiceId) + "?output_format=mp3_44100_128",
     {
       method: "POST",
       headers: {
