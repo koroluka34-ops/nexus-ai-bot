@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-14"
+AGENT_VERSION = "2026.11.05-voice-pc-15"
 import base64
 import json
 import os
@@ -647,10 +647,18 @@ Write-Output ("{0},{1},{2},{3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Hei
             _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD),
                         ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
                         ("dwExtraInfo", ULONG_PTR)]
+        class MOUSEINPUT(ctypes.Structure):
+            _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
+                        ("mouseData", wintypes.DWORD), ("dwFlags", wintypes.DWORD),
+                        ("time", wintypes.DWORD), ("dwExtraInfo", ULONG_PTR)]
+        class HARDWAREINPUT(ctypes.Structure):
+            _fields_ = [("uMsg", wintypes.DWORD), ("wParamL", wintypes.WORD),
+                        ("wParamH", wintypes.WORD)]
         class INPUTUNION(ctypes.Union):
-            _fields_ = [("ki", KEYBDINPUT)]
+            _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT), ("hi", HARDWAREINPUT)]
         class INPUT(ctypes.Structure):
             _fields_ = [("type", wintypes.DWORD), ("union", INPUTUNION)]
+        INPUT_KEYBOARD = 1
         KEYEVENTF_KEYUP = 0x0002
         KEYEVENTF_UNICODE = 0x0004
         encoded = message.encode("utf-16-le")
@@ -658,7 +666,7 @@ Write-Output ("{0},{1},{2},{3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Hei
         for i in range(0, len(encoded), 2):
             code = int.from_bytes(encoded[i:i+2], "little")
             down, up = INPUT(), INPUT()
-            down.type = up.type = 1
+            down.type = up.type = INPUT_KEYBOARD
             down.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
             up.union.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
             inputs.extend((down, up))
@@ -668,7 +676,9 @@ Write-Output ("{0},{1},{2},{3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Hei
         user32.SendInput.restype = wintypes.UINT
         sent = user32.SendInput(len(inputs), input_array, ctypes.sizeof(INPUT))
         if sent != len(inputs):
-            raise OSError("Windows ввела не весь текст; сообщение НЕ отправлено.")
+            error_code = ctypes.get_last_error()
+            raise OSError("Windows SendInput ввёл " + str(sent) + " из " + str(len(inputs)) +
+                          " событий (код ошибки " + str(error_code) + "). Сообщение НЕ отправлено.")
         pyautogui.press("enter")
         return {"result": "Сообщение отправлено в Telegram контакту «" + recipient + "»."}
     if action == "type_text":
