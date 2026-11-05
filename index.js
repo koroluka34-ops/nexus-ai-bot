@@ -4473,7 +4473,10 @@ bot.on("message:voice", async ctx => {
           return;
         }
         queueVoiceAction(action, args, userId, ctx.chat.id);
-        const label = action === "open_app" ? "Открываю приложение " + args.app
+        const label = action === "set_volume" ? (args.mode === "set"
+            ? "Устанавливаю громкость на " + args.percent + "%"
+            : (args.mode === "up" ? "Повышаю" : "Уменьшаю") + " громкость на " + args.amount + "%")
+          : action === "open_app" ? "Открываю приложение " + args.app
           : action === "close_app" ? "Запрашиваю закрытие приложения " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
           : action === "open_store" ? "Открываю Microsoft Store"
