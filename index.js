@@ -4175,7 +4175,7 @@ bot.on("message:voice", async ctx => {
       };
 
       const apps = [
-        ["Melida Launcher", ["melida launcher", "millida launcher", "melidar launcher", "мелида лаунчер", "мелидо лаунчер", "меллида лаунчер", "мелидар лаунчер", "мелида", "мелидо", "меллида", "мелидар", "муда лаунчер", "мелуда лаунчер", "амелида лаунчер", "абелидо лаунчер"]],
+        ["Millida Launcher", ["millida launcher", "millida", "millida launcher", "millida-launcher", "мильида лаунчер", "миллида лаунчер", "миллида лаунчера", "миллида", "биллили лаунчер", "биллили лаунчера", "биллили", "мелида лаунчер", "мелидо лаунчер", "меллида лаунчер", "мелидар лаунчер", "мелида", "мелидо", "меллида", "мелидар", "муда лаунчер", "мелуда лаунчер", "амелида лаунчер", "абелидо лаунчер"]],
         ["TurboVPN", ["turbovpn", "turbo vpn", "турбовпн", "турбо впн", "турбо vpn"]],
         ["roblox", ["роблокс", "roblox"]],
         ["discord", ["дискорд", "discord"]],
@@ -4190,7 +4190,7 @@ bot.on("message:voice", async ctx => {
         ["explorer", ["проводник", "explorer"]]
       ];
       const app = apps.find(([, names]) => names.some(name => spoken.includes(name)));
-      const wantsOpenKnownApp = Boolean(app && app[0] === "Melida Launcher" && !isSearch && !isDownload);
+      const wantsOpenKnownApp = Boolean(app && app[0] === "Millida Launcher" && !isSearch && !isDownload);
 
       const isShutdown = /(?:выключи|выключить|заверши работу|отключи)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
       const isRestart = /(?:перезагрузи|перезапусти|перезагрузить)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
