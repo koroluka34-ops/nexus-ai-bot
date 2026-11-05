@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020"><title>NEXUS Touchpad</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -19,6 +19,10 @@ body.game-mode{position:fixed;inset:0;width:100vw;height:100dvh;min-height:0;pad
 body.game-mode header,body.game-mode>.pad,body.game-mode>.controls,body.game-mode>#keyboardPanel{display:none!important}
 body.game-mode .screen-wrap{touch-action:none;position:absolute;inset:0;padding:0;border:0;border-radius:0;background:#020617;overflow:hidden}
 body.game-mode .screen-head{position:absolute;z-index:4;top:env(safe-area-inset-top,8px);left:10px;right:10px;margin:0;padding:4px 8px;background:#02061788;border-radius:8px}
+body.game-mode .screen-head{display:none!important}
+body.game-mode #gamePanel>.small{display:none!important}
+body.game-mode .screen-wrap,body.game-mode #liveVideo{margin:0;max-width:none;max-height:none}
+body.game-mode #liveVideo{width:100vw;height:100dvh;height:100vh;object-fit:contain}
 body.game-mode #liveVideo{width:100vw;height:100dvh;aspect-ratio:auto;object-fit:contain;border-radius:0}
 body.game-mode>.keyboard-row{display:flex!important;position:absolute;z-index:12;top:calc(env(safe-area-inset-top,0px) + 8px);right:10px;gap:0!important}
 body.game-mode #gameButton{position:absolute;z-index:12;top:calc(env(safe-area-inset-top,0px) + 8px);right:10px;padding:8px 12px;background:#111827cc}
@@ -166,8 +170,8 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
   setRemoteCursorVisible(game!=='roblox');
   gamePicker.classList.remove('open');document.body.classList.add('game-mode');gamePanel.classList.add('open');
   gameButton.textContent='✕';keyboardPanel.classList.remove('open');
-  try{if(tg?.requestFullscreen)await tg.requestFullscreen();}catch{}
-  try{if(screen.orientation?.lock)await screen.orientation.lock('landscape');}catch{}
+  try{if(tg?.requestFullscreen)await tg.requestFullscreen();else if(tg?.expand)tg.expand();}catch{try{tg?.expand?.();}catch{}}
+  try{if(tg?.lockOrientation)tg.lockOrientation();else if(screen.orientation?.lock)await screen.orientation.lock('landscape');}catch{}
  }
  function exitGameMode(){
   document.body.classList.remove('game-mode');gamePanel.classList.remove('open');gamePicker.classList.remove('open');gameButton.textContent='🎮';
