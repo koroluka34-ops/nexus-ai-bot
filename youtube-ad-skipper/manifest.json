@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "NEXUS YouTube Ad Skipper",
+  "version": "1.0.0",
+  "description": "Автоматически нажимает доступную кнопку пропуска рекламы в YouTube.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
