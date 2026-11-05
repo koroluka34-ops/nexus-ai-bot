@@ -181,6 +181,21 @@ $lines | Select-Object -First 45
             value = "".join(translit.get(ch, ch) for ch in value)
             return re.sub(r"[^a-z0-9]+", "", value)
         wanted = norm(app)
+        # Common Russian nicknames and Whisper/ASR variants for installed apps.
+        aliases = {
+            "telegram": ["телега", "телеграм", "телеграмма", "телеграмм", "телеграмчик"],
+            "discord": ["дискорд", "дискордик", "дискордд"],
+            "turbovpn": ["турбо впн", "турбовпн", "турбо vpn", "турбо в п н"],
+            "millidalauncher": ["меллида", "мелида лаунчер", "миллида лаунчер", "мильида лаунчер"],
+            "roblox": ["роблокс", "роблоксс"],
+            "spotify": ["спотифай", "спотифай"],
+            "steam": ["стим"],
+            "chrome": ["хром", "гугл хром"]
+        }
+        for canonical, variants in aliases.items():
+            if wanted == canonical or wanted in {norm(v) for v in variants}:
+                wanted = canonical
+                break
         from difflib import SequenceMatcher
         def best_matches(items, get_name, threshold=0.76, margin=0.055):
             scored = []
@@ -191,6 +206,11 @@ $lines | Select-Object -First 45
                 score = SequenceMatcher(None, wanted, candidate).ratio()
                 if candidate == wanted:
                     score = 1.0
+                elif len(wanted) >= 5 and candidate.startswith(wanted):
+                    # e.g. "Telegram" should resolve to the installed "Telegram Desktop".
+                    score = max(score, 0.91)
+                elif len(wanted) >= 5 and wanted in candidate:
+                    score = max(score, 0.86)
                 scored.append((score, item))
             if not scored:
                 return []
