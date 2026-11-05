@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-1"
+AGENT_VERSION = "2026.11.05-voice-pc-2"
 import base64
 import json
 import os
@@ -119,23 +119,53 @@ def execute(command):
         shot.save(buf, format="PNG")
         return {"result": "Скриншот готов.", "image": base64.b64encode(buf.getvalue()).decode("ascii")}
     if action == "open_app":
-        allowed = {
+        app = str(args.get("app", "")).strip()
+        key = app.casefold()
+        aliases = {
             "roblox": "roblox://",
             "discord": "discord://",
             "notepad": "notepad.exe",
+            "блокнот": "notepad.exe",
             "calculator": "calc.exe",
+            "калькулятор": "calc.exe",
             "paint": "mspaint.exe",
+            "пейнт": "mspaint.exe",
             "explorer": "explorer.exe",
+            "проводник": "explorer.exe",
         }
-        app = str(args.get("app", "")).lower()
-        if app not in allowed:
-            raise ValueError("Application not allowed")
-        target = allowed[app]
-        if target.endswith("://"):
-            webbrowser.open(target, new=1)
-        else:
-            subprocess.Popen([target], shell=False)
-        return {"result": "Открываю приложение: " + app}
+        if not app or len(app) > 80 or any(ch in app for ch in "\\\\/:*?\\"<>|"):
+            raise ValueError("Недопустимое название приложения")
+        if key in aliases:
+            target = aliases[key]
+            if target.endswith("://"):
+                webbrowser.open(target, new=1)
+            else:
+                subprocess.Popen([target], shell=False)
+            return {"result": "Открываю приложение: " + app}
+
+        # Ищем только ярлыки в меню «Пуск» текущего пользователя и всех пользователей.
+        roots = [
+            Path.home() / "AppData/Roaming/Microsoft/Windows/Start Menu/Programs",
+            Path(os.environ.get("PROGRAMDATA", r"C:\\ProgramData")) / "Microsoft/Windows/Start Menu/Programs",
+        ]
+        shortcuts = []
+        for root in roots:
+            if root.is_dir():
+                try:
+                    shortcuts.extend(p for p in root.rglob("*.lnk") if p.is_file())
+                except OSError:
+                    pass
+        wanted = app.casefold()
+        exact = [p for p in shortcuts if p.stem.casefold() == wanted]
+        partial = [p for p in shortcuts if wanted in p.stem.casefold()]
+        matches = exact or partial
+        if not matches:
+            raise ValueError("Не нашёл ярлык приложения «" + app + "» в меню Пуск.")
+        if len(matches) > 1 and not exact:
+            names = ", ".join(p.stem for p in matches[:5])
+            raise ValueError("Нашёл несколько совпадений: " + names + ". Назови приложение точнее.")
+        os.startfile(str(matches[0]))
+        return {"result": "Открыто приложение: " + matches[0].stem}
 
     if action == "open_folder":
         folders = {
