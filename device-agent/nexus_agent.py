@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-nexus-cursor-fix-1"
+AGENT_VERSION = "2026.11.05-nexus-smooth-fix-1"
 import base64
 import json
 import os
@@ -456,6 +456,7 @@ def start_webrtc_stream(cfg, offer):
                         if pc.connectionState == "disconnected":
                             break
             finally:
+                cursor_smooth_task.cancel()
                 try:
                     import pyautogui
                     for key in list(held_keys):
