@@ -143,7 +143,8 @@ for ($i=0; $i -lt $count; $i++) {
   $r = $el.Current.BoundingRectangle
   $bounds = ("x={0}, y={1}, w={2}, h={3}" -f [int]$r.X,[int]$r.Y,[int]$r.Width,[int]$r.Height)
   $enabled = if ($el.Current.IsEnabled) { "enabled" } else { "disabled" }
-  $lines.Add(("{0}: ""{1}"" [{2}] {3}" -f $type, $name.Replace("""", "'"), $bounds, $enabled))
+  $safeName = $name.Replace([char]34, [char]39)
+  $lines.Add(("{0}: '{1}' [{2}] {3}" -f $type, $safeName, $bounds, $enabled))
 }
 if ($lines.Count -eq 1) { $lines.Add("Именованные элементы интерфейса не обнаружены. Возможно, приложение рисует интерфейс без UI Automation.") }
 $lines | Select-Object -First 45
