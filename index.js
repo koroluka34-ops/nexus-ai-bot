@@ -4131,7 +4131,9 @@ bot.on("message:voice", async ctx => {
       let action = null;
       let args = {};
 
-      const wantsOpen = hasAny("открой", "открывай", "откроем", "запусти", "запускай", "покажи") || /(?:можешь|мог\s+бы)\s+открыть/iu.test(spoken);
+      const wantsOpen = hasAny("открой", "откройте", "открывай", "открывайте", "откроем", "открыть", "запусти", "запустите", "запускай", "запускайте", "запустить", "включи", "включите", "включить", "стартани", "стартуем", "подними", "покажи") || /(?:можешь|мог\s+бы|не\s+мог\s+бы|пожалуйста)\s+(?:мне\s+)?(?:открыть|запустить|включить)/iu.test(spoken);
+      const closeAll = /(?:закрой|закрывай|закройте|позакрывай|заверши|завершить|закрыть|прикрой)\s+(?:(?:мне|пожалуйста)\s+)?(?:вообще\s+)?(?:все|всё|все\s+открытые)\s*(?:приложения|программы|окна)?\s*$/iu.test(spoken)
+        || /^(?:закрой|закрыть|заверши)\s+(?:все\s+)?(?:приложения|программы|окна)$/iu.test(spoken);
       const folders = [
         ["downloads", ["загрузки", "downloads"]],
         ["desktop", ["рабочий стол", "desktop"]],
@@ -4143,7 +4145,7 @@ bot.on("message:voice", async ctx => {
       const folder = folders.find(([, names]) => hasAny(...names));
       const searchVerbs = ["найди", "найти", "поищи", "поищите", "ищи", "загугли", "отыщи", "подбери"];
       const isSearch = hasAny(...searchVerbs);
-      const isDownload = hasAny("скачай", "скачать", "загрузи", "загрузить", "установи", "установить");
+      const isDownload = hasAny("скачай", "скачать", "скачивай", "загрузи", "загрузить", "установи", "установить", "устанавливай", "поставь", "инсталлируй");
       const youtube = hasAny("youtube", "ютуб", "ю туб", "на ютубе");
       const google = hasAny("google", "гугл", "гугле", "в интернете", "в гугле");
       const microsoftStore = hasAny("microsoft store", "майкрософт стор", "майкрософт сторе", "микрософт стор", "microsoft store");
@@ -4192,13 +4194,16 @@ bot.on("message:voice", async ctx => {
       const app = apps.find(([, names]) => names.some(name => spoken.includes(name)));
       const wantsOpenKnownApp = Boolean(app && app[0] === "Millida Launcher" && !isSearch && !isDownload);
 
-      const isShutdown = /(?:выключи|выключить|заверши работу|отключи)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
-      const isRestart = /(?:перезагрузи|перезапусти|перезагрузить)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken);
-      const isSleep = /(?:спящ(?:ий|его)\s+режим|усыпи|уснуть|переведи.*(?:сон|спящ))/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+сон/iu.test(spoken);
-      const isLock = /(?:заблокируй|блокируй|заблокировать)\s+(?:мой\s+)?(?:компьютер|пк|ноутбук)/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+блокировку/iu.test(spoken);
+      const isShutdown = /(?:выключи|выключить|выруби|вырубить|отключи|отключить|заверши\s+работу|погаси)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken)
+        || /(?:заверши|завершить)\s+работу/iu.test(spoken);
+      const isRestart = /(?:перезагрузи|перезапусти|перезагрузить|перезапустить|ребутни|сделай\s+ребут)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)?/iu.test(spoken);
+      const isSleep = /(?:спящ(?:ий|его)\s+режим|усыпи|усыпить|усни|отправь\s+(?:его\s+)?(?:спать|в\s+спячку)|переведи.*(?:сон|спящ)|пусть\s+(?:ноутбук|компьютер|он)\s+поспит)/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+сон/iu.test(spoken);
+      const isLock = /(?:заблокируй|блокируй|заблокировать|запри)\s+(?:(?:мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken) || /(?:введи|переведи)\s+(?:компьютер\s+)?в\s+блокировку/iu.test(spoken);
       const uninstallMatch = spoken.match(/(?:удали|удалить|деинсталлируй|деинсталлировать)\s+(?:(?:приложение|программу)\s+)?(.{1,80})$/iu);
       const cleanAppName = value => String(value || "").replace(/^(?:(?:приложение|программу)\s+)/iu, "").replace(/[.!?,]+$/g, "").trim();
-      if (isShutdown) {
+      if (closeAll) {
+        action = "close_all_apps";
+      } else if (isShutdown) {
         action = "shutdown_pc";
       } else if (isRestart) {
         action = "restart_pc";
@@ -4255,7 +4260,7 @@ bot.on("message:voice", async ctx => {
         args = { url: "https://www.youtube.com/" };
       } else if (wantsOpen) {
         const appName = spoken
-          .replace(/^(?:(?:можешь|мог\s+бы)\s+)?(?:открой|открывай|откроем|открыть|запусти|запускай|покажи)\s+/iu, "")
+          .replace(/^(?:(?:можешь|мог\s+бы|не\s+мог\s+бы)\s+)?(?:мне\s+)?(?:пожалуйста\s+)?(?:откройте?|открывай(?:те)?|откроем|открыть|запуст(?:и|ите|ить)|запускай(?:те)?|включи(?:те)?|включить|стартани|подними|покажи)\s+/iu, "")
           .replace(/^(?:(?:мне|пожалуйста|к\s+примеру|например|просто)\s+)+/iu, "")
           .replace(/^(?:(?:приложение|программу)\s+)+/iu, "")
           .replace(/\s+(?:и\s+потом|потом).*$/iu, "")
@@ -4271,8 +4276,9 @@ bot.on("message:voice", async ctx => {
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + " в Telegram.").catch(() => {});
           return;
         }
-        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app"].includes(action)) {
+        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps"].includes(action)) {
           const descriptions = {
+            close_all_apps: "Закрыть все открытые приложения (несохранённые изменения могут быть потеряны)",
             shutdown_pc: "Выключить компьютер",
             restart_pc: "Перезагрузить компьютер",
             sleep_pc: "Перевести компьютер в спящий режим",
