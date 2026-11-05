@@ -25,6 +25,7 @@ body.game-mode .screen-wrap,body.game-mode #liveVideo{margin:0;max-width:none;ma
 body.game-mode #liveVideo{width:100vw;height:100dvh;height:100vh;object-fit:contain}
 body.game-mode #liveVideo{width:100vw;height:100dvh;aspect-ratio:auto;object-fit:contain;border-radius:0}
 body.game-mode>.keyboard-row{display:flex!important;position:absolute;z-index:12;top:calc(env(safe-area-inset-top,0px) + 8px);right:10px;gap:0!important}
+body.game-mode #fullscreenButton{position:absolute;z-index:12;top:calc(env(safe-area-inset-top,0px) + 8px);left:10px;padding:8px 12px;background:#111827cc}
 body.game-mode #gameButton{position:absolute;z-index:12;top:calc(env(safe-area-inset-top,0px) + 8px);right:10px;padding:8px 12px;background:#111827cc}
 body.game-mode #keyboardButton{display:none}
 body.game-mode #gamePanel{display:block!important;position:absolute;inset:0;z-index:8;padding:0;border:0;border-radius:0;background:transparent;pointer-events:none}
@@ -46,7 +47,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
 <header><div>🖥 NEXUS PC</div><div id="status">Подключение…</div></header>
 <section class="screen-wrap"><div class="screen-head"><b>Экран компьютера</b><span id="screenState">Ожидание изображения…</span></div><video id="liveVideo" autoplay muted playsinline></video></section>
 <div class="pad" id="pad"><div><strong>Води пальцем здесь</strong><span>Один палец — курсор · два пальца — прокрутка<br>Тап — левый клик</span></div></div>
-<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button><button type="button" data-key="f11" class="wide">⛶ F11 · Полный экран ПК</button></div></section>
+<div class="controls"><button id="left">ЛКМ</button><button id="right">ПКМ</button></div><div class="keyboard-row" style="gap:8px"><button id="fullscreenButton" class="keyboard-button" aria-label="Полный экран">⛶</button><button id="gameButton" class="keyboard-button" aria-label="Игровое управление">🎮</button><button id="keyboardButton" class="keyboard-button" aria-label="Открыть клавиатуру">⌨</button></div><section id="keyboardPanel" class="keyboard-panel"><div class="small" style="text-align:left">Сначала выбери поле ввода на компьютере (например, сообщение в Telegram Desktop). Затем напиши здесь — текст вставится в выбранное поле.</div><textarea id="keyboardText" maxlength="1000" placeholder="Текст для активного окна ПК…"></textarea><button id="sendText">⌨ Вставить текст в ПК</button><div class="key-actions"><button type="button" data-key="backspace">⌫ Backspace</button><button type="button" data-key="delete">Del</button><button type="button" data-hotkey="ctrl+a" class="wide">Ctrl + A · Выделить всё</button><button type="button" data-key="left">←</button><button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button><button type="button" data-key="right">→</button><button type="button" data-key="home">Home</button><button type="button" data-key="end">End</button><button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button><button type="button" data-key="f11" class="wide">⛶ F11 · Полный экран ПК</button></div></section>
 <div id="gamePicker" class="game-picker"><div class="game-picker-card"><h2>Во что играем?</h2><p>Выбери игру — откроется горизонтальный игровой экран с джойстиком.</p><div class="game-picker-options"><button type="button" data-select-game="minecraft"><span>⛏️</span>Minecraft</button><button type="button" data-select-game="roblox"><span>🎮</span>Roblox</button><button type="button" data-select-game="cs2"><span>🔫</span>CS2</button></div><button type="button" id="gamePickerCancel" class="game-picker-cancel">Отмена</button></div></div>
 <section id="gamePanel" class="game-panel">
  <div class="small">Курсор показан — камера не вращается. Спрячь курсор, чтобы вращать камеру пальцем по экрану.</div><div class="sensitivity-control"><label for="sensitivity">Чувствительность камеры: <b id="sensitivityValue">150%</b></label><input id="sensitivity" type="range" min="50" max="300" step="10" value="150"></div>
@@ -169,6 +170,19 @@ setInterval(()=>send({type:'heartbeat'}),1200);send({type:'heartbeat'});startLiv
  }
  document.getElementById('left').addEventListener('click',()=>sendRealtime({type:'game-click',button:'left'},{type:'click',button:'left'}));
  document.getElementById('right').addEventListener('click',()=>sendRealtime({type:'game-click',button:'right'},{type:'click',button:'right'}));
+ const fullscreenButton=document.getElementById('fullscreenButton');
+ async function toggleFullscreen(){
+  try{
+   if(tg?.isFullscreen && tg?.exitFullscreen){await tg.exitFullscreen();}
+   else if(tg?.requestFullscreen){await tg.requestFullscreen();}
+   else if(document.fullscreenElement){await document.exitFullscreen();}
+   else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}
+   else{status.textContent='Полный экран не поддерживается в этом окне Telegram';}
+  }catch(err){status.textContent='Не удалось включить полный экран: '+(err?.message||'ошибка');}
+ }
+ fullscreenButton.addEventListener('click',toggleFullscreen);
+ tg?.onEvent?.('fullscreenChanged',()=>{fullscreenButton.textContent=tg.isFullscreen?'↙':'⛶';});
+ document.addEventListener('fullscreenchange',()=>{fullscreenButton.textContent=document.fullscreenElement?'↙':'⛶';});
  const gameButton=document.getElementById('gameButton'),gamePanel=document.getElementById('gamePanel'),gamePicker=document.getElementById('gamePicker');const sensitivityInput=document.getElementById('sensitivity'),sensitivityValue=document.getElementById('sensitivityValue');sensitivityInput.addEventListener('input',()=>{sensitivity=Number(sensitivityInput.value)/100;sensitivityValue.textContent=sensitivityInput.value+'%';});
  let remoteCursorVisible=true;
  const cursorToggleButton=document.getElementById('cursorToggleButton');
