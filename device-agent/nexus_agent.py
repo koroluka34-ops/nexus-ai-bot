@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-nexus-optimized-1"
+AGENT_VERSION = "2026.11.05-nexus-low-latency-1"
 import base64
 import json
 import os
