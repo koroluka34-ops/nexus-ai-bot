@@ -4126,70 +4126,92 @@ bot.on("message:voice", async ctx => {
     // Безопасные голосовые команды: Unicode-safe matching для русской речи.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (ownerId && String(userId) === ownerId) {
-      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
+      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\\s+/g, " ").trim();
       const hasAny = (...phrases) => phrases.some(phrase => spoken.includes(phrase));
       let action = null;
       let args = {};
 
       const wantsOpen = hasAny("открой", "открывай", "запусти", "запускай", "покажи");
+      const folders = [
+        ["downloads", ["загрузки", "downloads"]],
+        ["desktop", ["рабочий стол", "desktop"]],
+        ["documents", ["документы", "documents"]],
+        ["pictures", ["изображения", "картинки", "фото", "pictures"]],
+        ["videos", ["видео", "videos"]],
+        ["music", ["музыка", "music"]]
+      ];
+      const folder = folders.find(([, names]) => hasAny(...names));
+      const searchVerbs = ["найди", "найти", "поищи", "поищите", "ищи", "загугли", "отыщи", "подбери"];
+      const isSearch = hasAny(...searchVerbs);
+      const isDownload = hasAny("скачай", "скачать", "загрузи", "загрузить", "установи", "установить");
+      const youtube = hasAny("youtube", "ютуб", "ю туб", "на ютубе");
+      const google = hasAny("google", "гугл", "гугле", "в интернете", "в гугле");
+      const cleanQuery = (value) => value
+        .replace(/^(?:а ну |пожалуйста |мне |мне нужно |мне надо )+/iu, "")
+        .replace(/\\b(?:открой|открывай|найди|найти|поищи|поищите|ищи|загугли|отыщи|подбери|скачай|скачать|загрузи|загрузить|установи|установить|google|гугл|гугле|youtube|ютуб|ю туб|в интернете|в гугле|на ютубе|на ютуб|и|мне|пожалуйста)\\b/giu, " ")
+        .replace(/\\s+/g, " ").trim();
+      const searchTail = () => {
+        const markers = [...searchVerbs, "скачай", "скачать", "загрузи", "загрузить", "установи", "установить"];
+        let pos = -1;
+        for (const marker of markers) {
+          const found = spoken.indexOf(marker);
+          if (found >= 0 && (pos < 0 || found < pos)) pos = found;
+        }
+        return pos >= 0 ? cleanQuery(spoken.slice(pos + (spoken.slice(pos).match(/^(?:найди|найти|поищи|поищите|ищи|загугли|отыщи|подбери|скачай|скачать|загрузи|загрузить|установи|установить)/u)?.[0].length || 0))) : "";
+      };
+
       const apps = [
         ["roblox", ["роблокс", "roblox"]],
         ["discord", ["дискорд", "discord"]],
+        ["steam", ["стим", "steam"]],
+        ["spotify", ["спотифай", "spotify"]],
+        ["chrome", ["хром", "chrome", "гугл хром"]],
+        ["firefox", ["фаерфокс", "firefox"]],
+        ["edge", ["эдж", "edge"]],
         ["notepad", ["блокнот", "notepad"]],
         ["calculator", ["калькулятор", "calculator"]],
         ["paint", ["пейнт", "paint"]],
         ["explorer", ["проводник", "explorer"]]
       ];
-      const folders = [
-        ["downloads", ["загрузки", "downloads"]],
-        ["desktop", ["рабочий стол", "desktop"]],
-        ["documents", ["документы", "documents"]],
-        ["pictures", ["изображения", "картинки", "pictures"]],
-        ["videos", ["видео", "videos"]],
-        ["music", ["музыка", "music"]]
-      ];
       const app = apps.find(([, names]) => hasAny(...names));
-      const folder = folders.find(([, names]) => hasAny(...names));
 
-      const extractSearch = (prefixes, suffixes = []) => {
-        let query = spoken;
-        for (const phrase of [...prefixes, ...suffixes]) {
-          query = query.replace(phrase, " ");
-        }
-        return query.replace(/\s+/g, " ").trim();
-      };
-
-      if ((hasAny("найди", "поищи", "ищи", "загугли") && hasAny("google", "гугл", "гугле", "в интернете")) ||
-          (wantsOpen && hasAny("google", "гугл", "гугле") && hasAny("найди", "поищи", "ищи"))) {
-        const query = extractSearch(
-          ["найди", "поищи", "ищи", "загугли", "открой", "google", "гугл", "гугле", "в", "интернете", "и"],
-          []
-        );
-        action = "open_url";
-        args = { url: query
-          ? "https://www.google.com/search?q=" + encodeURIComponent(query)
-          : "https://www.google.com/" };
-      } else if (wantsOpen && app) {
-        action = "open_app";
-        args = { app: app[0] };
-      } else if (wantsOpen && folder) {
-        action = "open_folder";
-        args = { folder: folder[0] };
-      } else if (wantsOpen && hasAny("youtube", "ютуб", "ю туб")) {
-        action = "open_url";
-        args = { url: "https://www.youtube.com/" };
-      } else if (hasAny("найди", "поищи", "ищи") && hasAny("youtube", "ютуб", "ю туб")) {
-        const query = extractSearch(
-          ["найди", "поищи", "ищи", "на youtube", "youtube", "на ютубе", "на ютуб", "ютубе", "ютуб", "ю туб"],
-          []
-        );
+      if (youtube && isSearch) {
+        const query = searchTail();
         if (query) {
           action = "open_url";
           args = { url: "https://www.youtube.com/results?search_query=" + encodeURIComponent(query) };
         }
-      } else if (wantsOpen && /^(?:открой|открывай|запусти|запускай|покажи)\s+(?:приложение\s+|программу\s+)?[\p{L}\p{N} ._-]{2,80}$/iu.test(spoken)) {
-        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\s+(?:(?:приложение|программу)\s+)?/iu, "").trim();
-        if (appName && !["google", "гугл", "гугле", "youtube", "ютуб", "ю туб"].includes(appName)) {
+      } else if (isDownload) {
+        const query = searchTail();
+        if (query) {
+          const downloadQuery = query + " официальный сайт скачать";
+          action = "open_url";
+          args = { url: "https://www.google.com/search?q=" + encodeURIComponent(downloadQuery) };
+        }
+      } else if (isSearch || (google && hasAny("найди", "найти", "поищи", "ищи"))) {
+        const query = searchTail();
+        if (query) {
+          action = "open_url";
+          args = { url: "https://www.google.com/search?q=" + encodeURIComponent(query) };
+        } else if (google) {
+          action = "open_url";
+          args = { url: "https://www.google.com/" };
+        }
+      } else if (wantsOpen && folder) {
+        action = "open_folder";
+        args = { folder: folder[0] };
+      } else if (wantsOpen && app) {
+        action = "open_app";
+        args = { app: app[0] };
+      } else if (wantsOpen && google) {
+        action = "open_url";
+        args = { url: "https://www.google.com/" };
+      } else if (wantsOpen && youtube) {
+        action = "open_url";
+        args = { url: "https://www.youtube.com/" };
+      } else if (wantsOpen) {
+        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\\s+(?:(?:приложение|программу)\\s+)?/iu, "").replace(/\\s+(?:и|потом).*$/iu, "").trim();
+        if (appName && appName.length <= 80 && !/^(google|гугл|гугле|youtube|ютуб)$/iu.test(appName)) {
           action = "open_app";
           args = { app: appName };
         }
