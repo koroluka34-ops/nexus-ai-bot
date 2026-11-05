@@ -30,8 +30,8 @@ body.game-mode .joystick-wrap{position:absolute;left:max(16px,env(safe-area-inse
 body.game-mode .joystick{width:clamp(118px,22vh,170px);height:clamp(118px,22vh,170px);background:radial-gradient(circle,#475569 0 4px,#334155 5px 42%,#0f172acc 72%);border-color:#cbd5e1aa}
 body.game-mode .joystick-knob{width:clamp(48px,8vh,64px);height:clamp(48px,8vh,64px);background:linear-gradient(145deg,#e2e8f0,#64748b)}
 body.game-mode .joystick-caption{color:white;text-shadow:0 1px 3px #000}
-body.game-mode .game-grid{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));width:min(43vw,340px);grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;pointer-events:auto}
-body.game-mode .game-grid button{min-height:clamp(42px,8vh,58px);border-radius:50%;padding:5px;background:#172033cc;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(10px,2vh,14px);backdrop-filter:blur(5px)}
+body.game-mode .game-grid{position:absolute;right:max(14px,env(safe-area-inset-right));top:12%;bottom:12%;width:min(50vw,520px);grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:10px;align-content:stretch;pointer-events:auto}
+body.game-mode .game-grid button{min-height:clamp(54px,12vh,100px);border-radius:22px;padding:8px;background:#172033dd;border:1px solid #cbd5e177;box-shadow:0 2px 8px #0008;font-size:clamp(13px,2.5vh,20px);backdrop-filter:blur(5px)}
 body.game-mode .game-grid button:active{background:#475569ee}
 body.game-mode .game-grid button[data-game-key="space"]{background:#2563ebcc}
 body.game-mode .game-grid button[data-game-mouse="left"]{background:#b45309dd}
