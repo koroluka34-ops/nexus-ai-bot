@@ -61,6 +61,7 @@ function queueVoiceAction(action, args, userId, chatId) {
     throw new Error("Голосовое управление ПК доступно только владельцу.");
   }
   const appName = String(args.app || "").trim();
+  const query = String(args.query || "").trim();
   const allowedFolders = new Set(["downloads", "desktop", "documents", "pictures", "videos", "music"]);
   if (action === "open_app") {
     if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()-]+$/u.test(appName)) {
@@ -69,6 +70,13 @@ function queueVoiceAction(action, args, userId, chatId) {
     args.app = appName;
   } else if (action === "open_folder" && !allowedFolders.has(String(args.folder || ""))) {
     throw new Error("Эта папка не входит в разрешённый список.");
+  } else if (action === "open_store_search") {
+    if (!query || query.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(query)) {
+      throw new Error("Название приложения для Microsoft Store некорректно.");
+    }
+    args.query = query;
+  } else if (action === "open_store") {
+    args = {};
   } else if (action === "open_url") {
     let url;
     try { url = new URL(String(args.url || "")); } catch { throw new Error("Некорректная ссылка."); }
@@ -79,7 +87,7 @@ function queueVoiceAction(action, args, userId, chatId) {
       throw new Error("Голосом разрешены Google и YouTube по HTTPS.");
     }
     args.url = url.toString();
-  } else if (!["open_app", "open_folder"].includes(action)) {
+  } else {
     throw new Error("Такое голосовое действие не поддерживается.");
   }
   if (!TOKEN || TOKEN.length < 32) throw new Error("Мост ПК не настроен: отсутствует PC_AGENT_TOKEN в Render.");
