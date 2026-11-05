@@ -4151,7 +4151,25 @@ bot.on("message:voice", async ctx => {
       const app = apps.find(([, names]) => hasAny(...names));
       const folder = folders.find(([, names]) => hasAny(...names));
 
-      if (wantsOpen && app) {
+      const extractSearch = (prefixes, suffixes = []) => {
+        let query = spoken;
+        for (const phrase of [...prefixes, ...suffixes]) {
+          query = query.replace(phrase, " ");
+        }
+        return query.replace(/\\s+/g, " ").trim();
+      };
+
+      if ((hasAny("найди", "поищи", "ищи", "загугли") && hasAny("google", "гугл", "гугле", "в интернете")) ||
+          (wantsOpen && hasAny("google", "гугл", "гугле") && hasAny("найди", "поищи", "ищи"))) {
+        const query = extractSearch(
+          ["найди", "поищи", "ищи", "загугли", "открой", "google", "гугл", "гугле", "в", "интернете", "и"],
+          []
+        );
+        action = "open_url";
+        args = { url: query
+          ? "https://www.google.com/search?q=" + encodeURIComponent(query)
+          : "https://www.google.com/" };
+      } else if (wantsOpen && app) {
         action = "open_app";
         args = { app: app[0] };
       } else if (wantsOpen && folder) {
@@ -4161,14 +4179,19 @@ bot.on("message:voice", async ctx => {
         action = "open_url";
         args = { url: "https://www.youtube.com/" };
       } else if (hasAny("найди", "поищи", "ищи") && hasAny("youtube", "ютуб", "ю туб")) {
-        let query = spoken;
-        for (const phrase of ["найди", "поищи", "ищи", "на youtube", "youtube", "на ютубе", "на ютуб", "ютубе", "ютуб", "ю туб"]) {
-          query = query.replace(phrase, " ");
-        }
-        query = query.replace(/\\s+/g, " ").trim();
+        const query = extractSearch(
+          ["найди", "поищи", "ищи", "на youtube", "youtube", "на ютубе", "на ютуб", "ютубе", "ютуб", "ю туб"],
+          []
+        );
         if (query) {
           action = "open_url";
           args = { url: "https://www.youtube.com/results?search_query=" + encodeURIComponent(query) };
+        }
+      } else if (wantsOpen && /^(?:открой|открывай|запусти|запускай|покажи)\\s+(?:приложение\\s+|программу\\s+)?[\\p{L}\\p{N} ._-]{2,80}$/iu.test(spoken)) {
+        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\\s+(?:(?:приложение|программу)\\s+)?/iu, "").trim();
+        if (appName && !["google", "гугл", "гугле", "youtube", "ютуб", "ю туб"].includes(appName)) {
+          action = "open_app";
+          args = { app: appName };
         }
       }
 
