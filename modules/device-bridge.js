@@ -103,6 +103,21 @@ function queueVoiceAction(action, args, userId, chatId) {
   return enqueue(action, args, userId, chatId, null);
 }
 
+function requestVoiceStoreInstallConfirmation(ctx, query) {
+  if (!authorized(ctx)) throw new Error("Голосовая установка доступна только владельцу.");
+  const safeQuery = String(query || "").trim();
+  if (!safeQuery || safeQuery.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(safeQuery)) {
+    throw new Error("Название приложения для Microsoft Store некорректно.");
+  }
+  if (!TOKEN || TOKEN.length < 32) throw new Error("Мост ПК не настроен в Render.");
+  const device = devices.get("windows-main");
+  if (!device || Date.now() - device.lastSeen > 45000) throw new Error("ПК не подключён. Сначала запусти NEXUS Agent на Windows.");
+  const id = crypto.randomUUID();
+  pending.set(id, { action: "install_store_app", args: { query: safeQuery }, userId: String(ctx.from.id), chatId: ctx.chat.id });
+  const keyboard = new InlineKeyboard().text("✅ Да, установить", "pc_yes:" + id).text("❌ Отмена", "pc_no:" + id);
+  return ctx.reply("📦 Подтверди установку приложения из Microsoft Store:\n\n<b>" + safeText(safeQuery, 80).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) + "</b>\n\nПосле подтверждения NEXUS запустит установку на этом ПК и попробует открыть приложение.", { parse_mode: "HTML", reply_markup: keyboard });
+}
+
 function installDeviceBridge(bot) {
   deviceBot = bot;
   bot.command("pc", async ctx => {
@@ -425,4 +440,4 @@ async function handleDeviceHttp(req, res) {
   return true;
 }
 
-module.exports = { installDeviceBridge, handleDeviceHttp, queueVoiceAction };
+module.exports = { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation };
