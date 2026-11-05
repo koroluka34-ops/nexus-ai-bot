@@ -84,7 +84,7 @@ function queueVoiceAction(action, args, userId, chatId) {
     const name = String(args.app || "").trim();
     if (!name || name.length > 80 || !/^[\p{L}\p{N} ._()-]+$/u.test(name)) throw new Error("Название приложения для удаления некорректно.");
     args = { app: name };
-  } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"].includes(action)) {
+  } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_all_apps"].includes(action)) {
     args = {};
   } else if (action === "open_store") {
     args = {};
@@ -127,7 +127,7 @@ function requestVoiceStoreInstallConfirmation(ctx, query) {
 
 function requestVoicePcConfirmation(ctx, action, args, description) {
   if (!authorized(ctx)) throw new Error("Управление ПК доступно только владельцу.");
-  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app"]);
+  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps"]);
   if (!allowed.has(action)) throw new Error("Это действие нельзя запросить через подтверждение.");
   if (action === "uninstall_app") {
     const name = String(args.app || "").trim();
