@@ -56,6 +56,36 @@ function enqueue(action, args, userId, chatId, messageId) {
   results.set(id, { chatId, userId: String(userId) });
   return id;
 }
+function queueVoiceAction(action, args, userId, chatId) {
+  if (!OWNER_ID || String(userId) !== OWNER_ID) {
+    throw new Error("Голосовое управление ПК доступно только владельцу.");
+  }
+  const allowedApps = new Set(["roblox", "discord", "notepad", "calculator", "paint", "explorer"]);
+  const allowedFolders = new Set(["downloads", "desktop", "documents", "pictures", "videos", "music"]);
+  if (action === "open_app" && !allowedApps.has(String(args.app || ""))) {
+    throw new Error("Это приложение не входит в разрешённый список.");
+  }
+  if (action === "open_folder" && !allowedFolders.has(String(args.folder || ""))) {
+    throw new Error("Эта папка не входит в разрешённый список.");
+  }
+  if (action === "open_url") {
+    let url;
+    try { url = new URL(String(args.url || "")); } catch { throw new Error("Некорректная ссылка."); }
+    if (url.protocol !== "https:" || url.hostname !== "www.youtube.com" || !["/","/results"].includes(url.pathname)) {
+      throw new Error("Голосом разрешено открывать только YouTube.");
+    }
+    args.url = url.toString();
+  } else if (!["open_app", "open_folder"].includes(action)) {
+    throw new Error("Такое голосовое действие не поддерживается.");
+  }
+  if (!TOKEN || TOKEN.length < 32) throw new Error("Мост ПК не настроен: отсутствует PC_AGENT_TOKEN в Render.");
+  const device = devices.get("windows-main");
+  if (!device || Date.now() - device.lastSeen > 45000) {
+    throw new Error("ПК не подключён. Сначала запусти NEXUS Agent на Windows.");
+  }
+  return enqueue(action, args, userId, chatId, null);
+}
+
 function installDeviceBridge(bot) {
   deviceBot = bot;
   bot.command("pc", async ctx => {
@@ -378,4 +408,4 @@ async function handleDeviceHttp(req, res) {
   return true;
 }
 
-module.exports = { installDeviceBridge, handleDeviceHttp };
+module.exports = { installDeviceBridge, handleDeviceHttp, queueVoiceAction };
