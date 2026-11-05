@@ -4126,7 +4126,7 @@ bot.on("message:voice", async ctx => {
     // Безопасные голосовые команды: Unicode-safe matching для русской речи.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (ownerId && String(userId) === ownerId) {
-      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\\s+/g, " ").trim();
+      const spoken = transcript.toLocaleLowerCase("ru").replace(/[.,!?]/g, " ").replace(/\s+/g, " ").trim();
       const hasAny = (...phrases) => phrases.some(phrase => spoken.includes(phrase));
       let action = null;
       let args = {};
@@ -4156,7 +4156,7 @@ bot.on("message:voice", async ctx => {
         for (const phrase of [...prefixes, ...suffixes]) {
           query = query.replace(phrase, " ");
         }
-        return query.replace(/\\s+/g, " ").trim();
+        return query.replace(/\s+/g, " ").trim();
       };
 
       if ((hasAny("найди", "поищи", "ищи", "загугли") && hasAny("google", "гугл", "гугле", "в интернете")) ||
@@ -4187,8 +4187,8 @@ bot.on("message:voice", async ctx => {
           action = "open_url";
           args = { url: "https://www.youtube.com/results?search_query=" + encodeURIComponent(query) };
         }
-      } else if (wantsOpen && /^(?:открой|открывай|запусти|запускай|покажи)\\s+(?:приложение\\s+|программу\\s+)?[\\p{L}\\p{N} ._-]{2,80}$/iu.test(spoken)) {
-        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\\s+(?:(?:приложение|программу)\\s+)?/iu, "").trim();
+      } else if (wantsOpen && /^(?:открой|открывай|запусти|запускай|покажи)\s+(?:приложение\s+|программу\s+)?[\p{L}\p{N} ._-]{2,80}$/iu.test(spoken)) {
+        const appName = spoken.replace(/^(?:открой|открывай|запусти|запускай|покажи)\s+(?:(?:приложение|программу)\s+)?/iu, "").trim();
         if (appName && !["google", "гугл", "гугле", "youtube", "ютуб", "ю туб"].includes(appName)) {
           action = "open_app";
           args = { app: appName };
