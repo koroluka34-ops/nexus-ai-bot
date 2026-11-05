@@ -1277,10 +1277,10 @@ def start_local_wake_listener():
                     return ""
                 peak = float(np.max(np.abs(samples))) if samples.size else 0.0
                 rms = float(np.sqrt(np.mean(samples * samples))) if samples.size else 0.0
-                if peak < 0.0015 or rms < 0.0007:
+                if peak < 0.00045 or rms < 0.00015:
                     return ""
                 # Normalize quiet microphone input before local inference.
-                gain = min(18.0, 0.82 / max(peak, 0.0001))
+                gain = min(35.0, 0.90 / max(peak, 0.0001))
                 samples = np.clip(samples * gain, -1.0, 1.0)
                 # Resample the device's native rate (often 44.1/48 kHz) to Whisper's 16 kHz.
                 if mic_rate != sample_rate:
@@ -1302,7 +1302,7 @@ def start_local_wake_listener():
                 return " ".join(segment.text.strip() for segment in segments).strip()
 
             pending_confirmation = None
-            noise_floor = 0.0015
+            noise_floor = 0.0008
             pre_roll = []
             captured = []
             speaking = False
@@ -1321,9 +1321,9 @@ def start_local_wake_listener():
                 while True:
                     chunk = audio_queue.get()
                     level = float(np.sqrt(np.mean(chunk * chunk))) if chunk.size else 0.0
-                    threshold = max(0.0018, min(0.018, noise_floor * 2.2))
+                    threshold = max(0.00055, min(0.008, noise_floor * 1.8))
                     if not speaking:
-                        noise_floor = noise_floor * 0.97 + level * 0.03
+                        noise_floor = noise_floor * 0.985 + min(level, 0.01) * 0.015
                         pre_roll.append(chunk)
                         if len(pre_roll) > 4:
                             pre_roll.pop(0)
