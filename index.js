@@ -4106,7 +4106,7 @@ async function interpretVoiceCommand(transcript) {
   const allowed = new Set([
     "open_app", "open_folder", "open_google", "search_google",
     "open_youtube", "search_youtube", "install_app", "uninstall_app",
-    "close_app", "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"
+    "close_app", "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "set_volume"
   ]);
   const system = [
     "Ты — семантический парсер голосовых команд Windows-ассистента NEXUS.",
@@ -4116,6 +4116,7 @@ async function interpretVoiceCommand(transcript) {
     "«отправ компьютер спать», «усыпи ноут», «переведи ПК в сон» => sleep_pc. «перезапусти/ребутни ноут» => restart_pc. «выруби компьютер» => shutdown_pc. «закрой всё» => close_all_apps.",
     "«закрой Discord», «закрой приложение Telegram», «выключи Millida Launcher» => close_app с app=название приложения. Не путай закрытие одного приложения с close_all_apps.",
     "«переведи ноут в режим блокировки», «заблокируй ноут», «поставь компьютер на блокировку» => lock_pc.",
+    "Установить громкость/звук на N процентов => set_volume с percent=N (целое от 0 до 100).",
     "Понимай любые естественные варианты: открой, запусти, включи, можешь открыть, открой-ка, пожалуйста, и похожие формы.",
     "Если сказано найти/поищи что-то в интернете — search_google; если на YouTube — search_youtube. Если сказано просто открыть Google или YouTube — open_google/open_youtube.",
     "Для установки/скачивания приложения => install_app. Для удаления => uninstall_app. Извлеки только название приложения, исправляя ASR-ошибки.",
@@ -4269,6 +4270,15 @@ bot.on("message:voice", async ctx => {
       const app = apps.find(([, names]) => names.some(name => spoken.includes(name)));
       const wantsOpenKnownApp = Boolean(app && app[0] === "Millida Launcher" && !isSearch && !isDownload);
 
+      const volumeMatch = spoken.match(/(?:громкост\\w*|звук)\\s+(?:на\\s+)?(\\d{1,3})\\s*(?:%|процент\\w*)?/iu);
+      if (volumeMatch) {
+        const percent = Number(volumeMatch[1]);
+        if (percent >= 0 && percent <= 100) {
+          action = "set_volume";
+          args = { percent };
+        }
+      }
+
       const isShutdown = /(?:выключи|выключить|выруби|вырубить|отключи|отключить|заверши\s+работу|погаси)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken)
         || /(?:заверши|завершить)\s+работу/iu.test(spoken);
       const isRestart = /(?:перезагрузи|перезапусти|перезагрузить|перезапустить|ребутни|сделай\s+ребут)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)?/iu.test(spoken);
@@ -4283,7 +4293,9 @@ bot.on("message:voice", async ctx => {
         .replace(/^(?:(?:мне|пожалуйста)\s+)/iu, "")
         .replace(/[.!?,]+$/g, "").trim();
       const closeOneMatch = spoken.match(/(?:закрой|закрывай|закройте|заверши|завершить|закрыть|прикрой|выключи|выключить)\s+(?:(?:мне|пожалуйста)\s+)?(?:(?:приложение|программу|окно)\s+)?(.{2,80})$/iu);
-      if (telegramMessageMatch) {
+      if (action === "set_volume") {
+        // Exact volume intent was parsed above.
+      } else if (telegramMessageMatch) {
         action = "telegram_send_message";
         args = { recipient: telegramMessageMatch[1].trim(), text: telegramMessageMatch[2].trim() };
       } else if (closeAll) {
