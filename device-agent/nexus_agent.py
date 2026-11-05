@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-16"
+AGENT_VERSION = "2026.11.05-voice-pc-17"
 import base64
 import json
 import os
@@ -453,9 +453,19 @@ $lines | Select-Object -First 85
         user32.EnumWindows(callback, 0)
         return {"result": "Отправил обычное закрытие для " + str(len(closed)) + " окон. Если в приложениях есть несохранённые данные, Windows покажет запрос на сохранение. Принудительное завершение не выполнялось."}
     if action == "set_volume":
-        percent = args.get("percent")
-        if isinstance(percent, bool) or not isinstance(percent, (int, float)) or int(percent) != percent or not 0 <= int(percent) <= 100:
-            raise ValueError("Громкость должна быть от 0 до 100 процентов.")
+        mode = str(args.get("mode", "set")).lower()
+        if mode == "set":
+            value = args.get("percent")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or int(value) != value or not 0 <= int(value) <= 100:
+                raise ValueError("Громкость должна быть от 0 до 100 процентов.")
+            value = int(value)
+        elif mode in ("up", "down"):
+            value = args.get("amount", 10)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or int(value) != value or not 1 <= int(value) <= 100:
+                raise ValueError("Шаг изменения громкости должен быть от 1 до 100.")
+            value = int(value)
+        else:
+            raise ValueError("Неизвестный режим изменения громкости.")
         ps_script = r"""
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
@@ -500,20 +510,35 @@ interface IAudioEndpointVolume {
     int GetVolumeRange(out float min, out float max, out float increment);
 }
 public static class NexusVolume {
-    public static void Set(float scalar) {
+    private static IAudioEndpointVolume GetEndpoint() {
         IMMDeviceEnumerator enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
         IMMDevice device;
         Marshal.ThrowExceptionForHR(enumerator.GetDefaultAudioEndpoint(0, 1, out device));
         Guid iid = typeof(IAudioEndpointVolume).GUID;
         IAudioEndpointVolume volume;
         Marshal.ThrowExceptionForHR(device.Activate(ref iid, 23, IntPtr.Zero, out volume));
+        return volume;
+    }
+    public static float Get() {
+        float scalar;
+        Marshal.ThrowExceptionForHR(GetEndpoint().GetMasterVolumeLevelScalar(out scalar));
+        return scalar;
+    }
+    public static void Set(float scalar) {
         Guid eventGuid = Guid.Empty;
-        Marshal.ThrowExceptionForHR(volume.SetMasterVolumeLevelScalar(scalar, ref eventGuid));
+        Marshal.ThrowExceptionForHR(GetEndpoint().SetMasterVolumeLevelScalar(scalar, ref eventGuid));
     }
 }
 '@
-[NexusVolume]::Set(__PERCENT__ / 100.0)
-""".replace("__PERCENT__", str(int(percent)))
+$current = [NexusVolume]::Get()
+$mode = '__MODE__'
+$value = __VALUE__
+if ($mode -eq 'set') { $target = $value / 100.0 }
+elseif ($mode -eq 'up') { $target = [Math]::Min(1.0, $current + ($value / 100.0)) }
+else { $target = [Math]::Max(0.0, $current - ($value / 100.0)) }
+[NexusVolume]::Set([float]$target)
+Write-Output ('NEXUS_VOLUME_RESULT=' + [Math]::Round($target * 100))
+""".replace("__MODE__", mode).replace("__VALUE__", str(value))
         powershell = __import__("shutil").which("powershell.exe") or __import__("shutil").which("powershell")
         if not powershell:
             raise RuntimeError("Не найден Windows PowerShell.")
@@ -522,7 +547,12 @@ public static class NexusVolume {
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout or "неизвестная ошибка").strip()[-700:]
             raise RuntimeError("Не удалось изменить системную громкость: " + detail)
-        return {"result": "Громкость Windows установлена на " + str(int(percent)) + "%."}
+        import re
+        match = re.search(r"NEXUS_VOLUME_RESULT=(\d+)", proc.stdout or "")
+        actual = int(match.group(1)) if match else (value if mode == "set" else None)
+        if actual is None:
+            return {"result": "Громкость Windows изменена."}
+        return {"result": "Громкость Windows: " + str(actual) + "%."}
     if action in ("shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"):
         if action == "shutdown_pc":
             subprocess.Popen(["shutdown.exe", "/s", "/t", "0"], shell=False)
