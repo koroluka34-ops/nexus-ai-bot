@@ -272,7 +272,9 @@ $lines | Select-Object -First 45
         current_pid = os.getpid()
         shell_processes = {"explorer.exe", "dwm.exe", "sihost.exe",
             "startmenuexperiencehost.exe", "shellexperiencehost.exe",
-            "searchhost.exe", "textinputhost.exe", "lockapp.exe"}
+            "searchhost.exe", "textinputhost.exe", "lockapp.exe",
+            "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe",
+            "wt.exe", "conhost.exe", "openconsole.exe", "python.exe", "pythonw.exe"}
         closed, skipped = [], []
         callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
         def close_window(hwnd, _):
