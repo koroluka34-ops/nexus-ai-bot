@@ -78,7 +78,7 @@ body.game-mode .game-grid button[data-game-mouse="right"]{background:#047857dd}
   try{const r=await fetch('/device/touchpad',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:JSON.stringify(payload),keepalive:true});if(!r.ok){let info={};try{info=await r.json();}catch{}status.textContent=r.status===401?'Нет доступа: '+(info.error||'unknown'):'Ошибка связи ('+r.status+')';return;}status.textContent='🟢 ПК управляется';return true;}
   catch{status.textContent='Нет связи с сервером';return false;}
  }
- function flush(){raf=0;if(moveX||moveY){const dx=Math.max(-60,Math.min(60,Math.round(moveX*sensitivity))),dy=Math.max(-60,Math.min(60,Math.round(moveY*sensitivity)));moveX=0;moveY=0;if(!sendMoveFast(dx,dy))send({type:'move',dx,dy});}}
+ function flush(){raf=0;if(moveX||moveY){const dx=Math.max(-60,Math.min(60,Math.round(moveX*sensitivity))),dy=Math.max(-60,Math.min(60,Math.round(moveY*sensitivity)));moveX=0;moveY=0;if(!sendMoveFast(dx,dy)){/* Не ставим устаревшие движения камеры в HTTP-очередь: при перегрузке канала лучше пропустить один кадр движения, чем получить рывок с задержкой. */if(!moveChannel||moveChannel.readyState!=='open')send({type:'move',dx,dy});}}}
  function queueMove(dx,dy){moveX=Math.max(-100,Math.min(100,moveX+dx));moveY=Math.max(-100,Math.min(100,moveY+dy));if(!raf)raf=requestAnimationFrame(flush);}
  async function startLiveVideo(){
  if(!initData||!window.RTCPeerConnection){screenState.textContent='Видео недоступно';return;}
