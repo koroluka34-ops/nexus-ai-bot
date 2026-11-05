@@ -4198,6 +4198,13 @@ bot.on("message:voice", async ctx => {
       let args = {};
 
       const wantsOpen = hasAny("открой", "откройте", "открывай", "открывайте", "откроем", "открыть", "запусти", "запустите", "запускай", "запускайте", "запустить", "включи", "включите", "включить", "стартани", "стартуем", "подними", "покажи") || /(?:можешь|мог\s+бы|не\s+мог\s+бы|пожалуйста)\s+(?:мне\s+)?(?:открыть|запустить|включить)/iu.test(spoken);
+      // Telegram Desktop: voice command "напиши контакту Костя, привет, как дела".
+      // Для первого безопасного релиза работаем только с уже открытым чатом:
+      // Windows agent проверит заголовок окна, а отправка будет только после callback-подтверждения.
+      const telegramCommand = spoken
+        .replace(/^(?:(?:открой|запусти|включи)\s+(?:телеграм(?:\s+десктоп)?|телегу)\s*[,;]?\s*)/iu, "")
+        .replace(/^(?:пожалуйста\s+|мне\s+)?/iu, "");
+      const telegramMessageMatch = telegramCommand.match(/^(?:напиши|отправь|отправить)\s+(?:(?:сообщение|смс)\s+)?(?:контакту\s+)?(.{1,60}?)[,:]\s*(.{1,1000})$/iu);
       const closeAll = /(?:закрой|закрывай|закройте|позакрывай|заверши|завершить|закрыть|прикрой)\s+(?:(?:мне|пожалуйста)\s+)?(?:вообще\s+)?(?:все|всё|все\s+открытые)\s*(?:приложения|программы|окна)?\s*$/iu.test(spoken)
         || /^(?:закрой|закрыть|заверши)\s+(?:все\s+)?(?:приложения|программы|окна)$/iu.test(spoken);
       const folders = [
@@ -4274,7 +4281,10 @@ bot.on("message:voice", async ctx => {
         .replace(/^(?:(?:мне|пожалуйста)\s+)/iu, "")
         .replace(/[.!?,]+$/g, "").trim();
       const closeOneMatch = spoken.match(/(?:закрой|закрывай|закройте|заверши|завершить|закрыть|прикрой|выключи|выключить)\s+(?:(?:мне|пожалуйста)\s+)?(?:(?:приложение|программу|окно)\s+)?(.{2,80})$/iu);
-      if (closeAll) {
+      if (telegramMessageMatch) {
+        action = "telegram_send_message";
+        args = { recipient: telegramMessageMatch[1].trim(), text: telegramMessageMatch[2].trim() };
+      } else if (closeAll) {
         action = "close_all_apps";
       } else if (closeOneMatch && closeOneMatch[1] && !/^(?:все|всё|все приложения|все программы|все окна)$/iu.test(closeOneMatch[1].trim())) {
         action = "close_app";
@@ -4373,6 +4383,14 @@ bot.on("message:voice", async ctx => {
       }
 
       if (action) {
+        if (action === "telegram_send_message") {
+          const recipient = String(args.recipient || "").trim();
+          const message = String(args.text || "").trim();
+          if (!recipient || !message) throw new Error("Не удалось распознать контакт и текст сообщения. Скажи: «Напиши контакту Костя, привет, как дела?»");
+          await requestVoicePcConfirmation(ctx, action, args, "Отправить сообщение в Telegram контакту «" + recipient + "»:\n\n" + message);
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Подготовил сообщение для Telegram. Проверь текст и подтверди отправку кнопкой.").catch(() => {});
+          return;
+        }
         if (action === "install_store_app" || action === "install_app") {
           const description = "Установить «" + args.query + "» через winget";
           await requestVoicePcConfirmation(ctx, action, args, description);
