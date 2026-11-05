@@ -261,6 +261,55 @@ $lines | Select-Object -First 45
                 raise ValueError("Нашёл несколько похожих установленных программ: " + ", ".join(x[0] for x in found[:6]) + ". Уточни название.")
         except ImportError: pass
         raise ValueError("Не нашёл установленное приложение «" + app + "». Проверь название или произношение.")
+    if action == "close_all_apps":
+        # Graceful close only: WM_CLOSE lets each application show its own
+        # unsaved-work prompt. Never force-kill processes or bypass dialogs.
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        WM_CLOSE = 0x0010
+        SMTO_ABORTIFHUNG = 0x0002
+        current_pid = os.getpid()
+        shell_processes = {"explorer.exe", "dwm.exe", "sihost.exe",
+            "startmenuexperiencehost.exe", "shellexperiencehost.exe",
+            "searchhost.exe", "textinputhost.exe", "lockapp.exe"}
+        closed, skipped = [], []
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def close_window(hwnd, _):
+            try:
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length <= 0:
+                    return True
+                title = ctypes.create_unicode_buffer(min(length + 1, 512))
+                user32.GetWindowTextW(hwnd, title, len(title))
+                pid = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value == current_pid:
+                    return True
+                process_name = ""
+                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+                if handle:
+                    try:
+                        image_path = ctypes.create_unicode_buffer(1024)
+                        size = wintypes.DWORD(len(image_path))
+                        if ctypes.windll.kernel32.QueryFullProcessImageNameW(handle, 0, image_path, ctypes.byref(size)):
+                            process_name = os.path.basename(image_path.value).lower()
+                    finally:
+                        ctypes.windll.kernel32.CloseHandle(handle)
+                if process_name in shell_processes:
+                    return True
+                result = wintypes.DWORD()
+                user32.SendMessageTimeoutW(hwnd, WM_CLOSE, 0, 0, SMTO_ABORTIFHUNG, 1500, ctypes.byref(result))
+                closed.append(title.value[:100])
+            except Exception as exc:
+                skipped.append(str(exc)[:100])
+            return True
+        callback = callback_type(close_window)
+        user32.EnumWindows(callback, 0)
+        return {"result": "Отправил обычное закрытие для " + str(len(closed)) + " окон. Если в приложениях есть несохранённые данные, Windows покажет запрос на сохранение. Принудительное завершение не выполнялось."}
     if action in ("shutdown_pc", "restart_pc", "sleep_pc", "lock_pc"):
         if action == "shutdown_pc":
             subprocess.Popen(["shutdown.exe", "/s", "/t", "0"], shell=False)
