@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """NEXUS Windows Agent — outbound-only, allowlisted desktop bridge."""
-AGENT_VERSION = "2026.11.05-voice-pc-5"
+AGENT_VERSION = "2026.11.05-voice-pc-6"
 import base64
 import json
 import os
@@ -140,21 +140,21 @@ def execute(command):
                 try: shortcuts.extend(p for p in root.rglob("*.lnk") if p.is_file())
                 except OSError: pass
         exact = [p for p in shortcuts if norm(p.stem) == wanted]
-        matches = exact or [p for p in shortcuts if wanted in norm(p.stem) or norm(p.stem) in wanted]
+        matches = exact or [p for p in shortcuts if norm(p.stem) and wanted and (wanted in norm(p.stem) or norm(p.stem) in wanted)]
         if len(matches) == 1:
             os.startfile(str(matches[0]))
             return {"result": "Открыто приложение: " + matches[0].stem}
         if len(matches) > 1:
             raise ValueError("Нашёл несколько ярлыков: " + ", ".join(p.stem for p in matches[:6]) + ". Уточни название.")
         # Получаем список приложений Windows безопасной фиксированной командой.
-        ps = r"Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress"
+        ps = r"[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); $OutputEncoding = New-Object System.Text.UTF8Encoding($false); Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress"
         try:
             proc = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, shell=False)
             rows = json.loads(proc.stdout) if proc.returncode == 0 and proc.stdout.strip() else []
             if isinstance(rows, dict): rows = [rows]
             exact_apps = [x for x in rows if norm(x.get("Name", "")) == wanted]
-            matches = exact_apps or [x for x in rows if wanted in norm(x.get("Name", "")) or norm(x.get("Name", "")) in wanted]
+            matches = exact_apps or [x for x in rows if norm(x.get("Name", "")) and wanted and (wanted in norm(x.get("Name", "")) or norm(x.get("Name", "")) in wanted)]
             if len(matches) == 1 and matches[0].get("AppID"):
                 subprocess.Popen(["explorer.exe", "shell:AppsFolder\\" + str(matches[0]["AppID"])], shell=False)
                 return {"result": "Открываю приложение: " + str(matches[0].get("Name", app))}
@@ -178,7 +178,7 @@ def execute(command):
                             try:
                                 with winreg.OpenKey(parent, winreg.EnumKey(parent, i)) as item:
                                     display = str(winreg.QueryValueEx(item, "DisplayName")[0])
-                                    if wanted and (wanted in norm(display) or norm(display) in wanted):
+                                    if wanted and norm(display) and (wanted in norm(display) or norm(display) in wanted):
                                         icon = str(winreg.QueryValueEx(item, "DisplayIcon")[0])
                                         exe = os.path.expandvars(icon.strip().strip('"').split(",")[0])
                                         path = Path(exe)
