@@ -4648,14 +4648,14 @@ bot.on("message:text", async ctx => {
   // Deterministic PC commands from ordinary Telegram text (do not send these to Groq).
   const normalizedCommand = addressedQuestion.replace(/[.!?]+$/g, "").trim();
 
-  if (/^(?:открой|запусти|включи)\\s+(?:ютуб|youtube)(?:\\s+сайт)?$/iu.test(normalizedCommand)) {
+  if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)(?:\s+сайт)?$/iu.test(normalizedCommand)) {
     queueVoiceAction("open_url", { url: "https://www.youtube.com/" }, userId, ctx.chat.id);
     await ctx.reply("▶️ Отправил команду открыть YouTube на подключённом ПК.");
     return;
   }
 
   const brightnessChange = normalizedCommand.match(
-    /^(?:уменьши|понизь|снизь)\\s+(?:мне\\s+)?яркость(?:\\s+экрана)?\\s+(?:на\\s+)?(\\d{1,3})\\s*(?:%|процент(?:а|ов)?)?$/iu
+    /^(?:уменьши|понизь|снизь)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu
   );
   if (brightnessChange) {
     const amount = Number(brightnessChange[1]);
