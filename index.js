@@ -4645,18 +4645,19 @@ bot.on("message:text", async ctx => {
   }
   const addressedQuestion = ctx.message.text.trim();
 
-  // Текстовые команды Microsoft Store используют тот же запрос подтверждения, что и голосовые.
-  // Поддерживаем фразы: «скачай Telegram из Microsoft Store» и «установи Telegram через магазин Microsoft».
+  // Текстовые команды Microsoft Store: отдельная установка и составная команда
+  // «Открой Microsoft Store и скачай ChatGPT».
+  const storeName = "(?:microsoft\\s+store|майкрософт\\s+стор(?:е)?|микрософт\\s+стор(?:е)?)";
   const storeInstallMatch = addressedQuestion.match(
-    /^(?:пожалуйста[, ]*)?(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\s+(.+?)\s+(?:из|через)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
+    new RegExp("^(?:пожалуйста[, ]*)?(?:(?:открой|запусти)\\s+" + storeName + "\\s+и\\s+(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)|(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)\\s+(?:из|через|в)\\s+" + storeName + ")[.!?]*$", "iu")
   );
   if (storeInstallMatch) {
-    const appName = storeInstallMatch[1]
-      .replace(/^(?:приложение|программу)\s+/iu, "")
+    const appName = (storeInstallMatch[1] || storeInstallMatch[2] || "")
+      .replace(/^(?:приложение|программу)\\s+/iu, "")
       .replace(/[.!?]+$/g, "")
       .trim();
-    if (!appName || appName.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(appName)) {
-      await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Скачай Telegram из Microsoft Store».");
+    if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(appName)) {
+      await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Открой Microsoft Store и скачай ChatGPT».");
       return;
     }
     try {
