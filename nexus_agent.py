@@ -123,7 +123,7 @@ def execute(action, args):
     if action == "install_store_app":
         return open_microsoft_store(args.get("query", ""))
     if action == "open_app":
-n        return open_app(args.get("app", ""))
+        return open_app(args.get("app", ""))
     if action == "close_app":
         return close_app(args.get("app", ""))
     if action == "open_folder":
