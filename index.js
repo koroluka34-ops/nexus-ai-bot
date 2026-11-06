@@ -4658,7 +4658,11 @@ bot.on("message:text", async ctx => {
       await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Скачай Telegram из Microsoft Store».");
       return;
     }
-    await requestVoiceStoreInstallConfirmation(ctx, appName);
+    try {
+      await requestVoiceStoreInstallConfirmation(ctx, appName);
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
     return;
   }
 
@@ -4666,8 +4670,12 @@ bot.on("message:text", async ctx => {
     /^(?:пожалуйста[, ]*)?(?:открой|запусти)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
   );
   if (storeOpenMatch) {
-    queueVoiceAction("open_store", {}, userId, ctx.chat.id);
-    await ctx.reply("🛍 Отправил команду открыть Microsoft Store на подключённом ПК.");
+    try {
+      queueVoiceAction("open_store", {}, userId, ctx.chat.id);
+      await ctx.reply("🛍 Отправил команду открыть Microsoft Store на подключённом ПК.");
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
     return;
   }
 
