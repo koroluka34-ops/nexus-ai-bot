@@ -4164,7 +4164,7 @@ async function interpretVoiceCommand(transcript) {
     const percent = Number(parsed.percent);
     const amount = Number(parsed.amount);
     const volumeMode = String(parsed.mode || "set").toLowerCase();
-    if (action === "set_volume" && !(
+    if (["set_volume", "set_brightness"].includes(action) && !(
       (volumeMode === "set" && Number.isInteger(percent) && percent >= 0 && percent <= 100) ||
       (["up", "down"].includes(volumeMode) && Number.isInteger(amount) && amount >= 1 && amount <= 100)
     )) return null;
@@ -4174,7 +4174,7 @@ async function interpretVoiceCommand(transcript) {
       action === "open_settings" ? { page } :
       ["set_wifi","set_airplane_mode"].includes(action) ? { state } :
       action === "get_pc_status" ? {} :
-      action === "set_volume" ? (volumeMode === "set" ? { mode: "set", percent } : { mode: volumeMode, amount }) : { }, confidence };
+      ["set_volume", "set_brightness"].includes(action) ? (volumeMode === "set" ? { mode: "set", percent } : { mode: volumeMode, amount }) : { }, confidence };
   } catch (error) {
     console.warn("NEXUS voice interpreter returned invalid JSON:", String(raw).slice(0, 500));
     return null;
@@ -4708,7 +4708,66 @@ bot.on("message:text", async ctx => {
     return;
   }
 
-  // General natural-language PC command routing for text messages.\n  // Reuse the same constrained semantic interpreter as voice commands instead of\n  // letting Groq answer that it cannot access the connected Windows PC.\n  const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");\n  if (ownerId && String(userId) === ownerId) {\n    let interpreted = null;\n    try { interpreted = await interpretVoiceCommand(addressedQuestion); }\n    catch (error) { console.warn("NEXUS text PC interpreter failed:", error.message); }\n    if (interpreted?.action) {\n      let { action, args } = interpreted;\n      args = args || {};\n      if (action === "open_google") { action = "open_url"; args = { url: "https://www.google.com/" }; }\n      else if (action === "open_youtube") { action = "open_url"; args = { url: "https://www.youtube.com/" }; }\n      else if (action === "search_google" || action === "search_youtube") {\n        const query = String(args.query || "").trim();\n        if (query) {\n          action = "open_url";\n          args = { url: action === "search_youtube"\n            ? "https://www.youtube.com/results?search_query=" + encodeURIComponent(query)\n            : "https://www.google.com/search?q=" + encodeURIComponent(query) };\n        }\n      }\n      const needsConfirmation = [\n        "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app",\n        "close_all_apps", "close_app", "install_app"\n      ].includes(action) || (action === "set_wifi" && args.state === "off") || action === "set_airplane_mode";\n      if (action === "install_app") {\n        await requestVoicePcConfirmation(ctx, action, args, "Установить «" + args.query + "» через winget");\n        return;\n      }\n      if (needsConfirmation) {\n        const descriptions = {\n          shutdown_pc: "Выключить компьютер", restart_pc: "Перезагрузить компьютер",\n          sleep_pc: "Перевести компьютер в спящий режим", lock_pc: "Заблокировать компьютер",\n          uninstall_app: "Удалить приложение «" + args.app + "»",\n          close_app: "Закрыть приложение «" + args.app + "»",\n          close_all_apps: "Закрыть все приложения (несохранённые изменения могут быть потеряны)",\n          set_wifi: "Отключить Wi-Fi на компьютере",\n          set_airplane_mode: args.state === "on" ? "Включить авиарежим (Wi-Fi и Bluetooth будут отключены)" : "Выключить авиарежим (Wi-Fi и Bluetooth будут включены)"\n        };\n        await requestVoicePcConfirmation(ctx, action, args, descriptions[action] || "Подтвердить действие на ПК");\n        return;\n      }\n      try {\n        queueVoiceAction(action, args, userId, ctx.chat.id);\n        const labels = {\n          open_app: "Запускаю приложение", open_folder: "Открываю папку",\n          open_url: "Открываю сайт", set_volume: "Меняю громкость",\n          set_brightness: "Меняю яркость", open_settings: "Открываю настройки Windows",\n          set_wifi: "Включаю Wi-Fi", get_pc_status: "Запрашиваю состояние компьютера"\n        };\n        await ctx.reply("🖥 " + (labels[action] || "Отправил команду") + ". Выполняю на подключённом ПК.");\n      } catch (error) {\n        await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));\n      }\n      return;\n    }\n  }\n  const rememberMatch = addressedQuestion.match(/^(?:запомни|сохрани в памяти)\s*[:,]?\s*(?:что\s+)?([\s\S]{2,1500})$/iu);
+  // General natural-language PC command routing for text messages.
+  // Reuse the same constrained semantic interpreter as voice commands instead of
+  // letting Groq answer that it cannot access the connected Windows PC.
+  const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+  if (ownerId && String(userId) === ownerId) {
+    let interpreted = null;
+    try { interpreted = await interpretVoiceCommand(addressedQuestion); }
+    catch (error) { console.warn("NEXUS text PC interpreter failed:", error.message); }
+    if (interpreted?.action) {
+      let { action, args } = interpreted;
+      args = args || {};
+      if (action === "open_google") { action = "open_url"; args = { url: "https://www.google.com/" }; }
+      else if (action === "open_youtube") { action = "open_url"; args = { url: "https://www.youtube.com/" }; }
+      else if (action === "search_google" || action === "search_youtube") {
+        const query = String(args.query || "").trim();
+        const searchTarget = action;
+        if (query) {
+          action = "open_url";
+          args = { url: searchTarget === "search_youtube"
+            ? "https://www.youtube.com/results?search_query=" + encodeURIComponent(query)
+            : "https://www.google.com/search?q=" + encodeURIComponent(query) };
+        }
+      }
+      const needsConfirmation = [
+        "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app",
+        "close_all_apps", "close_app", "install_app"
+      ].includes(action) || (action === "set_wifi" && args.state === "off") || action === "set_airplane_mode";
+      if (action === "install_app") {
+        await requestVoicePcConfirmation(ctx, action, args, "Установить «" + args.query + "» через winget");
+        return;
+      }
+      if (needsConfirmation) {
+        const descriptions = {
+          shutdown_pc: "Выключить компьютер", restart_pc: "Перезагрузить компьютер",
+          sleep_pc: "Перевести компьютер в спящий режим", lock_pc: "Заблокировать компьютер",
+          uninstall_app: "Удалить приложение «" + args.app + "»",
+          close_app: "Закрыть приложение «" + args.app + "»",
+          close_all_apps: "Закрыть все приложения (несохранённые изменения могут быть потеряны)",
+          set_wifi: "Отключить Wi-Fi на компьютере",
+          set_airplane_mode: args.state === "on" ? "Включить авиарежим (Wi-Fi и Bluetooth будут отключены)" : "Выключить авиарежим (Wi-Fi и Bluetooth будут включены)"
+        };
+        await requestVoicePcConfirmation(ctx, action, args, descriptions[action] || "Подтвердить действие на ПК");
+        return;
+      }
+      try {
+        queueVoiceAction(action, args, userId, ctx.chat.id);
+        const labels = {
+          open_app: "Запускаю приложение", open_folder: "Открываю папку",
+          open_url: "Открываю сайт", set_volume: "Меняю громкость",
+          set_brightness: "Меняю яркость", open_settings: "Открываю настройки Windows",
+          set_wifi: "Включаю Wi-Fi", get_pc_status: "Запрашиваю состояние компьютера"
+        };
+        await ctx.reply("🖥 " + (labels[action] || "Отправил команду") + ". Выполняю на подключённом ПК.");
+      } catch (error) {
+        await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+      }
+      return;
+    }
+  }
+  const rememberMatch = addressedQuestion.match(/^(?:запомни|сохрани в памяти)\s*[:,]?\s*(?:что\s+)?([\s\S]{2,1500})$/iu);
   if (rememberMatch) {
     const saved = await addLongTermFact(userId, rememberMatch[1].trim());
     await ctx.reply(saved ? "🧠 Запомнил и сохранил надолго." : "⚠️ Не удалось сохранить факт в Cloudflare KV.");
