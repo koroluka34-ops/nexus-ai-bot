@@ -143,6 +143,38 @@ def execute(action, args):
     if action == "sleep_pc":
         subprocess.Popen(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], shell=False)
         return "Отправил компьютер в спящий режим."
+    if action == "open_settings":
+        pages = {
+            "bluetooth": "ms-settings:bluetooth",
+            "hotspot": "ms-settings:network-mobilehotspot",
+            "airplane": "ms-settings:network-airplanemode",
+            "night_light": "ms-settings:nightlight",
+            "battery": "ms-settings:powersleep",
+            "accessibility": "ms-settings:easeofaccess",
+            "captions": "ms-settings:easeofaccess-closedcaptioning",
+            "display": "ms-settings:display",
+            "projection": "ms-settings:connect"
+        }
+        page = str(args.get("page", "")).lower()
+        if page not in pages:
+            raise ValueError("Раздел Windows не входит в разрешённый список.")
+        os.startfile(pages[page])
+        return "Открыл настройки Windows: " + page
+    if action == "set_wifi":
+        state = str(args.get("state", "")).lower()
+        if state not in ("on", "off"):
+            raise ValueError("Для Wi-Fi укажи on или off.")
+        ps = "$a=Get-NetAdapter -Physical | Where-Object {$_.Name -match 'Wi-Fi|Беспроводная'} | Select-Object -First 1; if(-not $a){throw 'Wi-Fi адаптер не найден'}; if('" + state + "' -eq 'on'){Enable-NetAdapter -Name $a.Name -Confirm:$false -ErrorAction Stop}else{Disable-NetAdapter -Name $a.Name -Confirm:$false -ErrorAction Stop}; $a.Name"
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or "Не удалось изменить Wi-Fi. Возможно, нужны права администратора.").strip()[-900:])
+        return "Wi-Fi " + ("включён" if state == "on" else "отключён") + "."
+    if action == "get_pc_status":
+        ps = "$b=Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue; if($b){'BATTERY=' + [int]$b.EstimatedChargeRemaining; 'STATUS=' + [int]$b.BatteryStatus}else{'BATTERY=unknown'}; 'AC=' + ((Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue).BatteryStatus)"
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or "Не удалось получить состояние батареи.").strip()[-700:])
+        return "Состояние ПК: " + result.stdout.strip().replace("\r", "").replace("\n", " · ")
     if action == "set_volume":
         try:
             from ctypes import POINTER, cast
@@ -177,7 +209,7 @@ def execute(action, args):
         # Windows WMI controls the built-in display backlight on supported laptops.
         script = r"""
 $ErrorActionPreference = 'Stop'
-$methods = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods
+$methods = Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods | Select-Object -First 1
 if (-not $methods) { throw 'Windows не обнаружила WMI-управление яркостью встроенного дисплея.' }
 $brightness = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness | Select-Object -First 1
 if (-not $brightness) { throw 'Не удалось прочитать текущую яркость дисплея.' }
@@ -188,7 +220,7 @@ $percent = [int]$env:NEXUS_BRIGHTNESS_PERCENT
 if ($mode -eq 'up') { $target = [Math]::Min(100, $current + $amount) }
 elseif ($mode -eq 'down') { $target = [Math]::Max(0, $current - $amount) }
 else { $target = $percent }
-$result = Invoke-CimMethod -InputObject ($methods | Select-Object -First 1) -MethodName WmiSetBrightness -Arguments @{ Timeout = [uint32]1; Brightness = [byte]$target }
+$result = $methods.WmiSetBrightness([uint32]1, [byte]$target)
 if ($result.ReturnValue -ne 0) { throw ('Windows вернула код ошибки яркости: ' + $result.ReturnValue) }
 Write-Output $target
 """
