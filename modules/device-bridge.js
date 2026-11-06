@@ -126,9 +126,9 @@ function queueVoiceAction(action, args, userId, chatId) {
     const pages = new Set(["bluetooth","hotspot","airplane","night_light","battery","accessibility","captions","display","projection"]);
     if (!pages.has(String(args.page || ""))) throw new Error("Раздел настроек Windows не разрешён.");
     args = { page: String(args.page) };
-  } else if (action === "set_wifi") {
+  } else if (action === "set_wifi" || action === "set_airplane_mode") {
     const state = String(args.state || "").toLowerCase();
-    if (!["on","off"].includes(state)) throw new Error("Для Wi-Fi укажи on или off.");
+    if (!["on","off"].includes(state)) throw new Error("Для переключения укажи on или off.");
     args = { state };
   } else if (action === "get_pc_status") {
     args = {};
@@ -173,7 +173,7 @@ function requestVoiceStoreInstallConfirmation(ctx, query) {
 
 function requestVoicePcConfirmation(ctx, action, args, description) {
   if (!authorized(ctx)) throw new Error("Управление ПК доступно только владельцу.");
-  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "close_app", "install_app", "telegram_send_message", "set_wifi"]);
+  const allowed = new Set(["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "close_app", "install_app", "telegram_send_message", "set_wifi", "set_airplane_mode"]);
   if (!allowed.has(action)) throw new Error("Это действие нельзя запросить через подтверждение.");
   if (action === "telegram_send_message") {
     const recipient = String(args.recipient || "").trim();
@@ -181,9 +181,9 @@ function requestVoicePcConfirmation(ctx, action, args, description) {
     if (!recipient || recipient.length > 80 || !/^[\p{L}\p{N} ._@()+-]+$/u.test(recipient)) throw new Error("Имя контакта Telegram некорректно.");
     if (!message || message.length > 1000) throw new Error("Текст сообщения должен содержать от 1 до 1000 символов.");
     args = { recipient, text: message };
-  } else if (action === "set_wifi") {
+  } else if (action === "set_wifi" || action === "set_airplane_mode") {
     const state = String(args.state || "").toLowerCase();
-    if (!["on", "off"].includes(state)) throw new Error("Для Wi-Fi укажи on или off.");
+    if (!["on", "off"].includes(state)) throw new Error("Для переключения укажи on или off.");
     args = { state };
   } else if (action === "install_app") {
     const name = String(args.query || "").trim();
