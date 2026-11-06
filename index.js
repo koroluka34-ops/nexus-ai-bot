@@ -4304,20 +4304,39 @@ bot.on("message:voice", async ctx => {
       const wantsVolumeValue = volumeContext && !volumeSetMatch && !volumeUp && !volumeDown &&
         /(?:установи|установить|поставь|поставить|выстави|сделай)/iu.test(spoken);
 
-      // Brightness control: "яркость до 50%", "сделай экран ярче на 10%".
+      // Brightness control. Accept both digits and Russian spoken numbers
+      // (e.g. "установи яркость на два процента").
       const brightnessContext = /(?:яркост\w*|экран|диспле\w*|светлее|темнее)/iu.test(spoken);
-      const brightnessTargetMatch = brightnessContext && spoken.match(/(?:до|на|уровень|значение|составлять|составит)\s*(\d{1,3})\s*(?:%|процент\w*)?/iu);
-      const brightnessUp = /(?:увелич\w*|повыс\w*|добав\w*|прибав\w*|сделай\s+(?:экран\s+)?ярче|светлее)/iu.test(spoken);
-      const brightnessDown = /(?:уменьш\w*|пониз\w*|убав\w*|сделай\s+(?:экран\s+)?темнее|темнее)/iu.test(spoken);
+      const brightnessNumberWords = {
+        "ноль": 0, "нуль": 0, "один": 1, "одна": 1, "одно": 1,
+        "два": 2, "две": 2, "три": 3, "четыре": 4, "пять": 5,
+        "шесть": 6, "семь": 7, "восемь": 8, "девять": 9, "десять": 10,
+        "одиннадцать": 11, "двенадцать": 12, "тринадцать": 13,
+        "четырнадцать": 14, "пятнадцать": 15, "шестнадцать": 16,
+        "семнадцать": 17, "восемнадцать": 18, "девятнадцать": 19,
+        "двадцать": 20, "тридцать": 30, "сорок": 40, "пятьдесят": 50,
+        "шестьдесят": 60, "семьдесят": 70, "восемьдесят": 80,
+        "девяносто": 90, "сто": 100
+      };
+      const brightnessNumberPattern = "(\\d{1,3}|ноль|нуль|один|одна|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)(?:\\s+(?:один|одна|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять))?";
+      const parseBrightnessNumber = value => {
+        const normalized = String(value || "").toLocaleLowerCase("ru").trim();
+        if (/^\\d{1,3}$/u.test(normalized)) return Number(normalized);
+        const parts = normalized.split(/\\s+/u);
+        return parts.reduce((sum, part) => sum + (brightnessNumberWords[part] ?? 0), 0);
+      };
+      const brightnessTargetMatch = brightnessContext && spoken.match(new RegExp("(?:до|на|уровень|значение|составлять|составит)\\s*(" + brightnessNumberPattern + ")\\s*(?:%|процент\\w*)?", "iu"));
+      const brightnessUp = /(?:увелич\\w*|повыс\\w*|добав\\w*|прибав\\w*|сделай\\s+(?:экран\\s+)?ярче|светлее)/iu.test(spoken);
+      const brightnessDown = /(?:уменьш\\w*|пониз\\w*|убав\\w*|сделай\\s+(?:экран\\s+)?темнее|темнее)/iu.test(spoken);
       if (brightnessContext && brightnessTargetMatch) {
-        const percent = Number(brightnessTargetMatch[1]);
+        const percent = parseBrightnessNumber(brightnessTargetMatch[1]);
         if (percent >= 0 && percent <= 100) {
           action = "set_brightness";
           args = { mode: "set", percent };
         }
       } else if (brightnessContext && (brightnessUp || brightnessDown)) {
-        const amountMatch = spoken.match(/(\d{1,3})\s*(?:%|процент\w*)?/iu);
-        const amount = amountMatch ? Number(amountMatch[1]) : 10;
+        const amountMatch = spoken.match(new RegExp(brightnessNumberPattern + "\\s*(?:%|процент\\w*)?", "iu"));
+        const amount = amountMatch ? parseBrightnessNumber(amountMatch[0].replace(/\\s*(?:%|процент\\w*)?$/iu, "")) : 10;
         if (amount >= 1 && amount <= 100) {
           action = "set_brightness";
           args = { mode: brightnessUp ? "up" : "down", amount };
