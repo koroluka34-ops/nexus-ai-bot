@@ -217,6 +217,17 @@ if ($bt) {
         if result.returncode != 0:
             raise RuntimeError((result.stderr or result.stdout or "Не удалось изменить Wi-Fi. Возможно, нужны права администратора.").strip()[-900:])
         return "Wi-Fi " + ("включён" if state == "on" else "отключён") + "."
+    if action == "media_control":
+        import ctypes
+        command = str(args.get("command", ""))
+        keys = {"next": 0xB0, "previous": 0xB1, "play_pause": 0xB3, "stop": 0xB2}
+        if command not in keys:
+            raise RuntimeError("Неизвестная команда управления музыкой")
+        key = keys[command]
+        ctypes.windll.user32.keybd_event(key, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(key, 0, 2, 0)
+        return "Команда управления воспроизведением отправлена Windows."
+
     if action == "get_pc_status":
         ps = "$b=Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue; if($b){'BATTERY=' + [int]$b.EstimatedChargeRemaining; 'STATUS=' + [int]$b.BatteryStatus}else{'BATTERY=unknown'}; 'AC=' + ((Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue).BatteryStatus)"
         result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
