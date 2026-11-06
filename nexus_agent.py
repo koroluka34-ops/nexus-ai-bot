@@ -149,8 +149,13 @@ def execute(action, args):
             from comtypes import CLSCTX_ALL
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            # Newer pycaw versions expose EndpointVolume directly on AudioDevice;
+            # older versions require Activate() and COM interface casting.
+            if hasattr(devices, "EndpointVolume"):
+                volume = devices.EndpointVolume
+            else:
+                interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                volume = cast(interface, POINTER(IAudioEndpointVolume))
             mode = str(args.get("mode", "set")).lower()
             current = int(round(volume.GetMasterVolumeLevelScalar() * 100))
             if mode == "set":
