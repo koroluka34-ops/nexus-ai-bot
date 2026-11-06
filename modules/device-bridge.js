@@ -80,7 +80,7 @@ function wakeDevicePoller() {
 }
 function queueVoiceAction(action, args, userId, chatId) {
   if (!OWNER_ID || String(userId) !== OWNER_ID) {
-    throw new Error("Голосовое управление ПК доступно только владельцу.");
+    throw new Error("Управление ПК доступно только владельцу.");
   }
   const appName = String(args.app || "").trim();
   const query = String(args.query || "").trim();
@@ -156,7 +156,7 @@ function queueVoiceAction(action, args, userId, chatId) {
 }
 
 function requestVoiceStoreInstallConfirmation(ctx, query) {
-  if (!authorized(ctx)) throw new Error("Голосовая установка доступна только владельцу.");
+  if (!authorized(ctx)) throw new Error("Установка из Microsoft Store доступна только владельцу.");
   const safeQuery = String(query || "").trim();
   if (!safeQuery || safeQuery.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(safeQuery)) {
     throw new Error("Название приложения для Microsoft Store некорректно.");
@@ -167,7 +167,7 @@ function requestVoiceStoreInstallConfirmation(ctx, query) {
   const id = crypto.randomUUID();
   pending.set(id, { action: "install_store_app", args: { query: safeQuery }, userId: String(ctx.from.id), chatId: ctx.chat.id });
   const keyboard = new InlineKeyboard().text("✅ Да, установить", "pc_yes:" + id).text("❌ Отмена", "pc_no:" + id);
-  return ctx.reply("📦 Подтверди установку приложения из Microsoft Store:\n\n<b>" + safeText(safeQuery, 80).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) + "</b>\n\nПосле подтверждения NEXUS запустит установку на этом ПК и попробует открыть приложение.", { parse_mode: "HTML", reply_markup: keyboard });
+  return ctx.reply("📦 Подтверди установку приложения из Microsoft Store:\n\n<b>" + safeText(safeQuery, 80).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) + "</b>\n\nПосле подтверждения NEXUS откроет поиск приложения в Microsoft Store. Нажми «Получить/Установить» в самом магазине; завершение установки пока нужно подтвердить вручную.", { parse_mode: "HTML", reply_markup: keyboard });
 }
 
 

@@ -102,8 +102,26 @@ def close_app(name):
         return "Приложение закрыто: " + str(name)
     return "Процесс не найден или уже закрыт: " + str(name)
 
+def open_microsoft_store(query=None):
+    """Open the real Microsoft Store UI, optionally on its search results."""
+    if query:
+        query = str(query).strip()
+        if not query or len(query) > 80 or not re.fullmatch(r"[\wА-Яа-яЁё ._()+-]+", query, re.UNICODE):
+            raise ValueError("Название приложения для Microsoft Store некорректно.")
+        target = "ms-windows-store://search/?query=" + urllib.parse.quote(query)
+        os.startfile(target)
+        return ("Открыл Microsoft Store и поиск: " + query +
+                ". На странице приложения нажми «Получить/Установить». " +
+                "Пока Windows Store не подтвердит установку, я не буду считать приложение установленным.")
+    os.startfile("ms-windows-store:")
+    return "Открыл Microsoft Store."
+
 def execute(action, args):
     args = args or {}
+    if action == "open_store":
+        return open_microsoft_store()
+    if action == "install_store_app":
+        return open_microsoft_store(args.get("query", ""))
     if action == "open_app":
         return open_app(args.get("app", ""))
     if action == "close_app":

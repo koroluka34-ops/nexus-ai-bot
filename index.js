@@ -997,7 +997,6 @@ async function translateImagePrompt(prompt) {
     },
     { role: "user", content: prompt }
   ];
-
   try {
     return (await askGroq(messages)).answer.trim().slice(0, 2048);
   } catch {
@@ -1997,8 +1996,7 @@ bot.command("sticker", async ctx => {
     await ctx.reply(
       "🎨 Создание стикера\n\n" +
       "Из текста: /sticker милый космический кот, мультяшный стиль\n" +
-      "Из фото: ответь командой /sticker на фотографию."
-    );
+      "Из фото: ответь командой /sticker на фотографию."    );
     return;
   }
 
@@ -2997,8 +2995,7 @@ bot.command("base64", async ctx => {
     } else {
       const encoded = match[2].replace(/\s/g, "");
       if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 === 1) throw new Error("Некорректная строка Base64.");
-      const decoded = Buffer.from(encoded, "base64").toString("utf8");
-      await ctx.reply("🔤 Результат:\n" + decoded.slice(0, 3500));
+      const decoded = Buffer.from(encoded, "base64").toString("utf8");      await ctx.reply("🔤 Результат:\n" + decoded.slice(0, 3500));
     }
   } catch (error) {
     await ctx.reply("❌ " + error.message);
@@ -3997,8 +3994,7 @@ bot.callbackQuery("menu_create", async ctx => {
 
 bot.callbackQuery("menu_overdrive", async ctx => {
   await ctx.answerCallbackQuery();
-  await ctx.reply(
-    "⚡ <b>NEXUS OVERDRIVE</b>\n\n" +
+  await ctx.reply(    "⚡ <b>NEXUS OVERDRIVE</b>\n\n" +
     "Три независимых ИИ-агента: аналитик, критик и стратег. Четвёртый ИИ объединяет их выводы и выносит вердикт.\n\n" +
     "Пример: <code>/overdrive придумай необычную идею для моего проекта</code>",
     { parse_mode: "HTML" }
@@ -4545,7 +4541,12 @@ bot.on("message:voice", async ctx => {
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Подготовил сообщение для Telegram. Проверь текст и подтверди отправку кнопкой.").catch(() => {});
           return;
         }
-        if (action === "install_store_app" || action === "install_app") {
+        if (action === "install_store_app") {
+          await requestVoiceStoreInstallConfirmation(ctx, args.query);
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки «" + args.query + "» через Microsoft Store.").catch(() => {});
+          return;
+        }
+        if (action === "install_app") {
           const description = "Установить «" + args.query + "» через winget";
           await requestVoicePcConfirmation(ctx, action, args, description);
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + ".").catch(() => {});
@@ -4643,6 +4644,41 @@ bot.on("message:text", async ctx => {
     if (cleanedQuestion) ctx.message.text = cleanedQuestion;
   }
   const addressedQuestion = ctx.message.text.trim();
+
+  // Текстовые команды Microsoft Store используют тот же запрос подтверждения, что и голосовые.
+  // Поддерживаем фразы: «скачай Telegram из Microsoft Store» и «установи Telegram через магазин Microsoft».
+  const storeInstallMatch = addressedQuestion.match(
+    /^(?:пожалуйста[, ]*)?(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\s+(.+?)\s+(?:из|через)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
+  );
+  if (storeInstallMatch) {
+    const appName = storeInstallMatch[1]
+      .replace(/^(?:приложение|программу)\s+/iu, "")
+      .replace(/[.!?]+$/g, "")
+      .trim();
+    if (!appName || appName.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(appName)) {
+      await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Скачай Telegram из Microsoft Store».");
+      return;
+    }
+    try {
+      await requestVoiceStoreInstallConfirmation(ctx, appName);
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
+    return;
+  }
+
+  const storeOpenMatch = addressedQuestion.match(
+    /^(?:пожалуйста[, ]*)?(?:открой|запусти)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
+  );
+  if (storeOpenMatch) {
+    try {
+      queueVoiceAction("open_store", {}, userId, ctx.chat.id);
+      await ctx.reply("🛍 Отправил команду открыть Microsoft Store на подключённом ПК.");
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
+    return;
+  }
 
   const rememberMatch = addressedQuestion.match(/^(?:запомни|сохрани в памяти)\s*[:,]?\s*(?:что\s+)?([\s\S]{2,1500})$/iu);
   if (rememberMatch) {
