@@ -997,7 +997,6 @@ async function translateImagePrompt(prompt) {
     },
     { role: "user", content: prompt }
   ];
-
   try {
     return (await askGroq(messages)).answer.trim().slice(0, 2048);
   } catch {
@@ -1997,8 +1996,7 @@ bot.command("sticker", async ctx => {
     await ctx.reply(
       "🎨 Создание стикера\n\n" +
       "Из текста: /sticker милый космический кот, мультяшный стиль\n" +
-      "Из фото: ответь командой /sticker на фотографию."
-    );
+      "Из фото: ответь командой /sticker на фотографию."    );
     return;
   }
 
@@ -2997,8 +2995,7 @@ bot.command("base64", async ctx => {
     } else {
       const encoded = match[2].replace(/\s/g, "");
       if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 === 1) throw new Error("Некорректная строка Base64.");
-      const decoded = Buffer.from(encoded, "base64").toString("utf8");
-      await ctx.reply("🔤 Результат:\n" + decoded.slice(0, 3500));
+      const decoded = Buffer.from(encoded, "base64").toString("utf8");      await ctx.reply("🔤 Результат:\n" + decoded.slice(0, 3500));
     }
   } catch (error) {
     await ctx.reply("❌ " + error.message);
@@ -3997,8 +3994,7 @@ bot.callbackQuery("menu_create", async ctx => {
 
 bot.callbackQuery("menu_overdrive", async ctx => {
   await ctx.answerCallbackQuery();
-  await ctx.reply(
-    "⚡ <b>NEXUS OVERDRIVE</b>\n\n" +
+  await ctx.reply(    "⚡ <b>NEXUS OVERDRIVE</b>\n\n" +
     "Три независимых ИИ-агента: аналитик, критик и стратег. Четвёртый ИИ объединяет их выводы и выносит вердикт.\n\n" +
     "Пример: <code>/overdrive придумай необычную идею для моего проекта</code>",
     { parse_mode: "HTML" }
@@ -4545,7 +4541,12 @@ bot.on("message:voice", async ctx => {
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Подготовил сообщение для Telegram. Проверь текст и подтверди отправку кнопкой.").catch(() => {});
           return;
         }
-        if (action === "install_store_app" || action === "install_app") {
+        if (action === "install_store_app") {
+          await requestVoiceStoreInstallConfirmation(ctx, args.query);
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки «" + args.query + "» через Microsoft Store.").catch(() => {});
+          return;
+        }
+        if (action === "install_app") {
           const description = "Установить «" + args.query + "» через winget";
           await requestVoicePcConfirmation(ctx, action, args, description);
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + ".").catch(() => {});
