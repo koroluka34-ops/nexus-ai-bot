@@ -4305,10 +4305,10 @@ bot.on("message:voice", async ctx => {
         /(?:установи|установить|поставь|поставить|выстави|сделай)/iu.test(spoken);
 
       // Brightness control: "яркость до 50%", "сделай экран ярче на 10%".
-      const brightnessContext = /(?:яркост\\w*|экран|диспле\\w*|светлее|темнее)/iu.test(spoken);
-      const brightnessTargetMatch = brightnessContext && spoken.match(/(?:до|на|уровень|значение|составлять|составит)\\s*(\\d{1,3})\\s*(?:%|процент\\w*)?/iu);
-      const brightnessUp = /(?:увелич\\w*|повыс\\w*|добав\\w*|прибав\\w*|сделай\\s+(?:экран\\s+)?ярче|светлее)/iu.test(spoken);
-      const brightnessDown = /(?:уменьш\\w*|пониз\\w*|убав\\w*|сделай\\s+(?:экран\\s+)?темнее|темнее)/iu.test(spoken);
+      const brightnessContext = /(?:яркост\w*|экран|диспле\w*|светлее|темнее)/iu.test(spoken);
+      const brightnessTargetMatch = brightnessContext && spoken.match(/(?:до|на|уровень|значение|составлять|составит)\s*(\d{1,3})\s*(?:%|процент\w*)?/iu);
+      const brightnessUp = /(?:увелич\w*|повыс\w*|добав\w*|прибав\w*|сделай\s+(?:экран\s+)?ярче|светлее)/iu.test(spoken);
+      const brightnessDown = /(?:уменьш\w*|пониз\w*|убав\w*|сделай\s+(?:экран\s+)?темнее|темнее)/iu.test(spoken);
       if (brightnessContext && brightnessTargetMatch) {
         const percent = Number(brightnessTargetMatch[1]);
         if (percent >= 0 && percent <= 100) {
@@ -4316,7 +4316,7 @@ bot.on("message:voice", async ctx => {
           args = { mode: "set", percent };
         }
       } else if (brightnessContext && (brightnessUp || brightnessDown)) {
-        const amountMatch = spoken.match(/(\\d{1,3})\\s*(?:%|процент\\w*)?/iu);
+        const amountMatch = spoken.match(/(\d{1,3})\s*(?:%|процент\w*)?/iu);
         const amount = amountMatch ? Number(amountMatch[1]) : 10;
         if (amount >= 1 && amount <= 100) {
           action = "set_brightness";
