@@ -172,6 +172,39 @@ def execute(action, args):
             return "Громкость установлена на " + str(target) + "%."
         except ImportError:
             raise RuntimeError("Для управления громкостью установи: py -m pip install pycaw comtypes")
+    if action == "set_brightness":
+        mode = str(args.get("mode", "set")).lower()
+        # Windows WMI controls the built-in display backlight on supported laptops.
+        script = r"""
+$ErrorActionPreference = 'Stop'
+$methods = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods
+if (-not $methods) { throw 'Windows не обнаружила WMI-управление яркостью встроенного дисплея.' }
+$brightness = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness | Select-Object -First 1
+if (-not $brightness) { throw 'Не удалось прочитать текущую яркость дисплея.' }
+$current = [int]$brightness.CurrentBrightness
+$mode = $env:NEXUS_BRIGHTNESS_MODE
+$amount = [int]$env:NEXUS_BRIGHTNESS_AMOUNT
+$percent = [int]$env:NEXUS_BRIGHTNESS_PERCENT
+if ($mode -eq 'up') { $target = [Math]::Min(100, $current + $amount) }
+elseif ($mode -eq 'down') { $target = [Math]::Max(0, $current - $amount) }
+else { $target = $percent }
+$result = Invoke-CimMethod -InputObject ($methods | Select-Object -First 1) -MethodName WmiSetBrightness -Arguments @{ Timeout = 1; Brightness = $target }
+if ($result.ReturnValue -ne 0) { throw ('Windows вернула код ошибки яркости: ' + $result.ReturnValue) }
+Write-Output $target
+"""
+        env = os.environ.copy()
+        env["NEXUS_BRIGHTNESS_MODE"] = mode
+        env["NEXUS_BRIGHTNESS_AMOUNT"] = str(int(args.get("amount", 10)))
+        env["NEXUS_BRIGHTNESS_PERCENT"] = str(int(args.get("percent", 50)))
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=20
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "Неизвестная ошибка PowerShell").strip()
+            raise RuntimeError(detail[-1200:])
+        target = result.stdout.strip().splitlines()[-1]
+        return "Яркость экрана установлена на " + target + "%."
     if action in ("install_app", "uninstall_app", "close_all_apps"):
         raise RuntimeError("Это действие пока отключено в Windows-агенте из соображений безопасности.")
     raise RuntimeError("Неизвестное действие: " + str(action))
