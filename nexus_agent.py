@@ -4,6 +4,7 @@
 
 import json
 import os
+import ipaddress
 import shutil
 import re
 import subprocess
@@ -84,10 +85,25 @@ def open_app(name):
         webbrowser.open("https://www.tiktok.com")
         return "Открыл TikTok в браузере."
     command = APP_COMMANDS.get(key)
-    if not command:
-        raise ValueError("Приложение пока не входит в список запуска: " + str(name))
-    subprocess.Popen(command, shell=False)
-    return "Команда запуска отправлена: " + str(name)
+    if command:
+        subprocess.Popen(command, shell=False)
+        return "Команда запуска отправлена: " + str(name)
+    # For other installed Start-menu apps, launch only an exact display-name match.
+    script = r"""
+$ErrorActionPreference = 'Stop'
+$name = $env:NEXUS_APP_NAME
+$matches = @(Get-StartApps | Where-Object { $_.Name -ieq $name })
+if ($matches.Count -eq 0) { throw ("В меню Пуск не найдено приложение с точным названием: " + $name) }
+if ($matches.Count -gt 1) { throw ("Найдено несколько приложений с названием: " + $name + ". Уточни название.") }
+Start-Process explorer.exe -ArgumentList ('shell:AppsFolder\' + $matches[0].AppID)
+"""
+    env = os.environ.copy()
+    env["NEXUS_APP_NAME"] = str(name).strip()
+    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=20)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Не удалось запустить приложение.").strip()[-900:])
+    return "Запускаю установленное приложение: " + str(name)
 
 def close_app(name):
     key = str(name or "").strip().lower()
@@ -120,6 +136,23 @@ def execute(action, args):
     args = args or {}
     if action == "open_store":
         return open_microsoft_store()
+    if action == "open_url":
+        raw_url = str(args.get("url", "")).strip()
+        parsed = urllib.parse.urlsplit(raw_url)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" or not host or parsed.username or parsed.password:
+            raise ValueError("Разрешены только публичные HTTPS-ссылки без логина и пароля.")
+        if host == "localhost" or host.endswith((".local", ".internal")):
+            raise ValueError("Локальные адреса открывать через эту команду нельзя.")
+        try:
+            address = ipaddress.ip_address(host)
+            if not address.is_global:
+                raise ValueError("Частные и локальные IP-адреса запрещены.")
+        except ValueError as exc:
+            if "IP-адреса запрещены" in str(exc):
+                raise
+        webbrowser.open(raw_url)
+        return "Открыл сайт: " + host
     if action == "install_store_app":
         return open_microsoft_store(args.get("query", ""))
     if action == "open_app":
