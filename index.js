@@ -4335,6 +4335,34 @@ bot.on("message:voice", async ctx => {
       };
       const brightnessUp = /(?:увелич\w*|повыс\w*|добав\w*|прибав\w*|сделай\s+(?:экран\s+)?ярче|светлее)/iu.test(spoken);
       const brightnessDown = /(?:уменьш\w*|пониз\w*|убав\w*|сделай\s+(?:экран\s+)?темнее|темнее)/iu.test(spoken);
+      // Windows system settings are resolved before generic app matching.
+      const systemPageRules = [
+        ["airplane", /(?:режим\s+самол[её]т\w*|авиарежим|самол[её]тн\w*\s+режим)/iu],
+        ["captions", /(?:автоматическ\w*\s+субтитр\w*|субтитр\w*|live\s+captions)/iu],
+        ["night_light", /(?:ночн\w*\s+свет|ночной\s+режим\s+экрана)/iu],
+        ["battery", /(?:энергосбережен\w*|экономи\w*\s+энерги\w*|состояни\w*\s+батаре\w*|параметр\w*\s+питани\w*)/iu],
+        ["accessibility", /(?:специальн\w*\s+возможност\w*|экранн\w*\s+диктор|экранн\w*\s+луп\w*|экранн\w*\s+клавиатур\w*)/iu],
+        ["hotspot", /(?:точк\w*\s+доступ\w*|мобильн\w*\s+хотспот|раздач\w*\s+интернет\w*)/iu],
+        ["bluetooth", /(?:блютуз|блютус|bluetooth)/iu],
+        ["projection", /(?:подключ\w*\s+(?:к\s+)?(?:беспроводн\w*\s+)?экран\w*|передач\w*\s+на\s+экран\w*|транслиров\w*\s+экран\w*)/iu],
+        ["display", /(?:настройк\w*\s+диспле\w*|настройк\w*\s+экран\w*)/iu]
+      ];
+      const systemPage = systemPageRules.find(([, pattern]) => pattern.test(spoken));
+      const wifiMention = /(?:wi[ -]?fi|вайфай|вай\s*фай)/iu.test(spoken);
+      const wantsEnable = /(?:включи|включить|активируй|активировать|запусти|запустить)/iu.test(spoken);
+      const wantsDisable = /(?:выключи|выключить|отключи|отключить|деактивируй|деактивировать)/iu.test(spoken);
+      const asksPcStatus = /(?:сколько\s+(?:процент\w*|заряд\w*)|процент\w*\s+батаре\w*|заряд\w*\s+батаре\w*|состояни\w*\s+(?:компьютер\w*|пк|ноутбук\w*))/iu.test(spoken);
+      if (wifiMention && (wantsEnable || wantsDisable)) {
+        action = "set_wifi";
+        args = { state: wantsEnable ? "on" : "off" };
+      } else if (asksPcStatus) {
+        action = "get_pc_status";
+        args = {};
+      } else if (systemPage) {
+        action = "open_settings";
+        args = { page: systemPage[0] };
+      }
+
       const brightnessUnit = "(?:%|процент\\w*)?";
       if (brightnessContext && (brightnessUp || brightnessDown)) {
         const amountMatch = spoken.match(new RegExp(brightnessNumberPattern + "\\s*" + brightnessUnit, "iu"));
@@ -4375,7 +4403,7 @@ bot.on("message:voice", async ctx => {
         .replace(/^(?:(?:мне|пожалуйста)\s+)/iu, "")
         .replace(/[.!?,]+$/g, "").trim();
       const closeOneMatch = spoken.match(/(?:закрой|закрывай|закройте|заверши|завершить|закрыть|прикрой|выключи|выключить)\s+(?:(?:мне|пожалуйста)\s+)?(?:(?:приложение|программу|окно)\s+)?(.{2,80})$/iu);
-      if (action === "set_volume" || action === "set_brightness") {
+      if (action && ["set_volume", "set_brightness", "open_settings", "set_wifi", "get_pc_status"].includes(action)) {
         // Exact volume/brightness intent was parsed above.
       } else if (telegramMessageMatch) {
         action = "telegram_send_message";
@@ -4397,7 +4425,7 @@ bot.on("message:voice", async ctx => {
         action = "uninstall_app";
         args = { app: cleanAppName(uninstallMatch[1]) };
       }
-      if (action === "set_volume" || action === "set_brightness") {
+      if (action && ["set_volume", "set_brightness", "open_settings", "set_wifi", "get_pc_status"].includes(action)) {
         // Keep parsed system-level control commands; do not route them to app install.
       } else if (microsoftStore && isDownload) {
         const query = storeProduct();
@@ -4519,7 +4547,7 @@ bot.on("message:voice", async ctx => {
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение установки " + args.query + ".").catch(() => {});
           return;
         }
-        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "close_app"].includes(action)) {
+        if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app", "close_all_apps", "close_app"].includes(action) || (action === "set_wifi" && args.state === "off")) {
           const descriptions = {
             close_all_apps: "Закрыть все открытые приложения (несохранённые изменения могут быть потеряны)",
             shutdown_pc: "Выключить компьютер",
@@ -4527,7 +4555,8 @@ bot.on("message:voice", async ctx => {
             sleep_pc: "Перевести компьютер в спящий режим",
             lock_pc: "Заблокировать компьютер",
             uninstall_app: "Удалить приложение «" + args.app + "»",
-            close_app: "Закрыть приложение «" + args.app + "» (несохранённые данные можно сохранить в приложении)"
+            close_app: "Закрыть приложение «" + args.app + "» (несохранённые данные можно сохранить в приложении)",
+            set_wifi: "Отключить Wi-Fi на компьютере (связь с NEXUS может прерваться)"
           };
           await requestVoicePcConfirmation(ctx, action, args, descriptions[action]);
           await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🔐 Запросил подтверждение: " + descriptions[action] + ".").catch(() => {});
@@ -4543,6 +4572,9 @@ bot.on("message:voice", async ctx => {
           : action === "open_app" ? "Открываю приложение " + args.app
           : action === "close_app" ? "Запрашиваю закрытие приложения " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
+          : action === "open_settings" ? "Открываю настройки Windows: " + args.page
+          : action === "set_wifi" ? (args.state === "on" ? "Включаю Wi-Fi" : "Отключаю Wi-Fi")
+          : action === "get_pc_status" ? "Проверяю состояние компьютера"
           : action === "open_store" ? "Открываю Microsoft Store"
           : args.url.includes("google.com/search?q=") ? "Ищу в Google: " + decodeURIComponent(args.url.split("q=")[1] || "")
           : args.url.includes("/results?") ? "Ищу на YouTube: " + decodeURIComponent(args.url.split("search_query=")[1] || "")
