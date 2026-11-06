@@ -4818,6 +4818,8 @@ async function start() {
     { command: "premium", description: "Проверить статус Premium" },
     { command: "model", description: "Посмотреть или выбрать модель ИИ" },
     { command: "status", description: "Проверить состояние бота" },
+    { command: "voicenotes", description: "Список и удаление голосовых заметок" },
+    { command: "scenario", description: "Создать и настроить голосовые сценарии" },
     { command: "voice", description: "Настройки голосового ответа" },
     { command: "voice_on", description: "Включить голосовые ответы" },
     { command: "voice_off", description: "Выключить голосовые ответы" },
