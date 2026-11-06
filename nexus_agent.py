@@ -106,7 +106,7 @@ def open_microsoft_store(query=None):
     """Open the real Microsoft Store UI, optionally on its search results."""
     if query:
         query = str(query).strip()
-        if not query or len(query) > 80 or not re.fullmatch(r"[\\wА-Яа-яЁё ._()+-]+", query, re.UNICODE):
+        if not query or len(query) > 80 or not re.fullmatch(r"[\wА-Яа-яЁё ._()+-]+", query, re.UNICODE):
             raise ValueError("Название приложения для Microsoft Store некорректно.")
         target = "ms-windows-store://search/?query=" + urllib.parse.quote(query)
         os.startfile(target)
