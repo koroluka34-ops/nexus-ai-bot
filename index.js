@@ -4304,6 +4304,26 @@ bot.on("message:voice", async ctx => {
       const wantsVolumeValue = volumeContext && !volumeSetMatch && !volumeUp && !volumeDown &&
         /(?:установи|установить|поставь|поставить|выстави|сделай)/iu.test(spoken);
 
+      // Brightness control: "яркость до 50%", "сделай экран ярче на 10%".
+      const brightnessContext = /(?:яркост\\w*|экран|диспле\\w*|светлее|темнее)/iu.test(spoken);
+      const brightnessTargetMatch = brightnessContext && spoken.match(/(?:до|на|уровень|значение|составлять|составит)\\s*(\\d{1,3})\\s*(?:%|процент\\w*)?/iu);
+      const brightnessUp = /(?:увелич\\w*|повыс\\w*|добав\\w*|прибав\\w*|сделай\\s+(?:экран\\s+)?ярче|светлее)/iu.test(spoken);
+      const brightnessDown = /(?:уменьш\\w*|пониз\\w*|убав\\w*|сделай\\s+(?:экран\\s+)?темнее|темнее)/iu.test(spoken);
+      if (brightnessContext && brightnessTargetMatch) {
+        const percent = Number(brightnessTargetMatch[1]);
+        if (percent >= 0 && percent <= 100) {
+          action = "set_brightness";
+          args = { mode: "set", percent };
+        }
+      } else if (brightnessContext && (brightnessUp || brightnessDown)) {
+        const amountMatch = spoken.match(/(\\d{1,3})\\s*(?:%|процент\\w*)?/iu);
+        const amount = amountMatch ? Number(amountMatch[1]) : 10;
+        if (amount >= 1 && amount <= 100) {
+          action = "set_brightness";
+          args = { mode: brightnessUp ? "up" : "down", amount };
+        }
+      }
+
       const isShutdown = /(?:выключи|выключить|выруби|вырубить|отключи|отключить|заверши\s+работу|погаси)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)/iu.test(spoken)
         || /(?:заверши|завершить)\s+работу/iu.test(spoken);
       const isRestart = /(?:перезагрузи|перезапусти|перезагрузить|перезапустить|ребутни|сделай\s+ребут)\s+(?:(?:мне|мой|пожалуйста)\s+)*(?:компьютер|комп|пк|ноутбук|ноут)?/iu.test(spoken);
@@ -4318,8 +4338,8 @@ bot.on("message:voice", async ctx => {
         .replace(/^(?:(?:мне|пожалуйста)\s+)/iu, "")
         .replace(/[.!?,]+$/g, "").trim();
       const closeOneMatch = spoken.match(/(?:закрой|закрывай|закройте|заверши|завершить|закрыть|прикрой|выключи|выключить)\s+(?:(?:мне|пожалуйста)\s+)?(?:(?:приложение|программу|окно)\s+)?(.{2,80})$/iu);
-      if (action === "set_volume") {
-        // Exact volume intent was parsed above.
+      if (action === "set_volume" || action === "set_brightness") {
+        // Exact volume/brightness intent was parsed above.
       } else if (telegramMessageMatch) {
         action = "telegram_send_message";
         args = { recipient: telegramMessageMatch[1].trim(), text: telegramMessageMatch[2].trim() };
@@ -4340,8 +4360,8 @@ bot.on("message:voice", async ctx => {
         action = "uninstall_app";
         args = { app: cleanAppName(uninstallMatch[1]) };
       }
-      if (action === "set_volume") {
-        // Keep the already parsed volume command; do not route it to install_app.
+      if (action === "set_volume" || action === "set_brightness") {
+        // Keep parsed system-level control commands; do not route them to app install.
       } else if (microsoftStore && isDownload) {
         const query = storeProduct();
         if (query) {
@@ -4480,6 +4500,9 @@ bot.on("message:voice", async ctx => {
         const label = action === "set_volume" ? (args.mode === "set"
             ? "Устанавливаю громкость на " + args.percent + "%"
             : (args.mode === "up" ? "Повышаю" : "Уменьшаю") + " громкость на " + args.amount + "%")
+          : action === "set_brightness" ? (args.mode === "set"
+            ? "Устанавливаю яркость на " + args.percent + "%"
+            : (args.mode === "up" ? "Повышаю" : "Уменьшаю") + " яркость на " + args.amount + "%")
           : action === "open_app" ? "Открываю приложение " + args.app
           : action === "close_app" ? "Запрашиваю закрытие приложения " + args.app
           : action === "open_folder" ? "Открываю папку " + args.folder
