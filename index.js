@@ -4337,8 +4337,8 @@ bot.on("message:voice", async ctx => {
       const brightnessDown = /(?:уменьш\w*|пониз\w*|убав\w*|сделай\s+(?:экран\s+)?темнее|темнее)/iu.test(spoken);
       // Windows system settings are resolved before generic app matching.
       const systemPageRules = [
-        ["airplane", /(?:режим\s+самол[её]т\w*|авиарежим|самол[её]тн\w*\s+режим)/iu],
-        ["captions", /(?:автоматическ\w*\s+субтитр\w*|субтитр\w*|live\s+captions)/iu],
+        ["airplane", /(?:режим\s+(?:самол[её]т\w*|пол[её]т\w*)|авиарежим|самол[её]тн\w*\s+режим)/iu],
+        ["captions", /(?:автоматическ\w*\s+суб(?:т|б)итр\w*|суб(?:т|б)итр\w*|live\s+captions)/iu],
         ["night_light", /(?:ночн\w*\s+свет|ночной\s+режим\s+экрана)/iu],
         ["battery", /(?:энергосбережен\w*|экономи\w*\s+энерги\w*|состояни\w*\s+батаре\w*|параметр\w*\s+питани\w*)/iu],
         ["accessibility", /(?:специальн\w*\s+возможност\w*|экранн\w*\s+диктор|экранн\w*\s+луп\w*|экранн\w*\s+клавиатур\w*)/iu],
