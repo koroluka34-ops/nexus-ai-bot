@@ -162,6 +162,52 @@ def execute(action, args):
             raise ValueError("Раздел Windows не входит в разрешённый список.")
         os.startfile(pages[page])
         return "Открыл настройки Windows: " + page
+    if action == "set_airplane_mode":
+        state = str(args.get("state", "")).lower()
+        if state not in ("on", "off"):
+            raise ValueError("Для авиарежима укажи on или off.")
+        # Windows exposes Wi-Fi adapters through NetAdapter and Bluetooth radios
+        # as Plug-and-Play devices. This toggles both radios; it is not a firmware
+        # airplane-mode switch. Administrator rights may be required.
+        ps = r"""
+$ErrorActionPreference = 'Stop'
+$state = $env:NEXUS_AIRPLANE_STATE
+$wifi = Get-NetAdapter -Physical -ErrorAction Stop | Where-Object {
+  $_.InterfaceDescription -match 'Wi-Fi|Wireless|802\.11|Беспровод'
+}
+if (-not $wifi) { throw 'Физический Wi-Fi адаптер не найден.' }
+if ($state -eq 'on') {
+  $wifi | Enable-NetAdapter -Confirm:$false -ErrorAction Stop
+} else {
+  $wifi | Disable-NetAdapter -Confirm:$false -ErrorAction Stop
+}
+$bt = Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Where-Object {
+  $_.FriendlyName -match 'Bluetooth.*(Radio|Adapter)|(Radio|Adapter).*Bluetooth|Qualcomm.*Bluetooth|Intel.*Bluetooth|Realtek.*Bluetooth|MediaTek.*Bluetooth'
+}
+if ($bt) {
+  if ($state -eq 'on') {
+    $bt | Enable-PnpDevice -Confirm:$false -ErrorAction Stop
+  } else {
+    $bt | Disable-PnpDevice -Confirm:$false -ErrorAction Stop
+  }
+} else {
+  Write-Output 'Предупреждение: Bluetooth-радио не найдено; изменён только Wi-Fi.'
+}
+'Airplane radio state: ' + $state
+"""
+        env = os.environ.copy()
+        env["NEXUS_AIRPLANE_STATE"] = state
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=35
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "Не удалось переключить радиомодули.").strip()
+            if "access" in detail.lower() or "доступ" in detail.lower() or "administrator" in detail.lower():
+                detail += " Запусти NEXUS Agent от имени администратора."
+            raise RuntimeError(detail[-1200:])
+        return ("Авиарежим включён: Wi-Fi и Bluetooth отключены. " if state == "off" else
+                "Авиарежим выключен: Wi-Fi и Bluetooth включены. ") + result.stdout.strip()
     if action == "set_wifi":
         state = str(args.get("state", "")).lower()
         if state not in ("on", "off"):
