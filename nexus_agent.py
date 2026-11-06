@@ -330,23 +330,29 @@ if ($bt) {
             raise RuntimeError("Для управления громкостью установи: py -m pip install pycaw comtypes")
     if action == "set_brightness":
         mode = str(args.get("mode", "set")).lower()
-        # Windows WMI controls the built-in display backlight on supported laptops.
         script = r"""
 $ErrorActionPreference = 'Stop'
-$methods = Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods | Select-Object -First 1
-if (-not $methods) { throw 'Windows не обнаружила WMI-управление яркостью встроенного дисплея.' }
-$brightness = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness | Select-Object -First 1
-if (-not $brightness) { throw 'Не удалось прочитать текущую яркость дисплея.' }
-$current = [int]$brightness.CurrentBrightness
-$mode = $env:NEXUS_BRIGHTNESS_MODE
-$amount = [int]$env:NEXUS_BRIGHTNESS_AMOUNT
-$percent = [int]$env:NEXUS_BRIGHTNESS_PERCENT
-if ($mode -eq 'up') { $target = [Math]::Min(100, $current + $amount) }
-elseif ($mode -eq 'down') { $target = [Math]::Max(0, $current - $amount) }
-else { $target = $percent }
-$result = $methods.WmiSetBrightness([uint32]1, [byte]$target)
-if ($result.ReturnValue -ne 0) { throw ('Windows вернула код ошибки яркости: ' + $result.ReturnValue) }
-Write-Output $target
+try {
+  $methods = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods | Select-Object -First 1
+  if (-not $methods) { [Console]::Out.WriteLine('NEXUS_BRIGHTNESS_ERROR_10'); exit 10 }
+  $brightness = Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness | Select-Object -First 1
+  if (-not $brightness) { [Console]::Out.WriteLine('NEXUS_BRIGHTNESS_ERROR_11'); exit 11 }
+  $current = [int]$brightness.CurrentBrightness
+  $mode = $env:NEXUS_BRIGHTNESS_MODE
+  $amount = [int]$env:NEXUS_BRIGHTNESS_AMOUNT
+  $percent = [int]$env:NEXUS_BRIGHTNESS_PERCENT
+  if ($mode -eq 'up') { $target = [Math]::Min(100, $current + $amount) }
+  elseif ($mode -eq 'down') { $target = [Math]::Max(0, $current - $amount) }
+  else { $target = $percent }
+  $result = Invoke-CimMethod -InputObject $methods -MethodName WmiSetBrightness -Arguments @{ Timeout = [uint32]1; Brightness = [byte]$target }
+  $code = [int]$result.ReturnValue
+  if ($code -ne 0) { [Console]::Out.WriteLine('NEXUS_BRIGHTNESS_ERROR_' + $code); exit (20 + $code) }
+  [Console]::Out.WriteLine('NEXUS_BRIGHTNESS_OK_' + $target)
+  exit 0
+} catch {
+  [Console]::Out.WriteLine('NEXUS_BRIGHTNESS_ERROR_99')
+  exit 99
+}
 """
         env = os.environ.copy()
         env["NEXUS_BRIGHTNESS_MODE"] = mode
@@ -354,13 +360,26 @@ Write-Output $target
         env["NEXUS_BRIGHTNESS_PERCENT"] = str(int(args.get("percent", 50)))
         result = subprocess.run(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=20
+            capture_output=True, text=True, encoding="ascii", errors="ignore", env=env, timeout=20
         )
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "Неизвестная ошибка PowerShell").strip()
-            raise RuntimeError(detail[-1200:])
-        target = result.stdout.strip().splitlines()[-1]
-        return "Яркость экрана установлена на " + target + "%."
+        marker = (result.stdout or "").strip().splitlines()
+        status = marker[-1] if marker else ""
+        if result.returncode == 0 and status.startswith("NEXUS_BRIGHTNESS_OK_"):
+            target = status.rsplit("_", 1)[-1]
+            return "Яркость экрана установлена на " + target + "%."
+        code = status.rsplit("_", 1)[-1] if status.startswith("NEXUS_BRIGHTNESS_ERROR_") else "99"
+        errors = {
+            "10": "Windows не предоставляет управление яркостью через WMI для этого дисплея.",
+            "11": "Windows не смогла прочитать текущую яркость дисплея.",
+            "1": "Драйвер дисплея не поддерживает изменение яркости через WMI.",
+            "2": "Драйвер отклонил значение яркости.",
+            "3": "Драйвер не смог изменить яркость.",
+            "4": "Истекло время ожидания изменения яркости.",
+            "5": "Драйвер не поддерживает эту операцию.",
+            "6": "Управление яркостью отключено драйвером.",
+            "99": "PowerShell или драйвер не смог выполнить команду яркости."
+        }
+        raise RuntimeError(errors.get(code, "Не удалось изменить яркость (код WMI " + code + ")."))
     if action == "install_app":
         query = str(args.get("query", "")).strip()
         if not query or len(query) > 80 or not re.fullmatch(r"[\wА-Яа-яЁё ._()+-]+", query, re.UNICODE):
