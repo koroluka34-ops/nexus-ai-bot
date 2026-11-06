@@ -4109,8 +4109,8 @@ async function interpretVoiceCommand(transcript) {
     "close_app", "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "set_volume", "set_brightness", "open_settings", "set_wifi", "set_airplane_mode", "get_pc_status"
   ]);
   const system = [
-    "Ты — семантический парсер голосовых команд Windows-ассистента NEXUS.",
-    "Распознанный текст Whisper может содержать опечатки, фонетические ошибки, пропущенные буквы, неверную кириллицу вместо английского названия и лишние слова.",
+    "Ты — семантический парсер естественных команд управления Windows для NEXUS.",
+    "Фраза пользователя может содержать опечатки, разговорные названия, транслитерацию и лишние слова.",
     "Восстанови наиболее вероятный смысл фразы, а не требуй точного совпадения. Учитывай разговорные названия и транслитерацию.",
     "Примеры: «телега», «телеграм», «телеграмма» в контексте запуска приложения => open_app app=Telegram; «дискорд», «дискордик», «дискорд с ошибками» => Discord; «дискорд» написанный как «дискорд» всё равно Discord; «турбо впн», «турбовпн» => TurboVPN; «стим» => Steam; «ютуб» => YouTube.",
     "«отправ компьютер спать», «усыпи ноут», «переведи ПК в сон» => sleep_pc. «перезапусти/ребутни ноут» => restart_pc. «выруби компьютер» => shutdown_pc. «закрой всё» => close_all_apps.",
@@ -4128,7 +4128,7 @@ async function interpretVoiceCommand(transcript) {
   ].join("\n");
   const messages = [
     { role: "system", content: system },
-    { role: "user", content: "Распознанное голосовое сообщение (может быть с ошибками): " + String(transcript).slice(0, 500) }
+    { role: "user", content: "Команда пользователя: " + String(transcript).slice(0, 500) }
   ];
   let raw = "";
   try {
@@ -4726,7 +4726,8 @@ bot.on("message:text", async ctx => {
   // Reuse the same constrained semantic interpreter as voice commands instead of
   // letting Groq answer that it cannot access the connected Windows PC.
   const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
-  const looksLikePcCommand = /(?:открой|открыть|запусти|запустить|включи|включить|выключи|выключить|закрой|закрыть|удали|удалить|установи|установить|скачай|скачать|найди|найти|поищи|ищи|перезагруз|перезапуст|выруби|заблокируй|усыпи|спящ|яркост|громкост|громче|тише|вай.?фай|wi.?fi|авиарежим|режим самол[её]т|рабочий стол|загрузки|документы|ютуб|youtube|google|гугл)/iu.test(addressedQuestion);
+  const looksLikePcCommand = !/^(?:как|почему|что|зачем|можно ли|подскажи)\b/iu.test(addressedQuestion) &&
+    /(?:открой|открыть|запусти|запустить|включи|включить|выключи|выключить|закрой|закрыть|удали|удалить|установи|установить|скачай|скачать|найди|найти|поищи|ищи|перезагруз|перезапуст|выруби|заблокируй|усыпи|спящ|яркост|ярче|темнее|светлее|громкост|громче|тише|звук|вай.?фай|wi.?fi|авиарежим|режим самол[её]т|рабочий стол|загрузки|документы|батаре|состояни.*(?:пк|компьютер|ноут)|ютуб|youtube|google|гугл)/iu.test(addressedQuestion);
   if (ownerId && String(userId) === ownerId && looksLikePcCommand) {
     let interpreted = null;
     try { interpreted = await interpretVoiceCommand(addressedQuestion); }
@@ -4779,6 +4780,9 @@ bot.on("message:text", async ctx => {
       } catch (error) {
         await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
       }
+      return;
+    } else {
+      await ctx.reply("🤔 Не удалось уверенно распознать команду для ПК. Переформулируй её конкретнее — например: «открой Discord», «установи яркость на 50%» или «найди видео на YouTube».");
       return;
     }
   }
