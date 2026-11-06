@@ -4348,7 +4348,7 @@ bot.on("message:voice", async ctx => {
         ["display", /(?:настройк\w*\s+диспле\w*|настройк\w*\s+экран\w*)/iu]
       ];
       const systemPage = systemPageRules.find(([, pattern]) => pattern.test(spoken));
-      const airplaneMention = /(?:режим\\s+(?:самол[её]т\\w*|пол[её]т\\w*)|авиарежим|самол[её]тн\\w*\\s+режим)/iu.test(spoken);
+      const airplaneMention = /(?:режим\s+(?:самол[её]т\w*|пол[её]т\w*)|авиарежим|самол[её]тн\w*\s+режим)/iu.test(spoken);
       const wifiMention = /(?:wi[ -]?fi|вайфай|вай\s*фай)/iu.test(spoken);
       const wantsEnable = /(?:включи|включить|активируй|активировать|запусти|запустить)/iu.test(spoken);
       const wantsDisable = /(?:выключи|выключить|отключи|отключить|деактивируй|деактивировать)/iu.test(spoken);
