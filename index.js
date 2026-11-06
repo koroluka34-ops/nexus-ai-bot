@@ -4110,7 +4110,7 @@ async function interpretVoiceCommand(transcript) {
   const allowed = new Set([
     "open_app", "open_folder", "open_google", "search_google",
     "open_youtube", "search_youtube", "install_app", "uninstall_app",
-    "close_app", "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "set_volume"
+    "close_app", "close_all_apps", "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "set_volume", "set_brightness", "open_settings", "set_wifi", "get_pc_status"
   ]);
   const system = [
     "Ты — семантический парсер голосовых команд Windows-ассистента NEXUS.",
@@ -4159,6 +4159,11 @@ async function interpretVoiceCommand(transcript) {
     if (["open_app", "close_app", "uninstall_app"].includes(action) && (!app || !/^[\p{L}\p{N} ._()+'-]+$/u.test(app))) return null;
     if (action === "install_app" && !(app || query)) return null;
     if (action === "open_folder" && !folders.has(folder)) return null;
+    const page = String(parsed.page || "").trim().toLowerCase();
+    const pages = new Set(["bluetooth","hotspot","airplane","night_light","battery","accessibility","captions","display","projection"]);
+    const state = String(parsed.state || "").trim().toLowerCase();
+    if (action === "open_settings" && !pages.has(page)) return null;
+    if (action === "set_wifi" && !["on","off"].includes(state)) return null;
     const percent = Number(parsed.percent);
     const amount = Number(parsed.amount);
     const volumeMode = String(parsed.mode || "set").toLowerCase();
@@ -4169,6 +4174,9 @@ async function interpretVoiceCommand(transcript) {
     return { action, args: ["open_app", "close_app", "uninstall_app"].includes(action) ? { app } :
       action === "install_app" ? { query: query || app } :
       action === "open_folder" ? { folder } :
+      action === "open_settings" ? { page } :
+      action === "set_wifi" ? { state } :
+      action === "get_pc_status" ? {} :
       action === "set_volume" ? (volumeMode === "set" ? { mode: "set", percent } : { mode: volumeMode, amount }) : { }, confidence };
   } catch (error) {
     console.warn("NEXUS voice interpreter returned invalid JSON:", String(raw).slice(0, 500));
