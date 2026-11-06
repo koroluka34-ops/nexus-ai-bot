@@ -88,22 +88,47 @@ def open_app(name):
     if command:
         subprocess.Popen(command, shell=False)
         return "Команда запуска отправлена: " + str(name)
-    # For other installed Start-menu apps, launch only an exact display-name match.
+
+    # Resolve common spacing/punctuation differences, e.g. "autoclicker" vs "Auto Clicker".
     script = r"""
 $ErrorActionPreference = 'Stop'
 $name = $env:NEXUS_APP_NAME
-$matches = @(Get-StartApps | Where-Object { $_.Name -ieq $name })
-if ($matches.Count -eq 0) { throw ("В меню Пуск не найдено приложение с точным названием: " + $name) }
-if ($matches.Count -gt 1) { throw ("Найдено несколько приложений с названием: " + $name + ". Уточни название.") }
-Start-Process explorer.exe -ArgumentList ('shell:AppsFolder\' + $matches[0].AppID)
+$normalize = { param($value) ([regex]::Replace([string]$value, '[^\p{L}\p{N}]', '')).ToLowerInvariant() }
+$wanted = & $normalize $name
+$apps = @(Get-StartApps)
+$matches = @($apps | Where-Object { (& $normalize $_.Name) -eq $wanted })
+if ($matches.Count -eq 0) {
+  $matches = @($apps | Where-Object {
+    $candidate = & $normalize $_.Name
+    $candidate.Contains($wanted) -or $wanted.Contains($candidate)
+  })
+}
+if ($matches.Count -eq 0) { [Console]::Out.WriteLine('NEXUS_NOT_FOUND'); exit 4 }
+if ($matches.Count -gt 1) { [Console]::Out.WriteLine('NEXUS_AMBIGUOUS'); exit 5 }
+try {
+  Start-Process explorer.exe -ArgumentList ('shell:AppsFolder\' + $matches[0].AppID) -ErrorAction Stop
+  [Console]::Out.WriteLine('NEXUS_STARTED')
+  exit 0
+} catch {
+  [Console]::Out.WriteLine('NEXUS_LAUNCH_ERROR')
+  exit 6
+}
 """
     env = os.environ.copy()
     env["NEXUS_APP_NAME"] = str(name).strip()
-    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
-                            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=20)
-    if result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "Не удалось запустить приложение.").strip()[-900:])
-    return "Запускаю установленное приложение: " + str(name)
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, timeout=25
+    )
+    marker = (result.stdout or "").strip().splitlines()
+    status = marker[-1] if marker else ""
+    if result.returncode == 0 and status == "NEXUS_STARTED":
+        return "Запускаю установленное приложение: " + str(name)
+    if status == "NEXUS_NOT_FOUND" or result.returncode == 4:
+        raise RuntimeError("Не нашёл «" + str(name) + "» среди приложений меню «Пуск». Проверь точное название или установку.")
+    if status == "NEXUS_AMBIGUOUS" or result.returncode == 5:
+        raise RuntimeError("Нашёл несколько похожих приложений для «" + str(name) + "». Уточни название.")
+    raise RuntimeError("Windows не смогла запустить «" + str(name) + "». Проверь, что приложение установлено и отображается в меню «Пуск».")
 
 def close_app(name):
     key = str(name or "").strip().lower()
