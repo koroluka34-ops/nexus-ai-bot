@@ -122,6 +122,16 @@ function queueVoiceAction(action, args, userId, chatId) {
       if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new Error("Шаг изменения " + subject.toLowerCase() + " должен быть от 1 до 100.");
       args = { mode, amount };
     } else throw new Error("Неизвестный режим изменения " + subject.toLowerCase() + ".");
+  } else if (action === "open_settings") {
+    const pages = new Set(["bluetooth","hotspot","airplane","night_light","battery","accessibility","captions","display","projection"]);
+    if (!pages.has(String(args.page || ""))) throw new Error("Раздел настроек Windows не разрешён.");
+    args = { page: String(args.page) };
+  } else if (action === "set_wifi") {
+    const state = String(args.state || "").toLowerCase();
+    if (!["on","off"].includes(state)) throw new Error("Для Wi-Fi укажи on или off.");
+    args = { state };
+  } else if (action === "get_pc_status") {
+    args = {};
   } else if (action === "open_store") {
     args = {};
   } else if (action === "open_url") {
