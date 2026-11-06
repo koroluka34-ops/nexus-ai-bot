@@ -4306,7 +4306,7 @@ bot.on("message:voice", async ctx => {
 
       // Brightness control: accept any value 0-100, digits or Russian number words.
       // Relative commands are handled before absolute targets so "increase by 15%" stays relative.
-      const brightnessContext = /(?:яркост\\w*|экран\\w*|диспле\\w*|подсветк\\w*|светлее|темнее)/iu.test(spoken);
+      const brightnessContext = /(?:яркост\w*|экран\w*|диспле\w*|подсветк\w*|светлее|темнее)/iu.test(spoken);
       const brightnessNumberWords = {
         "ноль": 0, "нуль": 0, "один": 1, "одна": 1, "одно": 1,
         "два": 2, "две": 2, "три": 3, "четыре": 4, "пять": 5,
@@ -4321,32 +4321,32 @@ bot.on("message:voice", async ctx => {
       const brightnessNumberPattern = "(\\d{1,3}|ноль|нуль|один|одна|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто)(?:\\s+(?:один|одна|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять))?";
       const parseBrightnessNumber = value => {
         const normalized = String(value || "").toLocaleLowerCase("ru").trim();
-        if (/^\\d{1,3}$/u.test(normalized)) return Number(normalized);
-        return normalized.split(/\\s+/u).reduce((sum, part) => sum + (brightnessNumberWords[part] ?? 0), 0);
+        if (/^\d{1,3}$/u.test(normalized)) return Number(normalized);
+        return normalized.split(/\s+/u).reduce((sum, part) => sum + (brightnessNumberWords[part] ?? 0), 0);
       };
-      const brightnessUp = /(?:увелич\\w*|повыс\\w*|добав\\w*|прибав\\w*|сделай\\s+(?:экран\\s+)?ярче|светлее)/iu.test(spoken);
-      const brightnessDown = /(?:уменьш\\w*|пониз\\w*|убав\\w*|сделай\\s+(?:экран\\s+)?темнее|темнее)/iu.test(spoken);
+      const brightnessUp = /(?:увелич\w*|повыс\w*|добав\w*|прибав\w*|сделай\s+(?:экран\s+)?ярче|светлее)/iu.test(spoken);
+      const brightnessDown = /(?:уменьш\w*|пониз\w*|убав\w*|сделай\s+(?:экран\s+)?темнее|темнее)/iu.test(spoken);
       const brightnessUnit = "(?:%|процент\\w*)?";
       if (brightnessContext && (brightnessUp || brightnessDown)) {
-        const amountMatch = spoken.match(new RegExp(brightnessNumberPattern + "\\\\s*" + brightnessUnit, "iu"));
-        const amount = amountMatch ? parseBrightnessNumber(amountMatch[0].replace(new RegExp("\\\\s*" + brightnessUnit + "$", "iu"), "")) : 10;
+        const amountMatch = spoken.match(new RegExp(brightnessNumberPattern + "\\s*" + brightnessUnit, "iu"));
+        const amount = amountMatch ? parseBrightnessNumber(amountMatch[0].replace(new RegExp("\\s*" + brightnessUnit + "$", "iu"), "")) : 10;
         if (amount >= 1 && amount <= 100) {
           action = "set_brightness";
           args = { mode: brightnessUp ? "up" : "down", amount };
         }
       } else if (brightnessContext) {
-        const targetMatch = spoken.match(new RegExp("(?:до|на|для|уровень(?:\\s+яркости)?|значение(?:\\s+яркости)?|составлять|составит)\\\\s*(" + brightnessNumberPattern + ")\\\\s*" + brightnessUnit, "iu"))
-          || spoken.match(new RegExp("(?:яркост\\\\w*|экран\\\\w*|диспле\\\\w*|подсветк\\\\w*).*?(" + brightnessNumberPattern + ")\\\\s*" + brightnessUnit, "iu"));
+        const targetMatch = spoken.match(new RegExp("(?:до|на|для|уровень(?:\\s+яркости)?|значение(?:\\s+яркости)?|составлять|составит)\\s*(" + brightnessNumberPattern + ")\\s*" + brightnessUnit, "iu"))
+          || spoken.match(new RegExp("(?:яркост\\w*|экран\\w*|диспле\\w*|подсветк\\w*).*?(" + brightnessNumberPattern + ")\\s*" + brightnessUnit, "iu"));
         if (targetMatch) {
           const percent = parseBrightnessNumber(targetMatch[1]);
           if (percent >= 0 && percent <= 100) {
             action = "set_brightness";
             args = { mode: "set", percent };
           }
-        } else if (/(?:максимум|максимальную|на\\s+полную|по\\s+максимуму)/iu.test(spoken)) {
+        } else if (/(?:максимум|максимальную|на\s+полную|по\s+максимуму)/iu.test(spoken)) {
           action = "set_brightness";
           args = { mode: "set", percent: 100 };
-        } else if (/(?:минимум|минимальную|на\\s+минимум)/iu.test(spoken)) {
+        } else if (/(?:минимум|минимальную|на\s+минимум)/iu.test(spoken)) {
           action = "set_brightness";
           args = { mode: "set", percent: 0 };
         }
