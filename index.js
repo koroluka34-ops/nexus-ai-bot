@@ -4647,14 +4647,14 @@ bot.on("message:text", async ctx => {
   // Текстовые команды Microsoft Store используют тот же запрос подтверждения, что и голосовые.
   // Поддерживаем фразы: «скачай Telegram из Microsoft Store» и «установи Telegram через магазин Microsoft».
   const storeInstallMatch = addressedQuestion.match(
-    /^(?:пожалуйста[, ]*)?(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)\\s+(?:из|через)\\s+(?:microsoft\\s+store|майкрософт\\s+стор(?:е)?|микрософт\\s+стор(?:е)?)[.!?]*$/iu
+    /^(?:пожалуйста[, ]*)?(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\s+(.+?)\s+(?:из|через)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
   );
   if (storeInstallMatch) {
     const appName = storeInstallMatch[1]
-      .replace(/^(?:приложение|программу)\\s+/iu, "")
+      .replace(/^(?:приложение|программу)\s+/iu, "")
       .replace(/[.!?]+$/g, "")
       .trim();
-    if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(appName)) {
+    if (!appName || appName.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(appName)) {
       await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Скачай Telegram из Microsoft Store».");
       return;
     }
@@ -4663,7 +4663,7 @@ bot.on("message:text", async ctx => {
   }
 
   const storeOpenMatch = addressedQuestion.match(
-    /^(?:пожалуйста[, ]*)?(?:открой|запусти)\\s+(?:microsoft\\s+store|майкрософт\\s+стор(?:е)?|микрософт\\s+стор(?:е)?)[.!?]*$/iu
+    /^(?:пожалуйста[, ]*)?(?:открой|запусти)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
   );
   if (storeOpenMatch) {
     queueVoiceAction("open_store", {}, userId, ctx.chat.id);
