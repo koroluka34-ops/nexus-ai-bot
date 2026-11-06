@@ -138,10 +138,13 @@ function queueVoiceAction(action, args, userId, chatId) {
     let url;
     try { url = new URL(String(args.url || "")); } catch { throw new Error("Некорректная ссылка."); }
     const host = url.hostname.toLowerCase();
-    if (url.protocol !== "https:" || url.username || url.password ||
-        !["google.com", "www.google.com", "youtube.com", "www.youtube.com"].includes(host) ||
-        !["/", "/search", "/results"].includes(url.pathname)) {
-      throw new Error("Голосом разрешены Google и YouTube по HTTPS.");
+    const privateOrLocalHost = !host.includes(".") || host === "localhost" ||
+      host.endsWith(".local") || host.endsWith(".internal") ||
+      /^(?:127\\.|10\\.|192\\.168\\.|169\\.254\\.|0\\.)/.test(host) ||
+      /^172\\.(?:1[6-9]|2[0-9]|3[01])\\./.test(host) ||
+      /^\\[?(?:::1|fc[0-9a-f]{2}:|fe80:)/i.test(host);
+    if (url.protocol !== "https:" || url.username || url.password || privateOrLocalHost) {
+      throw new Error("Разрешены только публичные HTTPS-сайты без локальных адресов и данных для входа.");
     }
     args.url = url.toString();
   } else {
