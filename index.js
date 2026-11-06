@@ -4660,6 +4660,28 @@ bot.on("message:text", async ctx => {
   // Deterministic PC commands from ordinary Telegram text (do not send these to Groq).
   const normalizedCommand = addressedQuestion.replace(/[.!?]+$/g, "").trim();
 
+  const youtubeChannelMatch = normalizedCommand.match(/^(?:на\s+(?:ютубе|youtube)\s+)?(?:открой|найди|покажи)\s+(?:мне\s+)?канал\s+(.+)$/iu);
+  if (youtubeChannelMatch) {
+    const channelName = youtubeChannelMatch[1].trim();
+    if (!channelName || channelName.length > 80) {
+      await ctx.reply("⚠️ Укажи название YouTube-канала.");
+      return;
+    }
+    try {
+      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(channelName + " канал");
+      queueVoiceAction("open_url", { url }, userId, ctx.chat.id);
+      await ctx.reply("▶️ Ищу YouTube-канал «" + channelName + "» на подключённом ПК.");
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
+    return;
+  }
+
+  if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)\s+и\s+(?:включи|поставь|запусти)\s+\d+\s+видео$/iu.test(normalizedCommand)) {
+    await ctx.reply("🎬 Какие именно два видео включить? Напиши названия или тему — тогда я открою подходящий поиск на YouTube.");
+    return;
+  }
+
   if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)(?:\s+сайт)?$/iu.test(normalizedCommand)) {
     try {
       queueVoiceAction("open_url", { url: "https://www.youtube.com/" }, userId, ctx.chat.id);
