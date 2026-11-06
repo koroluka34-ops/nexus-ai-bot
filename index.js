@@ -75,6 +75,9 @@ installQrSuite(bot);
 const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
+const { installVoiceSuite, handleVoiceTranscript } = require("./modules/voice-suite");
+installVoiceSuite(bot, { loadMemory, saveMemory, calculateExpression });
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
@@ -4210,6 +4213,8 @@ bot.on("message:voice", async ctx => {
       status.message_id,
       "📝 Распознано:\n" + transcript
     ).catch(() => {});
+
+    if (await handleVoiceTranscript(ctx, transcript, status, { loadMemory, saveMemory, calculateExpression, askAI, deliverAnswer, queueVoiceAction })) return;
 
     // Безопасные голосовые команды: Unicode-safe matching для русской речи.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
