@@ -4677,8 +4677,25 @@ bot.on("message:text", async ctx => {
     return;
   }
 
-  if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)\s+и\s+(?:включи|поставь|запусти)\s+\d+\s+видео$/iu.test(normalizedCommand)) {
-    await ctx.reply("🎬 Какие именно два видео включить? Напиши названия или тему — тогда я открою подходящий поиск на YouTube.");
+  const youtubeVideosMatch = normalizedCommand.match(/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)\s+и\s+(?:включи|поставь|запусти)\s+(\d{1,2})\s+видео(?:\s+(.+))?$/iu);
+  if (youtubeVideosMatch) {
+    const count = Number(youtubeVideosMatch[1]);
+    const topic = String(youtubeVideosMatch[2] || "").trim();
+    if (!topic) {
+      await ctx.reply("🎬 Укажи тему или автора. Например: «открой ютуб и включи 2 видео Эдисона».");
+      return;
+    }
+    if (count < 1 || count > 5 || topic.length > 100) {
+      await ctx.reply("⚠️ Можно искать от 1 до 5 видео; тема должна быть короче 100 символов.");
+      return;
+    }
+    try {
+      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(topic);
+      queueVoiceAction("open_url", { url }, userId, ctx.chat.id);
+      await ctx.reply("🎬 Открыл поиск YouTube по теме «" + topic + "». Нашёл выдачу для выбора " + count + " видео; YouTube не позволяет гарантированно запустить несколько роликов одновременно одной командой.");
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
     return;
   }
 
@@ -4690,18 +4707,22 @@ bot.on("message:text", async ctx => {
     return;
   }
 
-  const brightnessChange = normalizedCommand.match(
-    /^(?:уменьши|понизь|снизь)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu
-  );
-  if (brightnessChange) {
-    const amount = Number(brightnessChange[1]);
-    if (amount < 1 || amount > 100) {
-      await ctx.reply("⚠️ Укажи изменение яркости от 1 до 100%.");
+  const brightnessSet = normalizedCommand.match(/^(?:установи|поставь|сделай)\s+яркость(?:\s+экрана)?\s+(?:на|до)\s+(\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu);
+  const brightnessChange = normalizedCommand.match(/^(уменьши|понизь|снизь|увеличь|повысь|прибавь|убольши)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu);
+  if (brightnessSet || brightnessChange) {
+    const isSet = Boolean(brightnessSet);
+    const amount = Number(isSet ? brightnessSet[1] : brightnessChange[2]);
+    const direction = isSet ? "set" : /^(?:увеличь|повысь|прибавь|убольши)$/iu.test(brightnessChange[1]) ? "up" : "down";
+    if (amount < (isSet ? 0 : 1) || amount > 100) {
+      await ctx.reply("⚠️ Укажи яркость или изменение от 0 до 100%.");
       return;
     }
     try {
-      queueVoiceAction("set_brightness", { mode: "down", amount }, userId, ctx.chat.id);
-      await ctx.reply("🌗 Отправил команду уменьшить яркость на " + amount + "%.");
+      const args = direction === "set" ? { mode: "set", percent: amount } : { mode: direction, amount };
+      queueVoiceAction("set_brightness", args, userId, ctx.chat.id);
+      await ctx.reply(direction === "set"
+        ? "🌗 Устанавливаю яркость на " + amount + "%."
+        : "🌗 Отправил команду " + (direction === "up" ? "увеличить" : "уменьшить") + " яркость на " + amount + "%.");
     } catch (error) {
       await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
     }
