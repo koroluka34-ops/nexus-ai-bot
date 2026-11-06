@@ -4,6 +4,8 @@
 
 import json
 import os
+import shutil
+import re
 import subprocess
 import time
 import urllib.error
@@ -237,8 +239,24 @@ Write-Output $target
             raise RuntimeError(detail[-1200:])
         target = result.stdout.strip().splitlines()[-1]
         return "Яркость экрана установлена на " + target + "%."
-    if action in ("install_app", "uninstall_app", "close_all_apps"):
-        raise RuntimeError("Это действие пока отключено в Windows-агенте из соображений безопасности.")
+    if action == "install_app":
+        query = str(args.get("query", "")).strip()
+        if not query or len(query) > 80 or not re.fullmatch(r"[\wА-Яа-яЁё ._()+-]+", query, re.UNICODE):
+            raise ValueError("Название приложения для установки некорректно.")
+        winget = shutil.which("winget")
+        if not winget:
+            raise RuntimeError("Windows Package Manager (winget) не найден. Обнови App Installer из Microsoft Store.")
+        command = [winget, "install", "--name", query, "--exact", "--silent",
+                   "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"]
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                                errors="replace", timeout=900)
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        if result.returncode != 0:
+            detail = output.strip()[-1400:] or ("winget завершился с кодом " + str(result.returncode))
+            raise RuntimeError("Не удалось установить " + query + ": " + detail)
+        return "Установка " + query + " завершена.\n" + output.strip()[-700:]
+    if action in ("uninstall_app", "close_all_apps"):
+        raise RuntimeError("Удаление приложений и закрытие всех программ пока отключены из соображений безопасности.")
     raise RuntimeError("Неизвестное действие: " + str(action))
 
 def main():
