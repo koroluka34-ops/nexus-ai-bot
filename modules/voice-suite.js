@@ -109,7 +109,7 @@ async function handleVoiceTranscript(ctx, transcript, status, deps) {
   }
 
   // Поиск: использует уже подключённый поисковый режим NEXUS.
-  const searchMatch = text.match(/^(?:(?:nexus[, ]*)?(?:найди|поищи|загугли|найди в интернете|поищи в интернете)\s+)([\s\S]{2,500})$/iu);
+  const searchMatch = text.match(/^(?:(?:nexus[, ]*)?(?:найди\\s+в\\s+интернете|поищи\\s+в\\s+интернете|найди|поищи|загугли)\s+)([\s\S]{2,500})$/iu);
   if (searchMatch) {
     const result = await askAI(userId, searchMatch[1].trim(), true);
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
