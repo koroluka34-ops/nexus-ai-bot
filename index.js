@@ -4661,8 +4661,10 @@ bot.on("message:text", async ctx => {
   const normalizedCommand = addressedQuestion.replace(/[.!?]+$/g, "").trim();
 
   if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)(?:\s+сайт)?$/iu.test(normalizedCommand)) {
-    queueVoiceAction("open_url", { url: "https://www.youtube.com/" }, userId, ctx.chat.id);
-    await ctx.reply("▶️ Отправил команду открыть YouTube на подключённом ПК.");
+    try {
+      queueVoiceAction("open_url", { url: "https://www.youtube.com/" }, userId, ctx.chat.id);
+      await ctx.reply("▶️ Отправил команду открыть YouTube на подключённом ПК.");
+    } catch (error) { await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500)); }
     return;
   }
 
@@ -4676,8 +4678,8 @@ bot.on("message:text", async ctx => {
       return;
     }
     try {
-      await requestVoicePcConfirmation(ctx, "set_brightness", { mode: "down", amount },
-        "Уменьшить яркость экрана на " + amount + "%");
+      queueVoiceAction("set_brightness", { mode: "down", amount }, userId, ctx.chat.id);
+      await ctx.reply("🌗 Отправил команду уменьшить яркость на " + amount + "%.");
     } catch (error) {
       await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
     }
