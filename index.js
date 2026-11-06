@@ -4645,18 +4645,46 @@ bot.on("message:text", async ctx => {
   }
   const addressedQuestion = ctx.message.text.trim();
 
-  // Текстовые команды Microsoft Store используют тот же запрос подтверждения, что и голосовые.
-  // Поддерживаем фразы: «скачай Telegram из Microsoft Store» и «установи Telegram через магазин Microsoft».
+  // Deterministic PC commands from ordinary Telegram text (do not send these to Groq).
+  const normalizedCommand = addressedQuestion.replace(/[.!?]+$/g, "").trim();
+
+  if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)(?:\s+сайт)?$/iu.test(normalizedCommand)) {
+    queueVoiceAction("open_url", { url: "https://www.youtube.com/" }, userId, ctx.chat.id);
+    await ctx.reply("▶️ Отправил команду открыть YouTube на подключённом ПК.");
+    return;
+  }
+
+  const brightnessChange = normalizedCommand.match(
+    /^(?:уменьши|понизь|снизь)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu
+  );
+  if (brightnessChange) {
+    const amount = Number(brightnessChange[1]);
+    if (amount < 1 || amount > 100) {
+      await ctx.reply("⚠️ Укажи изменение яркости от 1 до 100%.");
+      return;
+    }
+    try {
+      await requestVoicePcConfirmation(ctx, "set_brightness", { mode: "down", amount },
+        "Уменьшить яркость экрана на " + amount + "%");
+    } catch (error) {
+      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
+    }
+    return;
+  }
+
+  // Текстовые команды Microsoft Store: отдельная установка и составная команда
+  // «Открой Microsoft Store и скачай ChatGPT».
+  const storeName = "(?:microsoft\\s+store|майкрософт\\s+стор(?:е)?|микрософт\\s+стор(?:е)?)";
   const storeInstallMatch = addressedQuestion.match(
-    /^(?:пожалуйста[, ]*)?(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\s+(.+?)\s+(?:из|через)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
+    new RegExp("^(?:пожалуйста[, ]*)?(?:(?:открой|запусти)\\s+" + storeName + "\\s+и\\s+(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)|(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)\\s+(?:из|через|в)\\s+" + storeName + ")[.!?]*$", "iu")
   );
   if (storeInstallMatch) {
-    const appName = storeInstallMatch[1]
-      .replace(/^(?:приложение|программу)\s+/iu, "")
+    const appName = (storeInstallMatch[1] || storeInstallMatch[2] || "")
+      .replace(/^(?:приложение|программу)\\s+/iu, "")
       .replace(/[.!?]+$/g, "")
       .trim();
-    if (!appName || appName.length > 80 || !/^[\p{L}\p{N} ._()+-]+$/u.test(appName)) {
-      await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Скачай Telegram из Microsoft Store».");
+    if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(appName)) {
+      await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Открой Microsoft Store и скачай ChatGPT».");
       return;
     }
     try {
