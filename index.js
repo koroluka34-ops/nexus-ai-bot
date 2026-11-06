@@ -4667,7 +4667,7 @@ bot.on("message:text", async ctx => {
   }
 
   const brightnessChange = normalizedCommand.match(
-    /^(?:уменьши|понизь|снизь)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu
+    /^(?:уменьши|понизь|снизь)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu
   );
   if (brightnessChange) {
     const amount = Number(brightnessChange[1]);
@@ -4724,7 +4724,8 @@ bot.on("message:text", async ctx => {
   // Reuse the same constrained semantic interpreter as voice commands instead of
   // letting Groq answer that it cannot access the connected Windows PC.
   const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
-  if (ownerId && String(userId) === ownerId) {
+  const looksLikePcCommand = /(?:открой|открыть|запусти|запустить|включи|включить|выключи|выключить|закрой|закрыть|удали|удалить|установи|установить|скачай|скачать|найди|найти|поищи|ищи|перезагруз|перезапуст|выруби|заблокируй|усыпи|спящ|яркост|громкост|громче|тише|вай.?фай|wi.?fi|авиарежим|режим самол[её]т|рабочий стол|загрузки|документы|ютуб|youtube|google|гугл)/iu.test(addressedQuestion);
+  if (ownerId && String(userId) === ownerId && looksLikePcCommand) {
     let interpreted = null;
     try { interpreted = await interpretVoiceCommand(addressedQuestion); }
     catch (error) { console.warn("NEXUS text PC interpreter failed:", error.message); }
