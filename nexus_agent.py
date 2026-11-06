@@ -352,8 +352,38 @@ Write-Output $target
             detail = output.strip()[-1400:] or ("winget завершился с кодом " + str(result.returncode))
             raise RuntimeError("Не удалось установить " + query + ": " + detail)
         return "Установка " + query + " завершена.\n" + output.strip()[-700:]
-    if action in ("uninstall_app", "close_all_apps"):
-        raise RuntimeError("Удаление приложений и закрытие всех программ пока отключены из соображений безопасности.")
+    if action == "uninstall_app":
+        name = str(args.get("app", "")).strip()
+        if not name or len(name) > 80 or not re.fullmatch(r"[\wА-Яа-яЁё ._()+-]+", name, re.UNICODE):
+            raise ValueError("Название приложения для удаления некорректно.")
+        winget = shutil.which("winget")
+        if not winget:
+            raise RuntimeError("Windows Package Manager (winget) не найден.")
+        command = [winget, "uninstall", "--name", name, "--exact", "--silent",
+                   "--accept-source-agreements", "--disable-interactivity"]
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                                errors="replace", timeout=900)
+        output = (result.stdout or "") + "\n" + (result.stderr or "")
+        if result.returncode != 0:
+            raise RuntimeError("Не удалось удалить " + name + ": " + (output.strip()[-1200:] or str(result.returncode)))
+        return "Удаление " + name + " завершено.\n" + output.strip()[-500:]
+    if action == "close_all_apps":
+        script = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$skip = @('explorer', 'SystemSettings', 'SearchHost', 'StartMenuExperienceHost', 'ShellExperienceHost')
+$targets = @(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.ProcessName -notin $skip })
+$requested = @()
+foreach ($process in $targets) {
+  if ($process.CloseMainWindow()) { $requested += $process.ProcessName }
+}
+'Запрошено штатное закрытие окон: ' + ($requested -join ', ')
+'Принудительное завершение процессов не выполнялось.'
+"""
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or "Не удалось запросить закрытие окон.").strip()[-900:])
+        return result.stdout.strip() or "Запросил штатное закрытие открытых окон. Несохранённые документы могут показать запрос на сохранение."
     raise RuntimeError("Неизвестное действие: " + str(action))
 
 def main():
