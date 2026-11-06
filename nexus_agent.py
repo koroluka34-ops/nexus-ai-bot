@@ -188,7 +188,7 @@ $percent = [int]$env:NEXUS_BRIGHTNESS_PERCENT
 if ($mode -eq 'up') { $target = [Math]::Min(100, $current + $amount) }
 elseif ($mode -eq 'down') { $target = [Math]::Max(0, $current - $amount) }
 else { $target = $percent }
-$result = Invoke-CimMethod -InputObject ($methods | Select-Object -First 1) -MethodName WmiSetBrightness -Arguments @{ Timeout = 1; Brightness = $target }
+$result = Invoke-CimMethod -InputObject ($methods | Select-Object -First 1) -MethodName WmiSetBrightness -Arguments @{ Timeout = [uint32]1; Brightness = [byte]$target }
 if ($result.ReturnValue -ne 0) { throw ('Windows вернула код ошибки яркости: ' + $result.ReturnValue) }
 Write-Output $target
 """
