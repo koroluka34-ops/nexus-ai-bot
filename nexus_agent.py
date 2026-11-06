@@ -176,7 +176,7 @@ $wifi = Get-NetAdapter -Physical -ErrorAction Stop | Where-Object {
   $_.InterfaceDescription -match 'Wi-Fi|Wireless|802\.11|Беспровод'
 }
 if (-not $wifi) { throw 'Физический Wi-Fi адаптер не найден.' }
-if ($state -eq 'on') {
+if ($state -eq 'off') {
   $wifi | Enable-NetAdapter -Confirm:$false -ErrorAction Stop
 } else {
   $wifi | Disable-NetAdapter -Confirm:$false -ErrorAction Stop
@@ -185,7 +185,7 @@ $bt = Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Where-Objec
   $_.FriendlyName -match 'Bluetooth.*(Radio|Adapter)|(Radio|Adapter).*Bluetooth|Qualcomm.*Bluetooth|Intel.*Bluetooth|Realtek.*Bluetooth|MediaTek.*Bluetooth'
 }
 if ($bt) {
-  if ($state -eq 'on') {
+  if ($state -eq 'off') {
     $bt | Enable-PnpDevice -Confirm:$false -ErrorAction Stop
   } else {
     $bt | Disable-PnpDevice -Confirm:$false -ErrorAction Stop
@@ -206,7 +206,7 @@ if ($bt) {
             if "access" in detail.lower() or "доступ" in detail.lower() or "administrator" in detail.lower():
                 detail += " Запусти NEXUS Agent от имени администратора."
             raise RuntimeError(detail[-1200:])
-        return ("Авиарежим включён: Wi-Fi и Bluetooth отключены. " if state == "off" else
+        return ("Авиарежим включён: Wi-Fi и Bluetooth отключены. " if state == "on" else
                 "Авиарежим выключен: Wi-Fi и Bluetooth включены. ") + result.stdout.strip()
     if action == "set_wifi":
         state = str(args.get("state", "")).lower()
