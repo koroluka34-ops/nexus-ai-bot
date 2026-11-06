@@ -50,7 +50,7 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
-const { installAstraVoice, synthesizeAstraSpeech } = require("./modules/astra-voice");
+const { installAstraVoice } = require("./modules/astra-voice");
 installAstraVoice(bot);
 
 const { installSecurityMonitor } = require("./modules/security-monitor");
@@ -1607,10 +1607,7 @@ async function transcribeVoice(ctx) {
 // ======================================================
 
 async function makeSpeech(text) {
-  // Если голос Астры уже создан и выбран, используем его; иначе сохраняем прежний Edge TTS.
-  const astraAudio = await synthesizeAstraSpeech(text);
-  if (astraAudio) return astraAudio;
-
+  // Бесплатная озвучка через Microsoft Edge TTS — без вызова ElevenLabs.
   const filename = path.join(
     os.tmpdir(),
     `nexus-${crypto.randomUUID()}.mp3`
