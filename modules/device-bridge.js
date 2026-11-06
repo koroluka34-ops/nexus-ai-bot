@@ -110,17 +110,18 @@ function queueVoiceAction(action, args, userId, chatId) {
     args = { app: appName };
   } else if (["shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "close_all_apps"].includes(action)) {
     args = {};
-  } else if (action === "set_volume") {
+  } else if (action === "set_volume" || action === "set_brightness") {
     const mode = String(args.mode || "set").toLowerCase();
+    const subject = action === "set_volume" ? "Громкость" : "Яркость";
     if (mode === "set") {
       const percent = Number(args.percent);
-      if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error("Громкость должна быть целым числом от 0 до 100.");
+      if (!Number.isInteger(percent) || percent < 0 || percent > 100) throw new Error(subject + " должна быть целым числом от 0 до 100.");
       args = { mode: "set", percent };
     } else if (mode === "up" || mode === "down") {
       const amount = Number(args.amount ?? 10);
-      if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new Error("Шаг изменения громкости должен быть от 1 до 100.");
+      if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new Error("Шаг изменения " + subject.toLowerCase() + " должен быть от 1 до 100.");
       args = { mode, amount };
-    } else throw new Error("Неизвестный режим изменения громкости.");
+    } else throw new Error("Неизвестный режим изменения " + subject.toLowerCase() + ".");
   } else if (action === "open_store") {
     args = {};
   } else if (action === "open_url") {
