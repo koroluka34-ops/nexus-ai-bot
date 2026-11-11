@@ -117,7 +117,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function makePrizeEmoji(prize){
     const art=document.createElement("span");art.className="slice-emoji";
-    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="nexus_plus"?"💎":prize.type==="jackpot"?"💎":prize.type==="secret"?"🎁":prize.type==="none"?"🍀":prize.type==="gift_random"?"🧸":"🎁";
+    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="nexus_plus"?"💎":prize.type==="jackpot"?"💎":prize.type==="secret"?"❔":prize.type==="none"?"🍀":prize.type==="gift_random"?"🧸":"🎁";
     return art;
   }
   function drawWheel(prizes){
@@ -133,7 +133,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
       }else label.append(makePrizeEmoji(prize));
       const text=document.createElement("span");text.className="slice-text";
-      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"SECRET GIFT":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
+      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"???":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
     });
   }
@@ -167,8 +167,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function renderCatalog(prizes){
     drawWheel(prizes);
-    const rewards=(prizes||[]).filter(p=>["gift_random","jackpot","secret","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
-    const giftCount=rewards.filter(p=>["gift_random","jackpot","secret"].includes(p.type)).length;
+    const rewards=(prizes||[]).filter(p=>["gift_random","jackpot","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
+    const giftCount=rewards.filter(p=>["gift_random","jackpot"].includes(p.type)).length;
     $("giftCount").textContent=giftCount+" подарочных сектора · "+rewards.filter(p=>!["gift_random","jackpot","secret"].includes(p.type)).length+" подписки";
     prizesBox.replaceChildren();
     rewards.forEach(prize=>{
