@@ -94,10 +94,8 @@ async function getStarBalance(bot) {
   return Number(value?.amount || 0);
 }
 async function getGiftCatalog(bot) {
-  const [balance, result] = await Promise.all([
-    getStarBalance(bot),
-    bot.api.callApi("getAvailableGifts", {})
-  ]);
+  const balance = await getStarBalance(bot);
+  const result = await bot.api.callApi("getAvailableGifts", {});
   const gifts = Array.isArray(result?.gifts) ? result.gifts : [];
   const available = gifts
     .filter(g => g && typeof g.id === "string" && Number(g.star_count) > 0)
@@ -124,9 +122,10 @@ async function getGiftCatalog(bot) {
 }
 function choosePrize(gifts) {
   if (!gifts.length || crypto.randomInt(0, 1000000) < NO_PRIZE_WEIGHT) {
-    return { id: "no_prize", label: "Сегодня без подарка. Попробуй завтра!", short: "Попробуй завтра", probability: "50%", type: "none", cost: 0 };
+    return { id: "no_prize", label: "Сегодня без подарка. Попробуй завтра!", short: "Без приза", probability: "50%", type: "none", cost: 0, wheelIndex: gifts.length };
   }
-  return gifts[crypto.randomInt(0, gifts.length)];
+  const index = crypto.randomInt(0, gifts.length);
+  return { ...gifts[index], wheelIndex: index };
 }
 function publicPrize(prize) {
   return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0 };
@@ -292,6 +291,7 @@ function installRoulette(bot) {
           json(res, 200, {
             ok: true, canSpin: false, spinId,
             prize: publicPrize(prize),
+            prizeIndex: prize.wheelIndex,
             delivered,
             message: delivered
               ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : "Сегодня без подарка. Новая попытка будет завтра.")
@@ -305,8 +305,8 @@ function installRoulette(bot) {
       json(res, 404, { ok: false, error: "Маршрут не найден." });
       return true;
     } catch (error) {
-      console.error("NEXUS gift roulette HTTP:", error.message);
-      json(res, 500, { ok: false, error: "Не удалось обработать рулетку. Попробуй позже." });
+      console.error("NEXUS gift roulette HTTP:", error.stack || error.message);
+      json(res, 500, { ok: false, error: "Ошибка рулетки: " + String(error.message || error).slice(0, 220) });
       return true;
     }
   }
