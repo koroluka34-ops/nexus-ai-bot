@@ -291,7 +291,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     if (typeof isAdmin !== "function" || !await isAdmin(ctx.from.id)) {
       return ctx.reply("⛔ Команда доступна только администраторам NEXUS.");
     }
-    const parts = String(ctx.match || "").trim().split(/\\s+/).filter(Boolean);
+    const parts = String(ctx.match || "").trim().split(/\s+/).filter(Boolean);
     const replied = ctx.message.reply_to_message?.from;
     let targetId = replied ? String(replied.id) : "";
     let amount;
@@ -304,7 +304,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       targetId = parts[0] || "";
       amount = Number(parts[1]);
     }
-    if (!/^\\d{1,20}$/.test(targetId) || !Number.isSafeInteger(Number(targetId)) ||
+    if (!/^\d{1,20}$/.test(targetId) || !Number.isSafeInteger(Number(targetId)) ||
         !Number.isInteger(amount) || amount < 1 || amount > 10000) {
       return ctx.reply("Формат: /spinadd ID КОЛИЧЕСТВО\nПример: /spinadd 123456789 5\nМожно ответить на сообщение пользователя: /spinadd 5\nИли указать @username: /spinadd @username 5");
     }
