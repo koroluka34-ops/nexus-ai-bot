@@ -54,7 +54,9 @@ async function readState(userId) {
   return {
     lastSpinDay: String(value.lastSpinDay || ""),
     bonusSpins: Math.max(0, Math.min(100000, Math.floor(Number(value.bonusSpins) || 0))),
-    history: Array.isArray(value.history) ? value.history.slice(-100) : [],\n    streak: Math.max(0, Math.min(3650, Math.floor(Number(value.streak) || 0))),\n    lastStreakDay: String(value.lastStreakDay || "")
+    history: Array.isArray(value.history) ? value.history.slice(-100) : [],
+    streak: Math.max(0, Math.min(3650, Math.floor(Number(value.streak) || 0))),
+    lastStreakDay: String(value.lastStreakDay || "")
   };
 }
 async function writeState(userId, state) {
@@ -143,7 +145,7 @@ async function getGiftCatalog(bot) {
   // Keep the complete eligible pool. The wheel has one teddy-bear sector;
   // the actual gift is selected randomly only after that sector wins.
   const available = gifts
-    .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 999)
+    .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
     .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
     .map(g => ({
       id: "gift:" + g.id,
@@ -159,9 +161,11 @@ async function getGiftCatalog(bot) {
   const premiumAvailable = balance >= 2500;
   const prizes = [
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, available: true, weight: TELEGRAM_PREMIUM_WEIGHT },
+    { id: "jackpot_1000", label: "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐", short: "ДЖЕКПОТ · 1000 ⭐", probability: "0,01%", type: "jackpot", cost: 1000, available: true, weight: JACKPOT_WEIGHT },
+    { id: "secret_gift", label: "🎁 Секретный подарок", short: "Секретный приз", probability: "0,01%", type: "secret", cost: 0, available: true, weight: SECRET_WEIGHT },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–999 ⭐", short: "Мишка · 15–999 ⭐", probability: "38%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
+    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–1000 ⭐", short: "Мишка · 15–1000 ⭐", probability: "38%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
     { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "61,27%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
   ];
   return { balance, gifts: available, prizes };
@@ -225,14 +229,14 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       }
       const catalog = await telegramApi("getAvailableGifts");
       const gifts = (Array.isArray(catalog?.gifts) ? catalog.gifts : [])
-        .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 500)
+        .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
         .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
       for (const item of [...queue].filter(entry => entry.type !== "telegram_premium")) {
         // If the catalog was empty at spin time, select a real gift only when
         // it becomes available and the bot can afford it.
         let gift = item.giftId ? gifts.find(g => g.id === item.giftId) : null;
         if (!gift && !item.giftId) {
-          const affordable = gifts.filter(g => Number(g.star_count) <= balance);
+          const eligible = item.type === "jackpot" ? gifts.filter(g => Number(g.star_count) === 1000) : gifts.filter(g => Number(g.star_count) >= 15 && Number(g.star_count) <= 999);\n          const affordable = eligible.filter(g => Number(g.star_count) <= balance);
           if (affordable.length) gift = affordable[crypto.randomInt(0, affordable.length)];
         }
         const cost = Number(gift?.star_count || item.cost || 0);
@@ -364,7 +368,24 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     } catch (error) { await ctx.answerCallbackQuery({ text: "Не удалось отказаться: " + String(error.message || error).slice(0, 150), show_alert: true }); }
   });
 
-  bot.command("rouletteevent", async ctx => {\n    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");\n    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");\n    const mode = String(ctx.match || "").trim().toLowerCase();\n    const current = await readGlobal("event", { active: false, label: "NEXUS EVENT" });\n    current.active = mode === "on" ? true : mode === "off" ? false : !current.active;\n    current.updatedAt = Date.now();\n    await writeGlobal("event", current);\n    return ctx.reply(current.active ? "🔥 NEXUS EVENT включён: шанс подарочных секторов x2." : "⏹ NEXUS EVENT выключен.");\n  });\n\n  bot.command("roulettewinners", async ctx => {\n    const winners = await readGlobal("winners", []);\n    if (!winners.length) return ctx.reply("🏆 Победителей пока нет.");\n    return ctx.reply("🏆 <b>ПОСЛЕДНИЕ ПОБЕДИТЕЛИ NEXUS</b>\\n\\n" + winners.slice(-10).reverse().map((w,i) => (i+1)+". "+String(w.name||"Игрок").replace(/[<>]/g,"")+" — "+String(w.label||"Приз").replace(/[<>]/g,"")).join("\\n"), { parse_mode: "HTML" });\n  });\n\n  bot.command("roulettebalance", async ctx => {
+  bot.command("rouletteevent", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    const mode = String(ctx.match || "").trim().toLowerCase();
+    const current = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
+    current.active = mode === "on" ? true : mode === "off" ? false : !current.active;
+    current.updatedAt = Date.now();
+    await writeGlobal("event", current);
+    return ctx.reply(current.active ? "🔥 NEXUS EVENT включён: шанс подарочных секторов x2." : "⏹ NEXUS EVENT выключен.");
+  });
+
+  bot.command("roulettewinners", async ctx => {
+    const winners = await readGlobal("winners", []);
+    if (!winners.length) return ctx.reply("🏆 Победителей пока нет.");
+    return ctx.reply("🏆 <b>ПОСЛЕДНИЕ ПОБЕДИТЕЛИ NEXUS</b>\n\n" + winners.slice(-10).reverse().map((w,i) => (i+1)+". "+String(w.name||"Игрок").replace(/[<>]/g,"")+" — "+String(w.label||"Приз").replace(/[<>]/g,"")).join("\n"), { parse_mode: "HTML" });
+  });
+
+  bot.command("roulettebalance", async ctx => {
     const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
     try {
@@ -450,14 +471,14 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const [state, catalog, queue] = await Promise.all([readState(user.id), getGiftCatalog(bot), readPendingQueue()]);
         const freeSpinAvailable = state.lastSpinDay !== kyivDay();
         const canSpin = freeSpinAvailable || state.bonusSpins > 0;
-        const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
+        const winners = await readGlobal("winners", []);\n        const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });\n        const collection = state.history.filter(item => item.status === "delivered" && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse();\n        const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
           spinId: item.spinId,
           label: item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram"),
           cost: Number(item.cost || 0), createdAt: item.createdAt || 0
         }));
         json(res, 200, {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
-          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance,
+          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Array.isArray(winners) ? winners.slice(-10).reverse() : [],
           giftsAvailable: catalog.gifts.length, pendingGifts, prizes: catalog.prizes.map(publicPrize),
           unavailableReason: catalog.gifts.length ? "" : "Нет доступных подарков стоимостью 15–1000 ⭐ или не хватает Stars на балансе бота.",
           lastResult: state.history.at(-1) || null
@@ -492,9 +513,25 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const usedBonusSpin = fresh.lastSpinDay === today;
           if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
           
-          let prizeList = catalog.prizes.map(item => ({ ...item }));\n          const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });\n          const streakMultiplier = fresh.streak >= 30 ? 5 : fresh.streak >= 7 ? 3 : fresh.streak >= 3 ? 2 : 1;\n          const luckMultiplier = streakMultiplier * (event.active ? 2 : 1);\n          if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot"].includes(item.type) ? luckMultiplier : 1) }));\n          let prize = choosePrize(prizeList);
+          let prizeList = catalog.prizes.map(item => ({ ...item }));
+          const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
+          const streakMultiplier = fresh.streak >= 30 ? 5 : fresh.streak >= 7 ? 3 : fresh.streak >= 3 ? 2 : 1;
+          const luckMultiplier = streakMultiplier * (event.active ? 2 : 1);
+          if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot"].includes(item.type) ? luckMultiplier : 1) }));
+          let prize = choosePrize(prizeList);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
-          if (prize.type === "gift_random") {
+          if (["gift_random", "secret", "jackpot"].includes(prize.type)) {
+            const sourceType = prize.type;
+            const wheelIndex = prize.wheelIndex;
+            const eligible = sourceType === "jackpot"
+              ? catalog.gifts.filter(g => g.cost === 1000)
+              : catalog.gifts.filter(g => g.cost >= 15 && g.cost <= 999);
+            const selectedGift = eligible.length ? eligible[crypto.randomInt(0, eligible.length)] : null;
+            prize = selectedGift
+              ? { ...selectedGift, label: sourceType === "jackpot" ? "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐" : sourceType === "secret" ? "🎁 СЕКРЕТНЫЙ ПОДАРОК · " + selectedGift.cost + " ⭐" : selectedGift.label, short: sourceType === "jackpot" ? "ДЖЕКПОТ · 1000 ⭐" : sourceType === "secret" ? "Секрет · " + selectedGift.cost + " ⭐" : selectedGift.short, wheelIndex, sectorId: sourceType === "jackpot" ? "jackpot_1000" : sourceType === "secret" ? "secret_gift" : "telegram_gift_random", type: "gift", jackpot: sourceType === "jackpot", secret: sourceType === "secret" }
+              : { id: sourceType === "jackpot" ? "gift:pending-jackpot" : "gift:pending-random", giftId: "", label: sourceType === "jackpot" ? "💎 ДЖЕКПОТ · подарок за 1000 ⭐ (ожидает отправки)" : sourceType === "secret" ? "🎁 Секретный подарок (ожидает отправки)" : "🧸 Подарок Telegram · 15–999 ⭐", short: sourceType === "jackpot" ? "ДЖЕКПОТ · ожидание" : sourceType === "secret" ? "Секретный приз" : "Мишка · подарок ожидает", type: "gift", cost: sourceType === "jackpot" ? 1000 : 0, wheelIndex, sectorId: sourceType === "jackpot" ? "jackpot_1000" : sourceType === "secret" ? "secret_gift" : "telegram_gift_random", jackpot: sourceType === "jackpot", secret: sourceType === "secret" };
+          }
+          if (false && prize.type === "gift_random") {
             const wheelIndex = prize.wheelIndex;
             const selectedGift = catalog.gifts.length
               ? catalog.gifts[crypto.randomInt(0, catalog.gifts.length)]
@@ -532,7 +569,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
               queue.push({
                 spinId,
                 userId: user.id,
-                type: prize.type === "telegram_premium" ? "telegram_premium" : "gift",
+                type: prize.type === "telegram_premium" ? "telegram_premium" : (prize.jackpot ? "jackpot" : "gift"),
                 giftId: prize.giftId || "",
                 label: prize.label,
                 cost: prize.type === "telegram_premium" ? 2500 : (prize.cost || 0),
@@ -558,6 +595,11 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           } catch (error) {
             deliveryMessage = String(error.message || error).slice(0, 300);
             console.error("NEXUS gift roulette delivery:", user.id, prize.id, deliveryMessage);
+          }
+          if (delivered && prize.type !== "none") {
+            const winners = await readGlobal("winners", []);
+            winners.push({ userId: user.id, name: user.firstName || "Игрок", label: prize.label, cost: prize.cost || 0, at: Date.now() });
+            await writeGlobal("winners", winners.slice(-200));
           }
           const latestState = await readState(user.id);
           const latestRow = latestState.history.find(item => item.spinId === spinId);
