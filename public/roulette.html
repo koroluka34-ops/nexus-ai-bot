@@ -28,7 +28,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .outer{width:min(76vw,310px);aspect-ratio:1;padding:9px;border-radius:50%;background:conic-gradient(from 30deg,#9a5a14,#ffedaa,#c68a34,#fff1b9,#a65e18,#f4d17d);box-shadow:0 0 0 1px #ffe7a355,0 13px 30px #0009,0 0 38px #eab64b26}
 .wheel{width:100%;height:100%;position:relative;overflow:hidden;border-radius:50%;border:5px solid #10182c;background:conic-gradient(from -90deg,#284c9a 0 50%,#172b59 50% 100%);transition:transform 5s cubic-bezier(.12,.72,.12,1);box-shadow:inset 0 0 30px #02061799}
 .wheel:after{content:"N";position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#aab8d1);color:#101a34;font-size:25px;font-weight:1000;border:5px solid #10182c;box-shadow:0 5px 15px #000a}
-.slice-label{position:absolute;left:50%;top:50%;width:76px;margin-left:-38px;margin-top:-20px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;font-size:9px;font-weight:950;line-height:1.05;color:#fff;text-shadow:0 2px 5px #000,0 0 7px #000;transform-origin:50% 50%;pointer-events:none;z-index:2}
+.slice-label{position:absolute;left:50%;top:50%;width:76px;margin-left:-38px;margin-top:-24px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:9px;font-weight:950;line-height:1.05;color:#fff;text-shadow:0 2px 5px #000,0 0 7px #000;transform-origin:50% 50%;pointer-events:none;z-index:2}.slice-label img{display:block;width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 3px 5px #000b)}.slice-emoji{font-size:30px;line-height:38px;filter:drop-shadow(0 3px 5px #000b)}.slice-text{max-width:76px;font-size:8px;letter-spacing:.02em}
 .spin{width:100%;border:1px solid #f5d78b;border-radius:15px;padding:16px 18px;background:linear-gradient(100deg,#d99a32,#f4d47e 52%,#bd7b24);color:#171528;font-size:15px;font-weight:1000;letter-spacing:.04em;box-shadow:0 8px 25px #d69a3650}
 .spin:disabled{opacity:.48;filter:grayscale(.6);box-shadow:none}
 .hint{text-align:center;font-size:11px;color:#9cacc8;line-height:1.5;margin:10px 4px 0}
@@ -46,7 +46,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .prize{min-width:0;padding:11px;border-radius:14px;background:linear-gradient(145deg,#101a31,#0a1224);border:1px solid #2d3d5e}
 .gift-art{display:block;width:64px;height:64px;object-fit:contain;margin:0 auto 8px;filter:drop-shadow(0 5px 10px #0008)}.emoji-art{display:grid;place-items:center;font-size:42px}.prize b{display:block;font-size:11px;line-height:1.35;color:#f3f6ff;margin-bottom:5px;overflow-wrap:anywhere}
 .prize span{font-size:10px;color:#a8b7d1}
-.prize.no-prize{border-color:#4b5267}
+.prize.no-prize{border-color:#4b5267}.prize.unavailable{opacity:.72;border-style:dashed}
 .disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}
 @media(min-width:420px){body{padding-top:22px}.panel{padding:19px}.outer{width:310px}}
 </style>
@@ -54,7 +54,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 <body>
 <main>
   <div class="header"><div class="logo">NEXUS <span>✦</span> AI</div><div class="live">● DAILY GIFT DROP</div></div>
-  <div class="hero"><div class="eyebrow">ТВОЙ ЕЖЕДНЕВНЫЙ ШАНС</div><h1>Gift Roulette</h1><p class="subtitle">Крути колесо и выигрывай настоящие подарки Telegram или подписки NEXUS Premium и Ultra. На карточках показаны изображения подарков и цена в Stars.</p></div>
+  <div class="hero"><div class="eyebrow">ТВОЙ ЕЖЕДНЕВНЫЙ ШАНС</div><h1>Gift Roulette</h1><p class="subtitle">Крути колесо и выигрывай настоящие подарки Telegram, Telegram Premium на 12 месяцев или подписки NEXUS.</p></div>
   <section class="panel">
     <div class="stats"><span>Твоя попытка</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
     <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
@@ -69,7 +69,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
-    <p class="hint">Шанс не получить приз — 50%, NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%. Остальные 49,3% делятся между доступными подарками Telegram. Если подарки закончились или баланса не хватает, их шанс переходит в «без приза». Если подарки закончились или баланса не хватает, шанс переходит в «без приза».</p>
+    <p class="hint">NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%, Telegram Premium на 12 месяцев — 0,01% при наличии 2500 ⭐ на балансе бота. Остальные шансы распределяются между доступными подарками и сектором «без приза».</p>
   </section>
   <p class="disclaimer">В секторах показаны изображения подарков и подписок. Настоящий подарок отправляется только после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева.</p>
 </main>
@@ -116,18 +116,20 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     drawWheel(prizes);
     const rewards=(prizes||[]).filter(p=>["gift","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
     const giftCount=rewards.filter(p=>p.type==="gift").length;
-    $("giftCount").textContent=giftCount+" подарков · 3 подписки";
+    $("giftCount").textContent=giftCount+" подарков · "+rewards.filter(p=>p.type!=="gift").length+" подписки";
     prizesBox.replaceChildren();
     rewards.forEach(prize=>{
-      const item=document.createElement("div");item.className="prize";
+      const item=document.createElement("div");item.className="prize"+(prize.available===false?" unavailable":"");
       if(prize.type==="gift" && prize.imageUrl){
         const img=document.createElement("img");img.className="gift-art";img.src=prize.imageUrl;img.alt=prize.label;img.loading="lazy";
         img.onerror=()=>{img.style.display="none";};item.append(img);
+      }else if(prize.imageUrl){
+        const img=document.createElement("img");img.className="gift-art";img.src=prize.imageUrl;img.alt=prize.label;item.append(img);
       }else{
         const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="telegram_premium"?"⭐":prize.type==="nexus_ultra"?"🚀":"💎";item.append(art);
       }
       const b=document.createElement("b");b.textContent=prize.label;
-      const s=document.createElement("span");s.textContent="Шанс: "+prize.probability;
+      const s=document.createElement("span");s.textContent=prize.available===false?"Сейчас недоступен · нужно 2500 ⭐ на балансе бота":"Шанс: "+prize.probability;
       item.append(b,s);prizesBox.append(item);
     });
     if(!giftCount){
