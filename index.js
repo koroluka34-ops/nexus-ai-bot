@@ -50,6 +50,9 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+const { installPremium, resolveUsername } = require("./modules/premium-suite");
+installPremium(bot);
+
 const { installAstraVoice } = require("./modules/astra-voice");
 installAstraVoice(bot);
 
@@ -75,8 +78,6 @@ installQrSuite(bot);
 const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
-const { installPremium, resolveUsername } = require("./modules/premium-suite");
-installPremium(bot);
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
