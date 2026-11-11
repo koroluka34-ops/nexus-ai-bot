@@ -4917,6 +4917,9 @@ bot.on("message:text", async ctx => {
     return;
   }
 
+  const textQuota = await consumeQuota(userId, "text");
+  if (!textQuota.ok) return ctx.reply(textQuota.storageError ? "❌ Не удалось сохранить лимит в Cloudflare KV." : "⛔ Дневной лимит ИИ-запросов исчерпан. Посмотри тариф: /premium");
+
   busyUsers.add(userId);
 
   const searchMode = searchUsers.has(userId);
