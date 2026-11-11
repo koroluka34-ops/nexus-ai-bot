@@ -9,9 +9,9 @@ const TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const NAMESPACE = process.env.CLOUDFLARE_KV_NAMESPACE_ID || "";
 const locks = new Set();
 const NO_PRIZE_WEIGHT = 500000;
-const PLUS_WEIGHT = 100000; // 10.00%
+const PLUS_WEIGHT = 5000; // 0.50%
 const ULTRA_WEIGHT = 2000; // 0.20%
-const GIFT_TOTAL_WEIGHT = 398000; // 39.80%, split between currently affordable gifts
+const GIFT_TOTAL_WEIGHT = 493000; // 49.30%, split between currently affordable gifts
 const MAX_GIFTS_IN_WHEEL = 20;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
@@ -134,16 +134,16 @@ async function getGiftCatalog(bot) {
       type: "gift",
       cost: Number(g.star_count)
     }));
-  const chanceEach = available.length ? (39.8 / available.length) : 0;
+  const chanceEach = available.length ? (49.3 / available.length) : 0;
   for (const gift of available) {
     gift.weight = available.length ? Math.floor(GIFT_TOTAL_WEIGHT / available.length) : 0;
     gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 3 }) + "%";
   }
   const prizes = [
-    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "10%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
+    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     ...available,
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: available.length ? "50%" : "89,8%", type: "none", cost: 0, weight: available.length ? NO_PRIZE_WEIGHT : 898000 }
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: available.length ? "50%" : "99,3%", type: "none", cost: 0, weight: available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT }
   ];
   return { balance, gifts: available, prizes };
 }
