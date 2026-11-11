@@ -12,7 +12,9 @@ const NO_PRIZE_WEIGHT = 612700;
 const PLUS_WEIGHT = 5000; // 0.50%
 const ULTRA_WEIGHT = 2000; // 0.20%
 const GIFT_TOTAL_WEIGHT = 380000; // 38.00%, split between eligible gifts
-const TELEGRAM_PREMIUM_WEIGHT = 100; // 0.01%, 12 months\nconst JACKPOT_WEIGHT = 100; // 0.01%, exact 1000-Star Telegram gift\nconst SECRET_WEIGHT = 100; // 0.01%, hidden gift prize
+const TELEGRAM_PREMIUM_WEIGHT = 100; // 0.01%, 12 months
+const JACKPOT_WEIGHT = 100; // 0.01%, exact 1000-Star Telegram gift
+const SECRET_WEIGHT = 100; // 0.01%, hidden gift prize
 const MAX_GIFTS_IN_WHEEL = 20;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
@@ -21,7 +23,22 @@ function kvUrl(userId) {
     "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) +
     "/values/" + encodeURIComponent("nexus:roulette:" + userId);
 }
-function globalUrl(key) {\n  return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +\n    "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) +\n    "/values/" + encodeURIComponent("nexus:roulette:global:" + key);\n}\nasync function readGlobal(key, fallback) {\n  const r = await fetch(globalUrl(key), { headers: { Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(9000) });\n  if (r.status === 404) return fallback;\n  if (!r.ok) throw new Error("Cloudflare KV global HTTP " + r.status);\n  return JSON.parse(await r.text());\n}\nasync function writeGlobal(key, value) {\n  const r = await fetch(globalUrl(key), { method: "PUT", headers: { Authorization: "Bearer " + TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(value), signal: AbortSignal.timeout(9000) });\n  if (!r.ok) throw new Error("Cloudflare KV global write HTTP " + r.status);\n}\nfunction queueUrl() {
+function globalUrl(key) {
+  return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +
+    "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) +
+    "/values/" + encodeURIComponent("nexus:roulette:global:" + key);
+}
+async function readGlobal(key, fallback) {
+  const r = await fetch(globalUrl(key), { headers: { Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(9000) });
+  if (r.status === 404) return fallback;
+  if (!r.ok) throw new Error("Cloudflare KV global HTTP " + r.status);
+  return JSON.parse(await r.text());
+}
+async function writeGlobal(key, value) {
+  const r = await fetch(globalUrl(key), { method: "PUT", headers: { Authorization: "Bearer " + TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(value), signal: AbortSignal.timeout(9000) });
+  if (!r.ok) throw new Error("Cloudflare KV global write HTTP " + r.status);
+}
+function queueUrl() {
   return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +
     "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) +
     "/values/nexus:roulette:pending-gifts";
@@ -236,7 +253,8 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         // it becomes available and the bot can afford it.
         let gift = item.giftId ? gifts.find(g => g.id === item.giftId) : null;
         if (!gift && !item.giftId) {
-          const eligible = item.type === "jackpot" ? gifts.filter(g => Number(g.star_count) === 1000) : gifts.filter(g => Number(g.star_count) >= 15 && Number(g.star_count) <= 999);\n          const affordable = eligible.filter(g => Number(g.star_count) <= balance);
+          const eligible = item.type === "jackpot" ? gifts.filter(g => Number(g.star_count) === 1000) : gifts.filter(g => Number(g.star_count) >= 15 && Number(g.star_count) <= 999);
+          const affordable = eligible.filter(g => Number(g.star_count) <= balance);
           if (affordable.length) gift = affordable[crypto.randomInt(0, affordable.length)];
         }
         const cost = Number(gift?.star_count || item.cost || 0);
@@ -471,7 +489,10 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const [state, catalog, queue] = await Promise.all([readState(user.id), getGiftCatalog(bot), readPendingQueue()]);
         const freeSpinAvailable = state.lastSpinDay !== kyivDay();
         const canSpin = freeSpinAvailable || state.bonusSpins > 0;
-        const winners = await readGlobal("winners", []);\n        const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });\n        const collection = state.history.filter(item => item.status === "delivered" && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse();\n        const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
+        const winners = await readGlobal("winners", []);
+        const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
+        const collection = state.history.filter(item => item.status === "delivered" && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse();
+        const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
           spinId: item.spinId,
           label: item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram"),
           cost: Number(item.cost || 0), createdAt: item.createdAt || 0
