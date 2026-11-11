@@ -118,12 +118,12 @@ async function getGiftCatalog(bot) {
   const balance = await getStarBalance();
   const result = await telegramApi("getAvailableGifts");
   const gifts = Array.isArray(result?.gifts) ? result.gifts : [];
+  // Keep the complete eligible pool. The wheel has one teddy-bear sector;
+  // the actual gift is selected randomly only after that sector wins.
   const available = gifts
-    .filter(g => g && typeof g.id === "string" && Number(g.star_count) > 0)
+    .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 500)
     .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
-    .filter(g => Number(g.star_count) >= 15 && Number(g.star_count) <= 500 && Number(g.star_count) <= balance)
-    .sort((a, b) => Number(a.star_count) - Number(b.star_count))
-    .slice(0, MAX_GIFTS_IN_WHEEL)
+    .filter(g => Number(g.star_count) <= balance)
     .map(g => ({
       id: "gift:" + g.id,
       giftId: g.id,
@@ -135,17 +135,12 @@ async function getGiftCatalog(bot) {
       type: "gift",
       cost: Number(g.star_count)
     }));
-  const chanceEach = available.length ? (49.3 / available.length) : 0;
-  for (const gift of available) {
-    gift.weight = available.length ? Math.floor(GIFT_TOTAL_WEIGHT / available.length) : 0;
-    gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 3 }) + "%";
-  }
   const premiumAvailable = balance >= 2500;
   const prizes = [
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: premiumAvailable ? "0,01%" : "Пока недоступен", type: "telegram_premium", cost: 2500, available: premiumAvailable, weight: premiumAvailable ? TELEGRAM_PREMIUM_WEIGHT : 0 },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    ...available,
+    ...(available.length ? [{ id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: "49,3%", type: "gift_random", cost: 0, weight: GIFT_TOTAL_WEIGHT }] : []),
     { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (available.length ? (premiumAvailable ? "49,99%" : "50%") : premiumAvailable ? "99,29%" : "99,3%"), type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
   ];
   return { balance, gifts: available, prizes };
@@ -160,7 +155,7 @@ function choosePrize(prizes) {
   return { ...prizes[prizes.length - 1], wheelIndex: prizes.length - 1 };
 }
 function publicPrize(prize) {
-  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
+  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
@@ -179,7 +174,7 @@ function installRoulette(bot, { grantPrize } = {}) {
 
   bot.command("roulette", async ctx => {
     if (!webAppUrl) return ctx.reply("🎁 Для Mini App настрой NEXUS_WEBAPP_URL или проверь RENDER_EXTERNAL_HOSTNAME.");
-    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. При выигрыше бот отправит настоящий Telegram-подарок прямо в этот чат. Подарки доступны, пока на балансе бота хватает Stars.", {
+    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. При выигрыше бот отправит настоящий Telegram-подарок прямо в этот чат. Сектор с мишкой выдаёт случайный настоящий подарок стоимостью 15–500 ⭐, если он доступен на балансе бота.", {
       parse_mode: "HTML", reply_markup: openKeyboard()
     });
   });
@@ -295,7 +290,7 @@ function installRoulette(bot, { grantPrize } = {}) {
           balance: catalog.balance,
           giftsAvailable: catalog.gifts.length,
           prizes: catalog.prizes.map(publicPrize),
-          unavailableReason: catalog.gifts.length ? "" : "Подарки временно недоступны: проверь баланс Stars бота.",
+          unavailableReason: catalog.gifts.length ? "" : "Нет доступных подарков стоимостью 15–500 ⭐ или не хватает Stars на балансе бота.",
           lastResult: state.history.at(-1) || null
         });
         return true;
@@ -312,7 +307,14 @@ function installRoulette(bot, { grantPrize } = {}) {
             return true;
           }
           
-          const prize = choosePrize(catalog.prizes);
+          let prize = choosePrize(catalog.prizes);
+          // A single teddy-bear wheel sector resolves to a random real Telegram gift.
+          if (prize.type === "gift_random") {
+            if (!catalog.gifts.length) throw new Error("Сейчас нет доступных подарков Telegram стоимостью 15–500 ⭐.");
+            const wheelIndex = prize.wheelIndex;
+            const selectedGift = catalog.gifts[crypto.randomInt(0, catalog.gifts.length)];
+            prize = { ...selectedGift, wheelIndex, sectorId: "telegram_gift_random" };
+          }
           const spinId = crypto.randomUUID();
           const row = {
             spinId, day: today, prize: prize.id, label: prize.label,
