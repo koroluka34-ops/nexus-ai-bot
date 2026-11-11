@@ -3861,6 +3861,34 @@ bot.command("starcheck", async ctx => {
   }
 });
 
+bot.callbackQuery(/^devtask:(approve|reject):([a-z0-9]+)$/i, async ctx => {
+  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
+    return ctx.answerCallbackQuery({ text: "Только владелец может подтверждать задания.", show_alert: true });
+  }
+  const action = ctx.match[1];
+  const taskId = ctx.match[2];
+  const task = await readKvJson("nexus:devtask:" + taskId, null);
+  if (!task || task.status !== "pending") {
+    return ctx.answerCallbackQuery({ text: "Задание уже обработано или не найдено.", show_alert: true });
+  }
+  task.status = action === "approve" ? "approved" : "rejected";
+  task.reviewedAt = Date.now();
+  task.reviewedBy = String(ctx.from.id);
+  if (!await writeKvJson("nexus:devtask:" + taskId, task)) {
+    return ctx.answerCallbackQuery({ text: "Не удалось сохранить решение.", show_alert: true });
+  }
+  await ctx.answerCallbackQuery({ text: action === "approve" ? "Задание одобрено" : "Задание отклонено" });
+  const text = action === "approve"
+    ? "✅ ЗАДАНИЕ ОДОБРЕНО\\nАвтор: " + task.author + " (ID " + task.authorId + ")\\n\\n" + task.text +
+      "\\n\\nЧтобы передать задачу в ChatGPT, скопируй её текст из этого сообщения в чат разработки NEXUS. Автоматическая передача из Telegram в диалог ChatGPT не поддерживается."
+    : "❌ Задание отклонено. Автор: " + task.author + " (ID " + task.authorId + ").";
+  await ctx.editMessageText((ctx.callbackQuery.message?.text || "Задание") + "\\n\\n" + (action === "approve" ? "✅ ОДОБРЕНО" : "❌ ОТКЛОНЕНО"), { reply_markup: new InlineKeyboard() }).catch(() => {});
+  await ctx.api.sendMessage(PREMIUM_ADMIN_ID, text);
+  await ctx.api.sendMessage(task.authorId, action === "approve"
+    ? "✅ Твоё предложение одобрено владельцем NEXUS и передано на разработку."
+    : "❌ Твоё предложение отклонено владельцем NEXUS.").catch(() => {});
+});
+
 bot.command("paysupport", async ctx => {
   await ctx.reply("💳 Поддержка платежей и призов NEXUS AI\n\nЕсли Stars списались, а тариф не появился, или рулетка сообщила, что приз ожидает проверки, отправь администратору свой Telegram ID: " +
     ctx.from.id + "\nНе оплачивай повторно и не запускай новую попытку до проверки.");
@@ -3886,6 +3914,15 @@ bot.command("model", async ctx => {
   await ctx.reply("✅ Режим моделей сохранён: " + (mode === "auto" ? "автоматический выбор" : mode.toUpperCase()));
 });;
 
+bot.command("id", async ctx => {
+  const target = ctx.message.reply_to_message?.from;
+  const id = target?.id ?? ctx.from.id;
+  const label = target
+    ? "👤 ID пользователя, на сообщение которого ты ответил:"
+    : "👤 Твой Telegram ID:";
+  return ctx.reply(label + "\\n<code>" + id + "</code>", { parse_mode: "HTML" });
+});
+
 bot.command("admin", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
     return ctx.reply("⛔ Только владелец бота может управлять администраторами.");
@@ -3894,22 +3931,23 @@ bot.command("admin", async ctx => {
   const parts = String(ctx.match || "").trim().split(/\\s+/).filter(Boolean);
   const action = (parts[0] || "list").toLowerCase();
   const admins = await getNexusAdmins();
-
   if (action === "list") {
     return ctx.reply("👮 АДМИНИСТРАТОРЫ NEXUS\\n\\n" +
       (admins.length ? admins.map((id, i) => (i + 1) + ". " + id).join("\\n") : "Дополнительных администраторов пока нет.") +
-      "\\n\\nДобавить: /admin add 123456789\\nУдалить: /admin remove 123456789");
+      "\\n\\nДобавить: ответь на сообщение командой /admin add\\nИли: /admin add 123456789\\nУдалить: /admin remove 123456789");
   }
-  const id = String(parts[1] || "").replace(/^@/, "");
+  const replied = ctx.message.reply_to_message?.from;
+  const id = String(replied?.id ?? parts[1] ?? "").replace(/^@/, "");
   if (!["add", "remove"].includes(action) || !/^\\d{5,20}$/.test(id)) {
-    return ctx.reply("Формат:\\n/admin add 123456789\\n/admin remove 123456789\\n/admin list\\nНужен числовой Telegram ID.");
+    return ctx.reply("Форматы:\\nОтветом на сообщение: /admin add или /admin remove\\nПо ID: /admin add 123456789\\n/admin remove 123456789\\n/admin list\\nНужен числовой Telegram ID.");
   }
   if (id === PREMIUM_ADMIN_ID) return ctx.reply("Это владелец бота — его нельзя удалить из списка владельцев.");
   const next = action === "add"
     ? [...new Set([...admins, id])]
     : admins.filter(value => value !== id);
   if (!await writeKvJson("nexus:admins", next)) return ctx.reply("❌ Не удалось сохранить список администраторов.");
-  return ctx.reply(action === "add" ? "✅ Администратор добавлен: " + id : "✅ Администратор удалён: " + id);
+  const person = replied ? (replied.username ? "@" + replied.username : (replied.first_name || "пользователь")) : id;
+  return ctx.reply(action === "add" ? "✅ Администратор добавлен: " + person + " (ID " + id + ")" : "✅ Администратор удалён: " + person + " (ID " + id + ")");
 });
 
 bot.command("devmode", async ctx => {
@@ -4755,13 +4793,30 @@ bot.on("message:voice", async ctx => {
         "Telegram ID: " + userId + "\\n\\n" +
         "Текст задания:\\n" + transcript;
       if (ownerId && String(userId) !== ownerId) {
-        await ctx.api.sendMessage(ownerId, taskText);
+        const taskId = Date.now().toString(36) + crypto.randomBytes(3).toString("hex");
+        const task = { id: taskId, authorId: String(userId), author: ctx.from.username || ctx.from.first_name || "администратор", text: transcript, createdAt: Date.now(), status: "pending" };
+        if (!await writeKvJson("nexus:devtask:" + taskId, task)) {
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось сохранить задание. Проверь Cloudflare KV.").catch(() => {});
+          return;
+        }
+        const keyboard = new InlineKeyboard()
+          .text("✅ Одобрить", "devtask:approve:" + taskId)
+          .text("❌ Отклонить", "devtask:reject:" + taskId);
+        await ctx.api.sendMessage(ownerId, taskText + "\\n\\nID задания: " + taskId + "\\nСначала подтверди, что задание можно передавать в разработку.", { reply_markup: keyboard });
         await ctx.api.editMessageText(ctx.chat.id, status.message_id,
-          "✅ Задание распознано и отправлено владельцу NEXUS на рассмотрение. Код автоматически не менялся.").catch(() => {});
-      } else {
-        await ctx.api.editMessageText(ctx.chat.id, status.message_id,
-          "🛠 ЗАДАНИЕ ДЛЯ РАЗРАБОТКИ\\n\\n" + transcript +
-          "\\n\\nСкопируй это задание в чат разработки NEXUS. Код будет изменён только после проверки.").catch(() => {});
+          "✅ Задание отправлено владельцу. Ожидает его подтверждения.").catch(() => {});
+      } else if (ownerId && String(userId) === ownerId) {
+        const taskId = Date.now().toString(36) + crypto.randomBytes(3).toString("hex");
+        const task = { id: taskId, authorId: String(userId), author: ctx.from.username || ctx.from.first_name || "владелец", text: transcript, createdAt: Date.now(), status: "pending" };
+        if (!await writeKvJson("nexus:devtask:" + taskId, task)) {
+          await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось сохранить задание.").catch(() => {});
+          return;
+        }
+        const keyboard = new InlineKeyboard()
+          .text("✅ Одобрить", "devtask:approve:" + taskId)
+          .text("❌ Отклонить", "devtask:reject:" + taskId);
+        await ctx.api.sendMessage(ownerId, taskText + "\\n\\nID задания: " + taskId, { reply_markup: keyboard });
+        await ctx.api.editMessageText(ctx.chat.id, status.message_id, "🛠 Задание отправлено тебе на подтверждение.").catch(() => {});
       }
       return;
     }
