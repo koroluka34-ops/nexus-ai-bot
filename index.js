@@ -3642,8 +3642,8 @@ bot.on("message:successful_payment", async ctx => {
 });
 
 bot.command("paysupport", async ctx => {
-  await ctx.reply("💳 Поддержка платежей NEXUS AI\n\nЕсли Stars списались, а подписка не появилась, отправь администратору свой Telegram ID: " +
-    ctx.from.id + "\nНе оплачивай покупку повторно до проверки.");
+  await ctx.reply("💳 Поддержка платежей и призов NEXUS AI\n\nЕсли Stars списались, а тариф не появился, или рулетка сообщила, что приз ожидает проверки, отправь администратору свой Telegram ID: " +
+    ctx.from.id + "\nНе оплачивай повторно и не запускай новую попытку до проверки.");
 });
 
 bot.command("model", async ctx => {
@@ -5268,6 +5268,8 @@ async function start() {
     { command: "mygifts", description: "Посмотреть свои подарки" },
     { command: "premium", description: "Проверить статус и купить Premium за Stars" },
     { command: "roulette", description: "Бесплатная ежедневная рулетка NEXUS" },
+    { command: "roulettehistory", description: "Посмотреть историю рулетки" },
+    { command: "roulettebalance", description: "Проверить баланс Stars бота (админ)" },
     { command: "paysupport", description: "Помощь с оплатой Telegram Stars" },
     { command: "model", description: "Посмотреть или выбрать модель ИИ" },
     { command: "status", description: "Проверить состояние бота" },
