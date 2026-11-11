@@ -450,27 +450,7 @@ function premiumStatusText(memory) {
 }
 
 
-const rouletteSuite = installRoulette(bot, {
-  grantPrize: async (userId, prize, spinId) => {
-    const memory = await loadMemory(userId);
-    memory.rouletteClaims = Array.isArray(memory.rouletteClaims) ? memory.rouletteClaims : [];
-    if (memory.rouletteClaims.includes(spinId)) return true;
-    if (prize.type === "nexus_premium") {
-      const activeTier = currentPlan(memory), now = Date.now();
-      const base = activeTier !== "free" ? Math.max(now, Number(memory.premium?.expiresAt) || now) : now;
-      memory.premium = { tier: activeTier !== "free" ? activeTier : "plus", expiresAt: base + Number(prize.days || 0) * 86400000 };
-    } else if (prize.type === "bonus") {
-      const now = Date.now();
-      const remaining = memory.rouletteBonusTextExpiresAt > now ? Math.max(0, Number(memory.rouletteBonusTextRemaining) || 0) : 0;
-      memory.rouletteBonusTextRemaining = remaining + Number(prize.amount || 0);
-      memory.rouletteBonusTextExpiresAt = Math.max(now, Number(memory.rouletteBonusTextExpiresAt) || 0) + 30 * 86400000;
-    }
-    memory.rouletteClaims.push(spinId);
-    memory.rouletteClaims = memory.rouletteClaims.slice(-100);
-    if (!await saveMemory(userId)) throw new Error("Не удалось сохранить награду в Cloudflare KV.");
-    return true;
-  }
-});
+const rouletteSuite = installRoulette(bot);
 
 // Shared generation queue: Premium jobs are picked before Free jobs.
 const generationQueue = [];
