@@ -104,19 +104,19 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const label=document.createElement("span");label.className="slice-label";
       const angle=index*step+step/2;
       label.style.transform="rotate("+angle+"deg) translateY(-"+(wheel.clientWidth*.34)+"px) rotate(-"+angle+"deg)";
-      if(prize.type==="gift" && prize.imageUrl){
+      if(prize.imageUrl){
         const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
       }else label.append(makePrizeEmoji(prize));
       const text=document.createElement("span");text.className="slice-text";
-      text.textContent=prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
+      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
     });
   }
   function renderCatalog(prizes){
     drawWheel(prizes);
-    const rewards=(prizes||[]).filter(p=>["gift","nexus_plus","nexus_ultra"].includes(p.type));
+    const rewards=(prizes||[]).filter(p=>["gift","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
     const giftCount=rewards.filter(p=>p.type==="gift").length;
-    $("giftCount").textContent=giftCount+" подарков · 2 подписки";
+    $("giftCount").textContent=giftCount+" подарков · 3 подписки";
     prizesBox.replaceChildren();
     rewards.forEach(prize=>{
       const item=document.createElement("div");item.className="prize";
@@ -124,7 +124,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         const img=document.createElement("img");img.className="gift-art";img.src=prize.imageUrl;img.alt=prize.label;img.loading="lazy";
         img.onerror=()=>{img.style.display="none";};item.append(img);
       }else{
-        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="nexus_ultra"?"🚀":"💎";item.append(art);
+        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="telegram_premium"?"⭐":prize.type==="nexus_ultra"?"🚀":"💎";item.append(art);
       }
       const b=document.createElement("b");b.textContent=prize.label;
       const s=document.createElement("span");s.textContent="Шанс: "+prize.probability;
