@@ -78,6 +78,8 @@ installQrSuite(bot);
 const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
+const { installRoulette } = require("./modules/roulette-suite");
+
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
@@ -356,9 +358,9 @@ async function saveMemory(userId) {
 }
 
 const PREMIUM_PLANS = {
-  free: { name: "Бесплатный", text: 150, images: 20, videos: 2, media: 20, priority: 0 },
-  plus: { name: "NEXUS PREMIUM", text: 300, images: 100, videos: 20, media: 100, priority: 1 },
-  ultra: { name: "NEXUS ULTRA", text: 600, images: 300, videos: 60, media: 300, priority: 2 }
+  free: { name: "Бесплатный", text: 150, images: 20, videos: 2, media: 20, research: 1, kbDocs: 3, priority: 0 },
+  plus: { name: "NEXUS PREMIUM", text: 300, images: 100, videos: 20, media: 100, research: 5, kbDocs: 15, priority: 1 },
+  ultra: { name: "NEXUS ULTRA", text: 600, images: 300, videos: 60, media: 300, research: 20, kbDocs: 50, priority: 2 }
 };
 
 function currentPlan(memory) {
@@ -369,8 +371,9 @@ function currentPlan(memory) {
 
 function resetDailyUsage(memory) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
-  if (!memory.usage || memory.usage.day !== day) memory.usage = { day, text: 0, images: 0, videos: 0, media: 0 };
+  if (!memory.usage || memory.usage.day !== day) memory.usage = { day, text: 0, images: 0, videos: 0, media: 0, research: 0 };
   if (!Number.isFinite(memory.usage.media)) memory.usage.media = (memory.usage.images || 0) + (memory.usage.videos || 0);
+  if (!Number.isFinite(memory.usage.research)) memory.usage.research = 0;
   return memory.usage;
 }
 
@@ -380,7 +383,9 @@ async function consumeQuota(userId, kind) {
   const plan = PREMIUM_PLANS[tier];
   const usage = resetDailyUsage(memory);
   const key = kind === "image" ? "images" : kind === "video" ? "videos" : "text";
-  const limit = kind === "image" ? plan.images : kind === "video" ? plan.videos : plan.text;
+  const baseLimit = kind === "image" ? plan.images : kind === "video" ? plan.videos : plan.text;
+  const bonus = memory.rouletteBonusTextExpiresAt > Date.now() ? Math.max(0, Number(memory.rouletteBonusTextRemaining) || 0) : 0;
+  const limit = kind === "text" ? baseLimit + bonus : baseLimit;
   if ((kind === "image" || kind === "video") && usage.media >= plan.media) {
     await saveMemory(userId);
     return { ok: false, tier, limit: plan.media, storageError: false, combined: true };
@@ -389,6 +394,7 @@ async function consumeQuota(userId, kind) {
     await saveMemory(userId);
     return { ok: false, tier, limit, storageError: false };
   }
+  if (kind === "text" && usage[key] >= baseLimit && bonus > 0) memory.rouletteBonusTextRemaining = Math.max(0, bonus - 1);
   usage[key]++;
   if (kind === "image" || kind === "video") usage.media++;
   if (!await saveMemory(userId)) {
@@ -397,6 +403,22 @@ async function consumeQuota(userId, kind) {
     return { ok: false, tier, limit, storageError: true };
   }
   return { ok: true, tier, limit };
+}
+
+async function consumeResearchQuota(userId) {
+  const memory = await loadMemory(userId);
+  const tier = currentPlan(memory), limit = PREMIUM_PLANS[tier].research;
+  const usage = resetDailyUsage(memory);
+  if (usage.research >= limit) return { ok: false, tier, limit, used: usage.research };
+  usage.research++;
+  if (!await saveMemory(userId)) { usage.research = Math.max(0, usage.research - 1); return { ok: false, storageError: true, tier, limit }; }
+  return { ok: true, tier, limit, used: usage.research };
+}
+async function refundResearchQuota(userId) {
+  const memory = await loadMemory(userId);
+  const usage = resetDailyUsage(memory);
+  usage.research = Math.max(0, usage.research - 1);
+  await saveMemory(userId);
 }
 
 async function refundQuota(userId, kind) {
@@ -413,6 +435,8 @@ function premiumStatusText(memory) {
   const model = tier === "free" ? "GPT-OSS 120B" : (memory.selectedModel || "qwen/qwen3.8-27b");
   return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" +
     "Текстовых запросов в день: " + usage.text + "/" + plan.text + "\n" +
+    "Глубоких исследований в день: " + usage.research + "/" + plan.research + "\n" +
+    "Документов в базе знаний: " + (memory.knowledgeBase || []).length + "/" + plan.kbDocs + "\n" +
     "ИИ-фото в день: " + usage.images + "/" + plan.images + "\n" +
     "ИИ-видео в день: " + usage.videos + "/" + plan.videos + "\n" +
     "Всего фото и видео: " + usage.media + "/" + plan.media + "\n" +
@@ -422,6 +446,28 @@ function premiumStatusText(memory) {
     (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
 }
 
+
+const rouletteSuite = installRoulette(bot, {
+  grantPrize: async (userId, prize, spinId) => {
+    const memory = await loadMemory(userId);
+    memory.rouletteClaims = Array.isArray(memory.rouletteClaims) ? memory.rouletteClaims : [];
+    if (memory.rouletteClaims.includes(spinId)) return true;
+    if (prize.type === "nexus_premium") {
+      const activeTier = currentPlan(memory), now = Date.now();
+      const base = activeTier !== "free" ? Math.max(now, Number(memory.premium?.expiresAt) || now) : now;
+      memory.premium = { tier: activeTier !== "free" ? activeTier : "plus", expiresAt: base + Number(prize.days || 0) * 86400000 };
+    } else if (prize.type === "bonus") {
+      const now = Date.now();
+      const remaining = memory.rouletteBonusTextExpiresAt > now ? Math.max(0, Number(memory.rouletteBonusTextRemaining) || 0) : 0;
+      memory.rouletteBonusTextRemaining = remaining + Number(prize.amount || 0);
+      memory.rouletteBonusTextExpiresAt = Math.max(now, Number(memory.rouletteBonusTextExpiresAt) || 0) + 30 * 86400000;
+    }
+    memory.rouletteClaims.push(spinId);
+    memory.rouletteClaims = memory.rouletteClaims.slice(-100);
+    if (!await saveMemory(userId)) throw new Error("Не удалось сохранить награду в Cloudflare KV.");
+    return true;
+  }
+});
 
 // Shared generation queue: Premium jobs are picked before Free jobs.
 const generationQueue = [];
@@ -679,6 +725,7 @@ function mainMenu() {
     .text("⚡ OVERDRIVE", "menu_overdrive")
     .row()
     .text("🧰 Инструменты", "menu_tools")
+    .text("🎰 Рулетка", "menu_roulette")
     .text("💎 Premium", "menu_premium")
     .text("ℹ️ Возможности", "menu_features")
     .text("📚 Все команды", "menu_commands")
@@ -2639,6 +2686,8 @@ bot.command("research", async ctx => {
   const query = String(ctx.match || "").trim() || getRepliedText(ctx);
   if (!query) return ctx.reply("Напиши тему для исследования. Например: /research сравни современные бесплатные ИИ-модели.");
   if (busyUsers.has(userId)) return ctx.reply("⏳ Подожди предыдущую задачу.");
+  const researchQuota = await consumeResearchQuota(userId);
+  if (!researchQuota.ok) return ctx.reply(researchQuota.storageError ? "❌ Не удалось сохранить лимит исследований в Cloudflare KV." : "⛔ Лимит глубоких исследований исчерпан: " + researchQuota.used + "/" + researchQuota.limit + ". Тариф: /premium");
   busyUsers.add(userId);
   const status = await ctx.reply("🔎 Провожу исследование и ищу источники...");
   try {
@@ -2665,11 +2714,13 @@ bot.command("research", async ctx => {
     // Не показываем исследование, если браузер не вернул реальные URL.
     // Текст модели без источников может содержать выдуманные новости.
     if (uniqueSourceUrls.length < 2) {
+      await refundResearchQuota(userId);
       await ctx.reply("⚠️ Поиск не вернул минимум две проверяемые ссылки. Не буду выдавать неподтверждённый текст за исследование.");
       return;
     }
 
     if (hasFutureDatedClaims(result.answer)) {
+      await refundResearchQuota(userId);
       await ctx.reply("⚠️ Исследование отклонено: в ответе обнаружены даты из будущего. Это может быть выдуманная информация.");
       return;
     }
@@ -2682,6 +2733,7 @@ bot.command("research", async ctx => {
 
     await deliverAnswer(ctx, userId, result);
   } catch (error) {
+    await refundResearchQuota(userId);
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Исследование не удалось: " + String(error.message).slice(0, 1600)).catch(() => {});
   } finally { busyUsers.delete(userId); }
 });
@@ -3897,7 +3949,8 @@ bot.command("kb", async ctx => {
     const extension = path.extname(fileName).toLowerCase();
     const allowed = [".pdf", ".docx", ".txt", ".md", ".log", ".csv"].includes(extension) || CODE_EXTENSIONS.has(extension);
     if (!allowed) return ctx.reply("Этот формат не поддерживается.");
-    if ((memory.knowledgeBase || []).length >= 8) return ctx.reply("В базе уже 8 документов. Сначала удали её командой /kb clear.");
+    const kbLimit = PREMIUM_PLANS[currentPlan(memory)].kbDocs;
+    if ((memory.knowledgeBase || []).length >= kbLimit) return ctx.reply("Лимит базы знаний твоего тарифа: " + kbLimit + " документов. Тарифы: /premium");
     const status = await ctx.reply("📚 Добавляю документ в базу знаний...");
     try {
       const buffer = await downloadTelegramFile(ctx, doc.file_id, MAX_DOCUMENT_BYTES);
@@ -5211,6 +5264,7 @@ async function start() {
     { command: "gift", description: "Отправить виртуальный подарок" },
     { command: "mygifts", description: "Посмотреть свои подарки" },
     { command: "premium", description: "Проверить статус и купить Premium за Stars" },
+    { command: "roulette", description: "Бесплатная ежедневная рулетка NEXUS" },
     { command: "paysupport", description: "Помощь с оплатой Telegram Stars" },
     { command: "model", description: "Посмотреть или выбрать модель ИИ" },
     { command: "status", description: "Проверить состояние бота" },
@@ -5267,9 +5321,17 @@ async function start() {
 
   const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url === "/touchpad") {
-      fs.readFile(path.join(__dirname, "public", "touchpad.html"))
-        .then(page => { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }); res.end(page); })
-        .catch(error => { console.error("Touchpad page:", error.message); res.writeHead(404); res.end("Touchpad not found"); });
+      res.writeHead(302, { Location: "/roulette", "Cache-Control": "no-store" });
+      res.end();
+      return;
+    }
+    if (req.url === "/roulette" || req.url.startsWith("/roulette/")) {
+      rouletteSuite.handleHttp(req, res).then(handled => {
+        if (!handled && !res.headersSent) { res.writeHead(404); res.end("Not found"); }
+      }).catch(error => {
+        console.error("Roulette route:", error.message);
+        if (!res.headersSent) { res.writeHead(500); res.end("Internal error"); }
+      });
       return;
     }
     if (req.url.startsWith("/device/")) {
