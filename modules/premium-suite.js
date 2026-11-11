@@ -50,8 +50,12 @@ async function installPremium(bot) {
   bot.use(async (ctx, next) => {
     await load();
     const username = String(ctx.from?.username || "").replace(/^@/, "").toLowerCase();
-    if (username && /^[a-z0-9_]{5,32}$/.test(username) && usernames.get(username) !== String(ctx.from.id)) {
-      usernames.set(username, String(ctx.from.id));
+    const userId = String(ctx.from?.id || "");
+    if (username && userId && /^[a-z0-9_]{5,32}$/.test(username) && usernames.get(username) !== userId) {
+      for (const [oldName, mappedId] of usernames.entries()) {
+        if (mappedId === userId && oldName !== username) usernames.delete(oldName);
+      }
+      usernames.set(username, userId);
       save().catch(() => {});
     }
     await next();
