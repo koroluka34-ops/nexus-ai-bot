@@ -271,6 +271,61 @@ async function isDevVoiceModeEnabled() {
   return (await readKvJson("nexus:dev_voice_mode", false)) === true;
 }
 
+async function submitFeatureSuggestion(ctx, suggestion) {
+  const ownerId = PREMIUM_ADMIN_ID;
+  if (!ownerId) {
+    await ctx.reply("❌ Владелец ещё не настроил ADMIN_ID в Render. Предложение пока не отправлено.");
+    return false;
+  }
+  if (!kvConfigured()) {
+    await ctx.reply("❌ Сейчас не работает хранилище предложений. Попробуй позже.");
+    return false;
+  }
+  const cleanText = String(suggestion || "").trim().slice(0, 3000);
+  if (cleanText.length < 5) {
+    await ctx.reply("Напиши, какую функцию ты предлагаешь. Пример:\n/suggest Добавьте калькулятор прямо в бота.");
+    return false;
+  }
+  const taskId = Date.now().toString(36) + crypto.randomBytes(3).toString("hex");
+  const author = ctx.from.username ? "@" + ctx.from.username : [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ") || "пользователь";
+  const task = {
+    id: taskId,
+    authorId: String(ctx.from.id),
+    author,
+    text: cleanText,
+    chatId: String(ctx.chat.id),
+    messageId: ctx.message?.message_id || null,
+    createdAt: Date.now(),
+    status: "pending",
+    kind: "suggestion"
+  };
+  if (!await writeKvJson("nexus:devtask:" + taskId, task)) {
+    await ctx.reply("❌ Не удалось сохранить предложение. Попробуй позже.");
+    return false;
+  }
+  const keyboard = new InlineKeyboard()
+    .text("✅ Одобрить", "devtask:approve:" + taskId)
+    .text("❌ Отклонить", "devtask:reject:" + taskId);
+  try {
+    await ctx.api.sendMessage(
+      ownerId,
+      "💡 НОВОЕ ПРЕДЛОЖЕНИЕ ФУНКЦИИ NEXUS\n" +
+      "От: " + author + "\n" +
+      "Telegram ID: " + ctx.from.id + "\n\n" +
+      "Предложение:\n" + cleanText +
+      "\n\nID предложения: " + taskId +
+      "\nВыбери, добавлять ли эту функцию.",
+      { reply_markup: keyboard }
+    );
+  } catch (error) {
+    await writeKvJson("nexus:devtask:" + taskId, { ...task, status: "delivery_failed" });
+    await ctx.reply("❌ Не получилось отправить предложение владельцу. Пусть владелец сначала откроет бота и нажмёт /start.");
+    return false;
+  }
+  await ctx.reply("✅ Предложение отправлено владельцу NEXUS. Когда он рассмотрит его, я сообщу тебе результат.");
+  return true;
+}
+
 function kvUrl(userId) {
   return kvValueUrl(memoryKey(userId));
 }
@@ -3863,13 +3918,13 @@ bot.command("starcheck", async ctx => {
 
 bot.callbackQuery(/^devtask:(approve|reject):([a-z0-9]+)$/i, async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
-    return ctx.answerCallbackQuery({ text: "Только владелец может подтверждать задания.", show_alert: true });
+    return ctx.answerCallbackQuery({ text: "Только владелец может принимать решение.", show_alert: true });
   }
   const action = ctx.match[1];
   const taskId = ctx.match[2];
   const task = await readKvJson("nexus:devtask:" + taskId, null);
   if (!task || task.status !== "pending") {
-    return ctx.answerCallbackQuery({ text: "Задание уже обработано или не найдено.", show_alert: true });
+    return ctx.answerCallbackQuery({ text: "Предложение уже обработано или не найдено.", show_alert: true });
   }
   task.status = action === "approve" ? "approved" : "rejected";
   task.reviewedAt = Date.now();
@@ -3877,16 +3932,35 @@ bot.callbackQuery(/^devtask:(approve|reject):([a-z0-9]+)$/i, async ctx => {
   if (!await writeKvJson("nexus:devtask:" + taskId, task)) {
     return ctx.answerCallbackQuery({ text: "Не удалось сохранить решение.", show_alert: true });
   }
-  await ctx.answerCallbackQuery({ text: action === "approve" ? "Задание одобрено" : "Задание отклонено" });
-  const text = action === "approve"
-    ? "✅ ЗАДАНИЕ ОДОБРЕНО\\nАвтор: " + task.author + " (ID " + task.authorId + ")\\n\\n" + task.text +
-      "\\n\\nЧтобы передать задачу в ChatGPT, скопируй её текст из этого сообщения в чат разработки NEXUS. Автоматическая передача из Telegram в диалог ChatGPT не поддерживается."
-    : "❌ Задание отклонено. Автор: " + task.author + " (ID " + task.authorId + ").";
-  await ctx.editMessageText((ctx.callbackQuery.message?.text || "Задание") + "\\n\\n" + (action === "approve" ? "✅ ОДОБРЕНО" : "❌ ОТКЛОНЕНО"), { reply_markup: new InlineKeyboard() }).catch(() => {});
-  await ctx.api.sendMessage(PREMIUM_ADMIN_ID, text);
-  await ctx.api.sendMessage(task.authorId, action === "approve"
-    ? "✅ Твоё предложение одобрено владельцем NEXUS и передано на разработку."
-    : "❌ Твоё предложение отклонено владельцем NEXUS.").catch(() => {});
+  await ctx.answerCallbackQuery({ text: action === "approve" ? "Предложение одобрено" : "Предложение отклонено" });
+  await ctx.editMessageText(
+    (ctx.callbackQuery.message?.text || "Предложение") + "\n\n" +
+    (action === "approve" ? "✅ ОДОБРЕНО ВЛАДЕЛЬЦЕМ" : "❌ ОТКЛОНЕНО ВЛАДЕЛЬЦЕМ"),
+    { reply_markup: new InlineKeyboard() }
+  ).catch(() => {});
+
+  if (action === "approve") {
+    await ctx.api.sendMessage(
+      PREMIUM_ADMIN_ID,
+      "🛠 ОДОБРЕННОЕ ПРЕДЛОЖЕНИЕ ДЛЯ РЕАЛИЗАЦИИ\n" +
+      "Автор: " + task.author + " (ID " + task.authorId + ")\n\n" +
+      task.text +
+      "\n\nСтатус означает, что ты одобрил идею. Изменения в код автоматически не вносятся — реализацию нужно выполнить отдельно."
+    );
+  }
+
+  const userNotice = action === "approve"
+    ? "✅ Твоё предложение одобрено администратором NEXUS! Идея принята к рассмотрению и добавлению."
+    : "❌ Администратор отклонил твоё предложение. Спасибо, что предложил идею для NEXUS!";
+  try {
+    await ctx.api.sendMessage(task.authorId, userNotice);
+  } catch (error) {
+    if (task.chatId && task.chatId !== task.authorId) {
+      await ctx.api.sendMessage(task.chatId, userNotice, {
+        reply_to_message_id: task.messageId || undefined
+      }).catch(() => {});
+    }
+  }
 });
 
 bot.command("paysupport", async ctx => {
@@ -3914,13 +3988,10 @@ bot.command("model", async ctx => {
   await ctx.reply("✅ Режим моделей сохранён: " + (mode === "auto" ? "автоматический выбор" : mode.toUpperCase()));
 });;
 
-bot.command("id", async ctx => {
-  const target = ctx.message.reply_to_message?.from;
-  const id = target?.id ?? ctx.from.id;
-  const label = target
-    ? "👤 ID пользователя, на сообщение которого ты ответил:"
-    : "👤 Твой Telegram ID:";
-  return ctx.reply(label + "\\n<code>" + id + "</code>", { parse_mode: "HTML" });
+
+
+bot.command("suggest", async ctx => {
+  return submitFeatureSuggestion(ctx, String(ctx.match || "").trim());
 });
 
 bot.command("admin", async ctx => {
@@ -5598,6 +5669,7 @@ async function start() {
     { command: "jokelang", description: "Изменить язык шуток" },
     { command: "api", description: "Проверить доступность ИИ-сервисов" },
     { command: "id", description: "Показать Telegram ID" },
+    { command: "suggest", description: "Предложить новую функцию NEXUS" },
     { command: "chatid", description: "Показать ID текущего чата или группы" },
     { command: "gift", description: "Отправить виртуальный подарок" },
     { command: "mygifts", description: "Посмотреть свои подарки" },
