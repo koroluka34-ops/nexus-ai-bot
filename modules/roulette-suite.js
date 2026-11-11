@@ -176,14 +176,18 @@ async function getGiftCatalog(bot) {
       cost: Number(g.star_count)
     }));
   const premiumAvailable = balance >= 2500;
+  const settings = await readGlobal("settings", { giftPercent: 38 });
+  const giftPercent = Math.max(1, Math.min(90, Number(settings.giftPercent) || 38));
+  const giftWeight = Math.round(giftPercent * 10000);
+  const noPrizeWeight = 1000000 - giftWeight - PLUS_WEIGHT - ULTRA_WEIGHT - TELEGRAM_PREMIUM_WEIGHT - JACKPOT_WEIGHT - SECRET_WEIGHT;
   const prizes = [
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, available: true, weight: TELEGRAM_PREMIUM_WEIGHT },
     { id: "jackpot_1000", label: "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐", short: "ДЖЕКПОТ · 1000 ⭐", probability: "0,01%", type: "jackpot", cost: 1000, available: true, weight: JACKPOT_WEIGHT },
     { id: "secret_gift", label: "🎁 Секретный подарок", short: "Секретный приз", probability: "0,01%", type: "secret", cost: 0, available: true, weight: SECRET_WEIGHT },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–1000 ⭐", short: "Мишка · 15–1000 ⭐", probability: "38%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "61,27%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
+    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–1000 ⭐", short: "Мишка · 15–1000 ⭐", probability: giftPercent.toLocaleString("ru-RU") + "%", type: "gift_random", cost: 0, available: true, weight: giftWeight },
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (noPrizeWeight / 10000).toLocaleString("ru-RU") + "%", type: "none", cost: 0, weight: noPrizeWeight }
   ];
   return { balance, gifts: available, prizes };
 }
@@ -395,6 +399,88 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     current.updatedAt = Date.now();
     await writeGlobal("event", current);
     return ctx.reply(current.active ? "🔥 NEXUS EVENT включён: шанс подарочных секторов x2." : "⏹ NEXUS EVENT выключен.");
+  });
+
+  bot.command("rouletteodds", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    const value = Number(String(ctx.match || "").trim());
+    if (!Number.isFinite(value) || value < 1 || value > 90) return ctx.reply("Формат: /rouletteodds 38\nУкажи шанс обычного подарочного сектора от 1 до 90 процентов.");
+    const settings = await readGlobal("settings", { giftPercent: 38 });
+    settings.giftPercent = Math.round(value * 100) / 100;
+    await writeGlobal("settings", settings);
+    return ctx.reply("✅ Шанс обычных подарков установлен: " + settings.giftPercent + "%. Шанс «Без приза» автоматически пересчитан.");
+  });
+
+  bot.command("rouletteban", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    const id = String(ctx.match || "").trim();
+    if (!/^\d{1,20}$/.test(id)) return ctx.reply("Формат: /rouletteban TELEGRAM_ID");
+    const blocked = await readGlobal("blocked", []);
+    if (!blocked.map(String).includes(id)) blocked.push(id);
+    await writeGlobal("blocked", blocked.slice(-5000));
+    return ctx.reply("⛔ Доступ к рулетке заблокирован для ID " + id + ".");
+  });
+
+  bot.command("rouletteunban", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    const id = String(ctx.match || "").trim();
+    if (!/^\d{1,20}$/.test(id)) return ctx.reply("Формат: /rouletteunban TELEGRAM_ID");
+    const blocked = await readGlobal("blocked", []);
+    await writeGlobal("blocked", blocked.filter(value => String(value) !== id));
+    return ctx.reply("✅ Доступ к рулетке восстановлен для ID " + id + ".");
+  });
+
+  bot.command("roulettegiftgrant", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    const [userId, giftId] = String(ctx.match || "").trim().split(/\s+/);
+    if (!/^\d{1,20}$/.test(userId || "") || !giftId || giftId.length > 256) return ctx.reply("Формат: /roulettegiftgrant TELEGRAM_ID GIFT_ID");
+    try {
+      await telegramApi("sendGift", { user_id: Number(userId), gift_id: giftId, text: "🎁 Тебе отправлен подарок от NEXUS!" });
+      return ctx.reply("✅ Telegram-подарок отправлен пользователю " + userId + ".");
+    } catch (error) {
+      return ctx.reply("❌ Не удалось отправить подарок: " + String(error.message || error).slice(0, 220));
+    }
+  });
+
+  bot.command("roulettegrant", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    const [userId, kind, rawAmount] = String(ctx.match || "").trim().split(/\s+/);
+    if (!/^\d{1,20}$/.test(userId || "") || !["plus", "ultra", "spin"].includes(kind)) return ctx.reply("Формат: /roulettegrant TELEGRAM_ID plus|ultra|spin [количество]");
+    try {
+      if (kind === "spin") {
+        const amount = Math.max(1, Math.min(10000, Math.floor(Number(rawAmount) || 1)));
+        const state = await readState(userId);
+        state.bonusSpins = Math.min(100000, state.bonusSpins + amount);
+        await writeState(userId, state);
+        return ctx.reply("✅ Выдано " + amount + " прокруток пользователю " + userId + ".");
+      }
+      if (typeof grantPrize !== "function") throw new Error("Выдача подписок NEXUS не подключена.");
+      await grantPrize(Number(userId), kind);
+      return ctx.reply("✅ " + (kind === "ultra" ? "NEXUS Ultra" : "NEXUS Premium") + " выдан пользователю " + userId + ".");
+    } catch (error) {
+      return ctx.reply("❌ Не удалось выдать приз: " + String(error.message || error).slice(0, 220));
+    }
+  });
+
+  bot.command("rouletteadmin", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    try {
+      const [balance, queue, winners, event, settings, blocked] = await Promise.all([
+        getStarBalance(), readPendingQueue(), readGlobal("winners", []),
+        readGlobal("event", { active: false }), readGlobal("settings", { giftPercent: 38 }),
+        readGlobal("blocked", [])
+      ]);
+      return ctx.reply("🛠 <b>NEXUS ROULETTE ADMIN</b>\n\n⭐ Баланс: " + balance +
+        "\n🎁 Ожидают выдачи: " + queue.length + "\n🏆 Выигрышей в ленте: " + winners.length +
+        "\n🎯 Шанс подарков: " + settings.giftPercent + "%\n🔥 Ивент: " + (event.active ? "включён" : "выключен") +
+        "\n🚫 Заблокировано: " + blocked.length, { parse_mode: "HTML" });
+    } catch (error) { return ctx.reply("❌ " + String(error.message || error).slice(0, 200)); }
   });
 
   bot.command("roulettewinners", async ctx => {
