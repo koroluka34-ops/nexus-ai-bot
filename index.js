@@ -79,6 +79,8 @@ const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceSto
 installDeviceBridge(bot);
 
 const { installRoulette } = require("./modules/roulette-suite");
+const { installBitcoinSuite } = require("./modules/bitcoin-suite");
+installBitcoinSuite(bot);
 
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
