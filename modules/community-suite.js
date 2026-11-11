@@ -55,6 +55,7 @@ async function save() {
 function isGroup(ctx) { return ["group", "supergroup"].includes(ctx.chat?.type); }
 async function isAdmin(ctx) {
   if (!isGroup(ctx)) return false;
+  if (await isNexusAdmin(ctx.from.id)) return true;
   try {
     const m = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
     return m.status === "creator" || m.status === "administrator";
@@ -81,7 +82,7 @@ function antiSpamReasons(message, recent) {
   return reasons;
 }
 
-function installCommunitySuite(bot) {
+function installCommunitySuite(bot, isNexusAdmin = async () => false) {
   bot.use(async (ctx, next) => {
     try {
       await load();
@@ -103,7 +104,7 @@ function installCommunitySuite(bot) {
           let admin = false;
           try {
             const member = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
-            admin = member.status === "creator" || member.status === "administrator";
+            admin = member.status === "creator" || member.status === "administrator" || await isNexusAdmin(ctx.from.id);
           } catch {}
           const reasons = admin ? [] : antiSpamReasons(msg, rows);
           if (reasons.length) {
