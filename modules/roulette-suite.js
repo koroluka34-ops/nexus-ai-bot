@@ -568,6 +568,11 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     const initData = String(req.headers["x-telegram-init-data"] || "");
     const user = verifyInitData(initData);
     if (!user) { json(res, 401, { ok: false, error: "Сессия Telegram недействительна. Закрой и заново открой Mini App из бота." }); return true; }
+    const blockedUsers = await readGlobal("blocked", []);
+    if (Array.isArray(blockedUsers) && blockedUsers.map(String).includes(String(user.id))) {
+      json(res, 403, { ok: false, error: "Доступ к NEXUS Gift Roulette ограничен администратором." });
+      return true;
+    }
     if (!kvReady()) { json(res, 503, { ok: false, error: "Cloudflare KV не настроен — рулетка временно недоступна." }); return true; }
 
     try {
