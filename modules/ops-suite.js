@@ -50,6 +50,7 @@ function scheduleSave() {
 function isGroup(ctx) { return ["group", "supergroup"].includes(ctx.chat?.type); }
 async function isAdmin(ctx) {
   if (!isGroup(ctx)) return false;
+  if (await isNexusAdmin(ctx.from.id)) return true;
   try {
     const member = await ctx.api.getChatMember(ctx.chat.id, ctx.from.id);
     return member.status === "creator" || member.status === "administrator";
@@ -120,7 +121,7 @@ async function domainCheck(domainInput) {
   };
 }
 
-function installOpsSuite(bot, askAI) {
+function installOpsSuite(bot, askAI, isNexusAdmin = async () => false) {
   bot.use(async (ctx, next) => {
     try {
       await load();
