@@ -8,10 +8,10 @@ const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const NAMESPACE = process.env.CLOUDFLARE_KV_NAMESPACE_ID || "";
 const locks = new Set();
-const NO_PRIZE_WEIGHT = 499900;
+const NO_PRIZE_WEIGHT = 612900;
 const PLUS_WEIGHT = 5000; // 0.50%
 const ULTRA_WEIGHT = 2000; // 0.20%
-const GIFT_TOTAL_WEIGHT = 493000; // 49.30%, split between currently affordable gifts
+const GIFT_TOTAL_WEIGHT = 380000; // 38.00%, split between currently affordable gifts
 const TELEGRAM_PREMIUM_WEIGHT = 100; // 0.01%, 12 months
 const MAX_GIFTS_IN_WHEEL = 20;
 
@@ -161,8 +161,8 @@ async function getGiftCatalog(bot) {
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, available: true, weight: TELEGRAM_PREMIUM_WEIGHT },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: "49,3%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "49,99%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
+    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: "38%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "61,29%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
   ];
   return { balance, gifts: available, prizes };
 }
@@ -416,16 +416,35 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
 
     try {
       if (req.method === "GET" && url.pathname === "/roulette/api/status") {
-        const [state, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
-        const canSpin = state.lastSpinDay !== kyivDay() || state.bonusSpins > 0;
+        const [state, catalog, queue] = await Promise.all([readState(user.id), getGiftCatalog(bot), readPendingQueue()]);
+        const freeSpinAvailable = state.lastSpinDay !== kyivDay();
+        const canSpin = freeSpinAvailable || state.bonusSpins > 0;
+        const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
+          spinId: item.spinId,
+          label: item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram"),
+          cost: Number(item.cost || 0), createdAt: item.createdAt || 0
+        }));
         json(res, 200, {
-          ok: true, canSpin, lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins,
-          balance: catalog.balance,
-          giftsAvailable: catalog.gifts.length,
-          prizes: catalog.prizes.map(publicPrize),
+          ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
+          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance,
+          giftsAvailable: catalog.gifts.length, pendingGifts, prizes: catalog.prizes.map(publicPrize),
           unavailableReason: catalog.gifts.length ? "" : "Нет доступных подарков стоимостью 15–500 ⭐ или не хватает Stars на балансе бота.",
           lastResult: state.history.at(-1) || null
         });
+        return true;
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/decline") {
+        const body = await readBody(req);
+        const spinId = String(body.spinId || "");
+        if (!/^[a-f0-9-]{36}$/i.test(spinId)) { json(res, 400, { ok: false, error: "Идентификатор подарка некорректен." }); return true; }
+        const queue = await readPendingQueue();
+        const item = queue.find(entry => entry.spinId === spinId && String(entry.userId) === String(user.id));
+        if (!item) { json(res, 404, { ok: false, error: "Подарок уже отправлен или больше не ожидает выдачи." }); return true; }
+        await writePendingQueue(queue.filter(entry => entry.spinId !== spinId));
+        const state = await readState(user.id);
+        const row = state.history.find(entry => entry.spinId === spinId);
+        if (row) { row.status = "declined"; row.deliveryMessage = "Пользователь отказался от подарка."; row.declinedAt = Date.now(); await writeState(user.id, state); }
+        json(res, 200, { ok: true, message: "Подарок удалён из ожидающих. Бот не будет его отправлять." });
         return true;
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/spin") {
@@ -484,6 +503,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
                 userId: user.id,
                 type: prize.type === "telegram_premium" ? "telegram_premium" : "gift",
                 giftId: prize.giftId || "",
+                label: prize.label,
                 cost: prize.type === "telegram_premium" ? 2500 : (prize.cost || 0),
                 createdAt: Date.now()
               });
@@ -508,11 +528,15 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             deliveryMessage = String(error.message || error).slice(0, 300);
             console.error("NEXUS gift roulette delivery:", user.id, prize.id, deliveryMessage);
           }
-          row.status = delivered ? "delivered" : "pending";
-          row.deliveryMessage = deliveryMessage;
-          await writeState(user.id, fresh);
+          const latestState = await readState(user.id);
+          const latestRow = latestState.history.find(item => item.spinId === spinId);
+          if (latestRow && latestRow.status !== "delivered" && latestRow.status !== "declined") {
+            latestRow.status = delivered ? "delivered" : "pending";
+            latestRow.deliveryMessage = deliveryMessage;
+            await writeState(user.id, latestState);
+          }
           json(res, 200, {
-            ok: true, canSpin: fresh.bonusSpins > 0, bonusSpins: fresh.bonusSpins, spinId,
+            ok: true, canSpin: fresh.bonusSpins > 0, bonusSpins: fresh.bonusSpins, totalSpinsAvailable: fresh.bonusSpins, spinId,
             prize: publicPrize(prize),
             prizeIndex: prize.wheelIndex,
             delivered,
