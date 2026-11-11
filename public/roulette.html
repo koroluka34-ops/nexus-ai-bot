@@ -60,6 +60,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
     <button class="spin" id="spinButton" disabled>ПОДКЛЮЧАЕМ РУЛЕТКУ…</button>
     <p class="hint" id="balanceNote">Получаем список реальных подарков Telegram…</p>
+    <div class="hint" id="rouletteCountdown" style="margin-top:8px;text-align:center;font-weight:800;color:#f4d47e">⏳ До обновления рулетки: считаем…</div>
     <div class="error" id="errorBox"></div>
     <div class="result" id="result"><small>РЕЗУЛЬТАТ РУЛЕТКИ</small><h2 id="resultTitle"></h2><p id="resultText"></p></div>
   </section>
@@ -150,6 +151,28 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(prize?.imageUrl){art.src=prize.imageUrl;art.alt=prize.label||"Приз";art.style.display="block";}else{art.removeAttribute("src");art.style.display="none";}
     $("resultText").textContent=message+(delivered===false?" Напиши /paysupport — результат сохранён.":"");
   }
+  const kyivDateFormatter=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit"});
+  function kyivDateAt(ms){return kyivDateFormatter.format(new Date(ms));}
+  function nextKyivMidnight(){
+    const now=Date.now(),today=kyivDateAt(now);
+    let low=now,high=now+36*60*60*1000;
+    for(let i=0;i<40;i++){
+      const mid=Math.floor((low+high)/2);
+      if(kyivDateAt(mid)===today)low=mid+1;else high=mid;
+    }
+    return high;
+  }
+  let rouletteResetAt=nextKyivMidnight(),countdownRefreshDone=false;
+  function updateRouletteCountdown(){
+    const remaining=Math.max(0,rouletteResetAt-Date.now());
+    const total=Math.floor(remaining/1000),hours=Math.floor(total/3600),minutes=Math.floor((total%3600)/60),seconds=total%60;
+    const pad=n=>String(n).padStart(2,"0");
+    const el=$("rouletteCountdown");
+    if(el)el.textContent="⏳ До обновления рулетки: "+pad(hours)+":"+pad(minutes)+":"+pad(seconds);
+    if(remaining===0&&!countdownRefreshDone){countdownRefreshDone=true;refresh().finally(()=>{rouletteResetAt=nextKyivMidnight();countdownRefreshDone=false;});}
+  }
+  setInterval(updateRouletteCountdown,1000);
+  updateRouletteCountdown();
   async function refresh(){
     if(!initData){spinStatus.textContent="Открой через Telegram";balanceNote.textContent="Запусти Mini App кнопкой /roulette в боте.";spinButton.disabled=true;return;}
     try{
