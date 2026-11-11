@@ -21,6 +21,27 @@ function kvUrl(userId) {
     "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) +
     "/values/" + encodeURIComponent("nexus:roulette:" + userId);
 }
+function queueUrl() {
+  return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +
+    "/storage/kv/namespaces/" + encodeURIComponent(NAMESPACE) +
+    "/values/nexus:roulette:pending-gifts";
+}
+async function readPendingQueue() {
+  const r = await fetch(queueUrl(), { headers: { Authorization: "Bearer " + TOKEN }, signal: AbortSignal.timeout(9000) });
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error("Cloudflare KV queue HTTP " + r.status);
+  const value = JSON.parse(await r.text());
+  return Array.isArray(value) ? value : [];
+}
+async function writePendingQueue(queue) {
+  const r = await fetch(queueUrl(), {
+    method: "PUT",
+    headers: { Authorization: "Bearer " + TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify(queue),
+    signal: AbortSignal.timeout(9000)
+  });
+  if (!r.ok) throw new Error("Cloudflare KV queue write HTTP " + r.status);
+}
 async function readState(userId) {
   if (!kvReady()) throw new Error("Cloudflare KV не настроен.");
   const r = await fetch(kvUrl(userId), {
@@ -123,7 +144,6 @@ async function getGiftCatalog(bot) {
   const available = gifts
     .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 500)
     .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
-    .filter(g => Number(g.star_count) <= balance)
     .map(g => ({
       id: "gift:" + g.id,
       giftId: g.id,
@@ -140,7 +160,7 @@ async function getGiftCatalog(bot) {
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: premiumAvailable ? "0,01%" : "Пока недоступен", type: "telegram_premium", cost: 2500, available: premiumAvailable, weight: premiumAvailable ? TELEGRAM_PREMIUM_WEIGHT : 0 },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: available.length ? "49,3%" : "Нет доступных подарков", type: "gift_random", cost: 0, available: available.length > 0, weight: available.length ? GIFT_TOTAL_WEIGHT : 0 },
+    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: available.length ? "49,3%" : "Нет подарков в каталоге", type: "gift_random", cost: 0, available: available.length > 0, weight: available.length ? GIFT_TOTAL_WEIGHT : 0 },
     { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (available.length ? (premiumAvailable ? "49,99%" : "50%") : premiumAvailable ? "99,29%" : "99,3%"), type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
   ];
   return { balance, gifts: available, prizes };
@@ -168,6 +188,47 @@ function makeWebAppUrl() {
 }
 function installRoulette(bot, { grantPrize } = {}) {
   const webAppUrl = makeWebAppUrl();
+  let queueWorkerRunning = false;
+  async function processPendingGiftQueue() {
+    if (queueWorkerRunning || !kvReady()) return;
+    queueWorkerRunning = true;
+    try {
+      let queue = await readPendingQueue();
+      if (!queue.length) return;
+      const [balance, catalog] = await Promise.all([getStarBalance(), telegramApi("getAvailableGifts")]);
+      const gifts = Array.isArray(catalog?.gifts) ? catalog.gifts : [];
+      for (const item of [...queue]) {
+        const gift = gifts.find(g => g.id === item.giftId);
+        const cost = Number(gift?.star_count || item.cost || 0);
+        if (!gift || (gift.remaining_count !== undefined && Number(gift.remaining_count) <= 0) || !cost || balance < cost) continue;
+        try {
+          await telegramApi("sendGift", {
+            user_id: Number(item.userId),
+            gift_id: item.giftId,
+            text: "Поздравляем! Твой подарок из NEXUS Gift Roulette готов — спасибо за ожидание! 🎉"
+          });
+          queue = queue.filter(q => q.spinId !== item.spinId);
+          await writePendingQueue(queue);
+          const state = await readState(item.userId);
+          const row = state.history.find(h => h.spinId === item.spinId);
+          if (row) {
+            row.status = "delivered";
+            row.deliveryMessage = "";
+            row.deliveredAt = Date.now();
+            await writeState(item.userId, state);
+          }
+          await bot.api.sendMessage(Number(item.userId), "🎁 Твой выигранный подарок из NEXUS Gift Roulette отправлен! Спасибо, что дождался ❤️").catch(() => {});
+        } catch (error) {
+          console.error("NEXUS pending gift delivery:", item.spinId, String(error.message || error).slice(0, 200));
+          // Keep the item in KV; the next balance check will retry it.
+        }
+      }
+    } catch (error) {
+      console.error("NEXUS pending gift queue:", String(error.message || error).slice(0, 250));
+    } finally {
+      queueWorkerRunning = false;
+    }
+  }
   const openKeyboard = () => webAppUrl
     ? new InlineKeyboard().webApp("🎁 Открыть рулетку подарков", webAppUrl)
     : new InlineKeyboard().text("⚠️ Рулетка пока не настроена", "roulette_not_configured");
@@ -207,13 +268,16 @@ function installRoulette(bot, { grantPrize } = {}) {
     const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
     try {
+      await processPendingGiftQueue();
       const catalog = await getGiftCatalog(bot);
+      const queue = await readPendingQueue();
       const cheapest = catalog.gifts[0];
       return ctx.reply(
         "⭐ Баланс Stars бота: <b>" + catalog.balance + " ⭐</b>\n" +
         "🎁 Доступно подарков для рулетки: <b>" + catalog.gifts.length + "</b>\n" +
         (cheapest ? "Самый дешёвый доступный подарок: <b>" + cheapest.cost + " ⭐</b>" : "Пока нет подарков, которые можно оплатить с текущего баланса.") +
-        "\n\nПодарки отправляются через официальный Bot API. Получатель может показать их в профиле, но подарок от бота нельзя обменять на Stars.",
+        "\n⏳ Ожидают отправки: <b>" + queue.length + "</b>" +
+        "\n\nПодарки отправляются автоматически после пополнения баланса бота. Получатель может показать их в профиле, но подарок от бота нельзя обменять на Stars.",
         { parse_mode: "HTML" }
       );
     } catch (error) {
@@ -310,7 +374,7 @@ function installRoulette(bot, { grantPrize } = {}) {
           let prize = choosePrize(catalog.prizes);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
           if (prize.type === "gift_random") {
-            if (!catalog.gifts.length) throw new Error("Сейчас нет доступных подарков Telegram стоимостью 15–500 ⭐.");
+            if (!catalog.gifts.length) throw new Error("Сейчас в каталоге Telegram нет подарков стоимостью 15–500 ⭐.");
             const wheelIndex = prize.wheelIndex;
             const selectedGift = catalog.gifts[crypto.randomInt(0, catalog.gifts.length)];
             prize = { ...selectedGift, wheelIndex, sectorId: "telegram_gift_random" };
@@ -327,15 +391,19 @@ function installRoulette(bot, { grantPrize } = {}) {
           await writeState(user.id, fresh);
 
           let delivered = false, deliveryMessage = "";
-          try {
-            if (prize.type === "gift") {
-              await telegramApi("sendGift", {
-                user_id: user.id,
-                gift_id: prize.giftId,
-                text: "Поздравляем! Ты выиграл этот подарок в NEXUS Gift Roulette 🎉"
-              });
-              delivered = true;
-            } else if (prize.type === "telegram_premium") {
+          if (prize.type === "gift") {
+            const queue = await readPendingQueue();
+            if (!queue.some(item => item.spinId === spinId)) {
+              queue.push({ spinId, userId: user.id, giftId: prize.giftId, cost: prize.cost, createdAt: Date.now() });
+              await writePendingQueue(queue);
+            }
+            await processPendingGiftQueue();
+            const refreshed = await readState(user.id);
+            const savedRow = refreshed.history.find(item => item.spinId === spinId);
+            delivered = savedRow?.status === "delivered";
+            if (!delivered) deliveryMessage = "Подарок сохранён в очереди. Бот отправит его автоматически, когда на балансе появятся нужные Stars.";
+          } else try {
+            if (prize.type === "telegram_premium") {
               await telegramApi("giftPremiumSubscription", { user_id: user.id, month_count: 12, star_count: 2500, text: "Ты выиграл Telegram Premium на 12 месяцев в NEXUS!" });
               delivered = true;
             } else if (prize.type === "nexus_plus" || prize.type === "nexus_ultra") {
@@ -359,7 +427,7 @@ function installRoulette(bot, { grantPrize } = {}) {
             delivered,
             message: delivered
               ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : prize.type === "nexus_plus" ? "💎 Тебе выдан NEXUS Premium на 30 дней!" : prize.type === "nexus_ultra" ? "🚀 Тебе выдан NEXUS Ultra на 30 дней!" : prize.type === "telegram_premium" ? "⭐ Telegram Premium на 12 месяцев отправлен тебе! Бот списал 2500 Stars." : "Сегодня без приза. Новая попытка будет завтра.")
-              : "Подарок выпал, но Telegram не подтвердил отправку. Выигрыш сохранён для проверки — напиши /paysupport, повторно крутить не нужно."
+              : "🧸 Мишка выигран! Подарок сохранён. Бот автоматически отправит его, когда на балансе появятся нужные Stars. Повторно крутить не нужно."
           });
           return true;
         } finally {
@@ -374,6 +442,9 @@ function installRoulette(bot, { grantPrize } = {}) {
       return true;
     }
   }
+  const queuePoller = setInterval(() => { processPendingGiftQueue().catch(() => {}); }, 60 * 1000);
+  if (typeof queuePoller.unref === "function") queuePoller.unref();
+  processPendingGiftQueue().catch(() => {});
   return { handleHttp, webAppUrl };
 }
 module.exports = { installRoulette };
