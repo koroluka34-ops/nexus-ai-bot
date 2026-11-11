@@ -357,7 +357,7 @@ async function saveMemory(userId) {
 
 const PREMIUM_PLANS = {
   free: { name: "Бесплатный", text: 150, images: 20, videos: 2, media: 20, priority: 0 },
-  plus: { name: "NEXUS PLUS", text: 300, images: 100, videos: 20, media: 100, priority: 1 },
+  plus: { name: "NEXUS PREMIUM", text: 300, images: 100, videos: 20, media: 100, priority: 1 },
   ultra: { name: "NEXUS ULTRA", text: 600, images: 300, videos: 60, media: 300, priority: 2 }
 };
 
@@ -679,6 +679,7 @@ function mainMenu() {
     .text("⚡ OVERDRIVE", "menu_overdrive")
     .row()
     .text("🧰 Инструменты", "menu_tools")
+    .text("💎 Premium", "menu_premium")
     .text("ℹ️ Возможности", "menu_features")
     .text("📚 Все команды", "menu_commands")
     .row()
@@ -3493,7 +3494,7 @@ function premiumPurchaseKeyboard() {
 }
 
 bot.command("premium", async ctx => {
-  const memory = await loadMemory(String(ctx.from.id));
+  const memory = await loadMemory(ctx.from.id);
   await ctx.reply(
     premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars",
     { parse_mode: "HTML", reply_markup: premiumPurchaseKeyboard() }
@@ -3552,7 +3553,7 @@ bot.on("message:successful_payment", async ctx => {
     return ctx.reply("⚠️ Платёж получен, но данные счёта не совпали. Напиши /paysupport.");
   }
 
-  const userId = String(ctx.from.id);
+  const userId = ctx.from.id;
   const memory = await loadMemory(userId);
   memory.processedStarPayments = Array.isArray(memory.processedStarPayments) ? memory.processedStarPayments : [];
   if (memory.processedStarPayments.includes(payment.telegram_payment_charge_id)) {
@@ -4135,6 +4136,15 @@ bot.command("say", async ctx => {
 // ======================================================
 // MENU CALLBACKS
 // ======================================================
+
+bot.callbackQuery("menu_premium", async ctx => {
+  await ctx.answerCallbackQuery();
+  const memory = await loadMemory(ctx.from.id);
+  await ctx.reply(
+    premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars",
+    { parse_mode: "HTML", reply_markup: premiumPurchaseKeyboard() }
+  );
+});
 
 bot.callbackQuery("menu_chat", async ctx => {
   searchUsers.delete(ctx.from.id);
@@ -5200,7 +5210,8 @@ async function start() {
     { command: "chatid", description: "Показать ID текущего чата или группы" },
     { command: "gift", description: "Отправить виртуальный подарок" },
     { command: "mygifts", description: "Посмотреть свои подарки" },
-    { command: "premium", description: "Проверить статус Premium" },
+    { command: "premium", description: "Проверить статус и купить Premium за Stars" },
+    { command: "paysupport", description: "Помощь с оплатой Telegram Stars" },
     { command: "model", description: "Посмотреть или выбрать модель ИИ" },
     { command: "status", description: "Проверить состояние бота" },
     { command: "voice", description: "Настройки голосового ответа" },
