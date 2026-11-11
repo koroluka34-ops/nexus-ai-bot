@@ -308,7 +308,7 @@ async function loadMemory(userId) {
       reminders: Array.isArray(data.reminders) ? data.reminders : [],
       gifts: Array.isArray(data.gifts) ? data.gifts : [],
       lastFreeGift: String(data.lastFreeGift || ""),
-      knowledgeBase: Array.isArray(data.knowledgeBase) ? data.knowledgeBase.slice(0, 8) : [],
+      knowledgeBase: Array.isArray(data.knowledgeBase) ? data.knowledgeBase.slice(0, 50) : [],
       premium: data.premium && typeof data.premium === "object" ? data.premium : { tier: "free", expiresAt: 0 },
       usage: data.usage && typeof data.usage === "object" ? data.usage : { day: "", text: 0, images: 0, videos: 0 },
       selectedModel: String(data.selectedModel || "openai/gpt-oss-120b"),
@@ -394,11 +394,13 @@ async function consumeQuota(userId, kind) {
     await saveMemory(userId);
     return { ok: false, tier, limit, storageError: false };
   }
-  if (kind === "text" && usage[key] >= baseLimit && bonus > 0) memory.rouletteBonusTextRemaining = Math.max(0, bonus - 1);
+  const usedBonus = kind === "text" && usage[key] >= baseLimit && bonus > 0;
+  if (usedBonus) memory.rouletteBonusTextRemaining = Math.max(0, bonus - 1);
   usage[key]++;
   if (kind === "image" || kind === "video") usage.media++;
   if (!await saveMemory(userId)) {
     usage[key]--;
+    if (usedBonus) memory.rouletteBonusTextRemaining = bonus;
     if (kind === "image" || kind === "video") usage.media--;
     return { ok: false, tier, limit, storageError: true };
   }
@@ -437,6 +439,7 @@ function premiumStatusText(memory) {
     "Текстовых запросов в день: " + usage.text + "/" + plan.text + "\n" +
     "Глубоких исследований в день: " + usage.research + "/" + plan.research + "\n" +
     "Документов в базе знаний: " + (memory.knowledgeBase || []).length + "/" + plan.kbDocs + "\n" +
+    "Бонусных AI-запросов: " + (memory.rouletteBonusTextExpiresAt > Date.now() ? Math.max(0, Number(memory.rouletteBonusTextRemaining) || 0) : 0) + "\n" +
     "ИИ-фото в день: " + usage.images + "/" + plan.images + "\n" +
     "ИИ-видео в день: " + usage.videos + "/" + plan.videos + "\n" +
     "Всего фото и видео: " + usage.media + "/" + plan.media + "\n" +
