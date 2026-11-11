@@ -519,7 +519,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       const catalog = await getGiftCatalog(bot);
       if (!catalog.gifts.length) return ctx.reply("🎁 Сейчас нет подарков, которые можно купить с текущего баланса (" + catalog.balance + " ⭐).");
       return ctx.reply("🎁 <b>ПОДАРКИ В РУЛЕТКЕ</b>\n\n" + catalog.gifts.map((g, i) =>
-        (i + 1) + ". " + g.label + " — шанс " + g.probability
+        (i + 1) + ". " + g.label + " — ID: " + g.giftId
       ).join("\n"), { parse_mode: "HTML" });
     } catch (error) {
       return ctx.reply("❌ Не удалось получить каталог: " + String(error.message).slice(0, 250));
