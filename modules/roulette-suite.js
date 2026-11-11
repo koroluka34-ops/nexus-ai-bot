@@ -157,11 +157,11 @@ async function getGiftCatalog(bot) {
     }));
   const premiumAvailable = balance >= 2500;
   const prizes = [
-    { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: premiumAvailable ? "0,01%" : "Пока недоступен", type: "telegram_premium", cost: 2500, available: premiumAvailable, weight: premiumAvailable ? TELEGRAM_PREMIUM_WEIGHT : 0 },
+    { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, available: true, weight: TELEGRAM_PREMIUM_WEIGHT },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: "49,3%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: premiumAvailable ? "49,99%" : "50%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "49,99%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
   ];
   return { balance, gifts: available, prizes };
 }
@@ -196,11 +196,37 @@ function installRoulette(bot, { grantPrize } = {}) {
       let queue = await readPendingQueue();
       if (!queue.length) return;
       let balance = await getStarBalance();
+      const premiumQueue = queue.filter(item => item.type === "telegram_premium");
+      for (const item of premiumQueue) {
+        if (balance < 2500) continue;
+        try {
+          await telegramApi("giftPremiumSubscription", {
+            user_id: Number(item.userId),
+            month_count: 12,
+            star_count: 2500,
+            text: "Ты выиграл Telegram Premium на 12 месяцев в NEXUS!"
+          });
+          balance = Math.max(0, balance - 2500);
+          queue = queue.filter(q => q.spinId !== item.spinId);
+          await writePendingQueue(queue);
+          const state = await readState(item.userId);
+          const row = state.history.find(h => h.spinId === item.spinId);
+          if (row) {
+            row.status = "delivered";
+            row.deliveryMessage = "";
+            row.deliveredAt = Date.now();
+            await writeState(item.userId, state);
+          }
+          await bot.api.sendMessage(Number(item.userId), "⭐ Твой выигранный Telegram Premium на 12 месяцев оформлен! Поздравляем! 🎉").catch(() => {});
+        } catch (error) {
+          console.error("NEXUS pending Telegram Premium:", item.spinId, String(error.message || error).slice(0, 200));
+        }
+      }
       const catalog = await telegramApi("getAvailableGifts");
       const gifts = (Array.isArray(catalog?.gifts) ? catalog.gifts : [])
         .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 500)
         .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
-      for (const item of [...queue]) {
+      for (const item of [...queue].filter(entry => entry.type !== "telegram_premium")) {
         // If the catalog was empty at spin time, select a real gift only when
         // it becomes available and the bot can afford it.
         let gift = item.giftId ? gifts.find(g => g.id === item.giftId) : null;
@@ -415,22 +441,28 @@ function installRoulette(bot, { grantPrize } = {}) {
           await writeState(user.id, fresh);
 
           let delivered = false, deliveryMessage = "";
-          if (prize.type === "gift") {
+          if (prize.type === "gift" || prize.type === "telegram_premium") {
             const queue = await readPendingQueue();
             if (!queue.some(item => item.spinId === spinId)) {
-              queue.push({ spinId, userId: user.id, giftId: prize.giftId || "", cost: prize.cost || 0, createdAt: Date.now() });
+              queue.push({
+                spinId,
+                userId: user.id,
+                type: prize.type === "telegram_premium" ? "telegram_premium" : "gift",
+                giftId: prize.giftId || "",
+                cost: prize.type === "telegram_premium" ? 2500 : (prize.cost || 0),
+                createdAt: Date.now()
+              });
               await writePendingQueue(queue);
             }
             await processPendingGiftQueue();
             const refreshed = await readState(user.id);
             const savedRow = refreshed.history.find(item => item.spinId === spinId);
             delivered = savedRow?.status === "delivered";
-            if (!delivered) deliveryMessage = "Подарок сохранён в очереди. Бот отправит его автоматически, когда на балансе появятся нужные Stars.";
+            if (!delivered) deliveryMessage = prize.type === "telegram_premium"
+              ? "Telegram Premium на 12 месяцев сохранён в очереди. Бот автоматически оформит его, когда на балансе будет 2500 ⭐."
+              : "Подарок сохранён в очереди. Бот отправит его автоматически, когда на балансе появятся нужные Stars.";
           } else try {
-            if (prize.type === "telegram_premium") {
-              await telegramApi("giftPremiumSubscription", { user_id: user.id, month_count: 12, star_count: 2500, text: "Ты выиграл Telegram Premium на 12 месяцев в NEXUS!" });
-              delivered = true;
-            } else if (prize.type === "nexus_plus" || prize.type === "nexus_ultra") {
+            if (prize.type === "nexus_plus" || prize.type === "nexus_ultra") {
               if (typeof grantPrize !== "function") throw new Error("Выдача NEXUS Premium не подключена.");
               await grantPrize(user.id, prize.type === "nexus_ultra" ? "ultra" : "plus");
               delivered = true;
@@ -451,7 +483,9 @@ function installRoulette(bot, { grantPrize } = {}) {
             delivered,
             message: delivered
               ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : prize.type === "nexus_plus" ? "💎 Тебе выдан NEXUS Premium на 30 дней!" : prize.type === "nexus_ultra" ? "🚀 Тебе выдан NEXUS Ultra на 30 дней!" : prize.type === "telegram_premium" ? "⭐ Telegram Premium на 12 месяцев отправлен тебе! Бот списал 2500 Stars." : "Сегодня без приза. Новая попытка будет завтра.")
-              : "🧸 Мишка выигран! Подарок сохранён. Бот автоматически отправит его, когда на балансе появятся нужные Stars. Повторно крутить не нужно."
+              : prize.type === "telegram_premium"
+                ? "⭐ Telegram Premium на 12 месяцев выигран и сохранён в очереди. Бот автоматически оформит его, когда на балансе будет 2500 Stars. Повторно крутить не нужно."
+                : "🧸 Мишка выигран! Подарок сохранён. Бот автоматически отправит его, когда на балансе появятся нужные Stars. Повторно крутить не нужно."
           });
           return true;
         } finally {
