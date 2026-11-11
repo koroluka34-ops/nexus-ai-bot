@@ -9,6 +9,9 @@ const TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const NAMESPACE = process.env.CLOUDFLARE_KV_NAMESPACE_ID || "";
 const locks = new Set();
 const NO_PRIZE_WEIGHT = 500000;
+const PLUS_WEIGHT = 1000; // 0.10%
+const ULTRA_WEIGHT = 2000; // 0.20%
+const GIFT_TOTAL_WEIGHT = 497000; // 49.70%, split between currently affordable gifts
 const MAX_GIFTS_IN_WHEEL = 6;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
@@ -112,20 +115,27 @@ async function getGiftCatalog(bot) {
       type: "gift",
       cost: Number(g.star_count)
     }));
-  const chanceEach = available.length ? (50 / available.length) : 0;
-  for (const gift of available) gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + "%";
-  const prizes = [...available, {
-    id: "no_prize", label: "Сегодня без подарка. Попробуй завтра!", short: "Попробуй завтра",
-    probability: "50%", type: "none", cost: 0
-  }];
+  const chanceEach = available.length ? (49.7 / available.length) : 0;
+  for (const gift of available) {
+    gift.weight = available.length ? Math.floor(GIFT_TOTAL_WEIGHT / available.length) : 0;
+    gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 3 }) + "%";
+  }
+  const prizes = [
+    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "Premium", probability: "0,10%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
+    { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
+    ...available,
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "50%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
+  ];
   return { balance, gifts: available, prizes };
 }
-function choosePrize(gifts) {
-  if (!gifts.length || crypto.randomInt(0, 1000000) < NO_PRIZE_WEIGHT) {
-    return { id: "no_prize", label: "Сегодня без подарка. Попробуй завтра!", short: "Без приза", probability: "50%", type: "none", cost: 0, wheelIndex: gifts.length };
+function choosePrize(prizes) {
+  const total = prizes.reduce((sum, prize) => sum + (Number(prize.weight) || 0), 0);
+  let ticket = crypto.randomInt(0, total);
+  for (let index = 0; index < prizes.length; index++) {
+    ticket -= Number(prizes[index].weight) || 0;
+    if (ticket < 0) return { ...prizes[index], wheelIndex: index };
   }
-  const index = crypto.randomInt(0, gifts.length);
-  return { ...gifts[index], wheelIndex: index };
+  return { ...prizes[prizes.length - 1], wheelIndex: prizes.length - 1 };
 }
 function publicPrize(prize) {
   return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0 };
@@ -139,7 +149,7 @@ function makeWebAppUrl() {
     return u.protocol === "https:" ? (u.pathname.replace(/\/$/, "") === "/roulette" ? u.toString() : u.toString().replace(/\/$/, "") + "/roulette") : "";
   } catch { return ""; }
 }
-function installRoulette(bot) {
+function installRoulette(bot, { grantPrize } = {}) {
   const webAppUrl = makeWebAppUrl();
   const openKeyboard = () => webAppUrl
     ? new InlineKeyboard().webApp("🎁 Открыть рулетку подарков", webAppUrl)
@@ -257,7 +267,7 @@ function installRoulette(bot) {
             json(res, 503, { ok: false, error: "Сейчас нет доступных подарков: на балансе бота недостаточно Stars. Попробуй позже.", canSpin: false });
             return true;
           }
-          const prize = choosePrize(catalog.gifts);
+          const prize = choosePrize(catalog.prizes);
           const spinId = crypto.randomUUID();
           const row = {
             spinId, day: today, prize: prize.id, label: prize.label,
@@ -278,6 +288,10 @@ function installRoulette(bot) {
                 text: "Поздравляем! Ты выиграл этот подарок в NEXUS Gift Roulette 🎉"
               });
               delivered = true;
+            } else if (prize.type === "nexus_plus" || prize.type === "nexus_ultra") {
+              if (typeof grantPrize !== "function") throw new Error("Выдача NEXUS Premium не подключена.");
+              await grantPrize(user.id, prize.type === "nexus_ultra" ? "ultra" : "plus");
+              delivered = true;
             } else {
               delivered = true;
             }
@@ -294,7 +308,7 @@ function installRoulette(bot) {
             prizeIndex: prize.wheelIndex,
             delivered,
             message: delivered
-              ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : "Сегодня без подарка. Новая попытка будет завтра.")
+              ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : prize.type === "nexus_plus" ? "💎 Тебе выдан NEXUS Premium на 30 дней!" : prize.type === "nexus_ultra" ? "🚀 Тебе выдан NEXUS Ultra на 30 дней!" : "Сегодня без приза. Новая попытка будет завтра.")
               : "Подарок выпал, но Telegram не подтвердил отправку. Выигрыш сохранён для проверки — напиши /paysupport, повторно крутить не нужно."
           });
           return true;
