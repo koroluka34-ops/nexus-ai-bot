@@ -28,7 +28,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .outer{width:min(76vw,310px);aspect-ratio:1;padding:9px;border-radius:50%;background:conic-gradient(from 30deg,#9a5a14,#ffedaa,#c68a34,#fff1b9,#a65e18,#f4d17d);box-shadow:0 0 0 1px #ffe7a355,0 13px 30px #0009,0 0 38px #eab64b26}
 .wheel{width:100%;height:100%;position:relative;overflow:hidden;border-radius:50%;border:5px solid #10182c;background:conic-gradient(from -90deg,#284c9a 0 50%,#172b59 50% 100%);transition:transform 5s cubic-bezier(.12,.72,.12,1);box-shadow:inset 0 0 30px #02061799}
 .wheel:after{content:"N";position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#aab8d1);color:#101a34;font-size:25px;font-weight:1000;border:5px solid #10182c;box-shadow:0 5px 15px #000a}
-.slice-label{position:absolute;left:50%;top:50%;width:82px;margin-left:-41px;margin-top:-8px;text-align:center;font-size:10px;font-weight:900;line-height:1.15;color:#fff;text-shadow:0 2px 5px #000,0 0 7px #000;transform-origin:50% 50%;pointer-events:none;z-index:2}
+.slice-label{position:absolute;left:50%;top:50%;width:76px;margin-left:-38px;margin-top:-20px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;font-size:9px;font-weight:950;line-height:1.05;color:#fff;text-shadow:0 2px 5px #000,0 0 7px #000;transform-origin:50% 50%;pointer-events:none;z-index:2}
 .spin{width:100%;border:1px solid #f5d78b;border-radius:15px;padding:16px 18px;background:linear-gradient(100deg,#d99a32,#f4d47e 52%,#bd7b24);color:#171528;font-size:15px;font-weight:1000;letter-spacing:.04em;box-shadow:0 8px 25px #d69a3650}
 .spin:disabled{opacity:.48;filter:grayscale(.6);box-shadow:none}
 .hint{text-align:center;font-size:11px;color:#9cacc8;line-height:1.5;margin:10px 4px 0}
@@ -69,9 +69,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
-    <p class="hint">Шанс не получить приз — 50%. NEXUS Premium — 10%, NEXUS Ultra — 0,20%. Остальные 39,80% распределяются между доступными подарками Telegram. Один бесплатный прокрут в сутки.</p>
+    <p class="hint">Шанс не получить приз — 50%, NEXUS Premium — 10%, NEXUS Ultra — 0,20%. Остальные 39,80% делятся между доступными подарками Telegram. Если подарки закончились или баланса не хватает, шанс переходит в «без приза».</p>
   </section>
-  <p class="disclaimer">Подарки отправляются официальным методом Telegram Bot API. Их можно показать в профиле, но отправленные ботом подарки этим способом нельзя обменять на Stars. Попытка обновляется каждый день по времени Киева.</p>
+  <p class="disclaimer">В секторах показаны изображения подарков и подписок. Настоящий подарок отправляется только после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева.</p>
 </main>
 <script>
 (()=> {
@@ -90,16 +90,26 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
     return data;
   }
+  function makePrizeEmoji(prize){
+    const art=document.createElement("span");art.className="slice-emoji";
+    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="nexus_plus"?"💎":prize.type==="none"?"🍀":"🎁";
+    return art;
+  }
   function drawWheel(prizes){
     currentPrizes=Array.isArray(prizes)&&prizes.length?prizes:[{id:"gift_preview",short:"Подарок",label:"Подарок Telegram",type:"gift"},{id:"no_prize",short:"Попробуй завтра",label:"Без приза",type:"none"}];
     const step=360/currentPrizes.length;
     wheel.style.background="conic-gradient(from -90deg,"+currentPrizes.map((_,i)=>colors[i%colors.length]+" "+(i*step)+"deg "+((i+1)*step)+"deg").join(",")+")";
     wheel.querySelectorAll(".slice-label").forEach(node=>node.remove());
     currentPrizes.forEach((prize,index)=>{
-      const label=document.createElement("span");label.className="slice-label";label.textContent=prize.short||prize.label||"Подарок";
+      const label=document.createElement("span");label.className="slice-label";
       const angle=index*step+step/2;
       label.style.transform="rotate("+angle+"deg) translateY(-"+(wheel.clientWidth*.34)+"px) rotate(-"+angle+"deg)";
-      wheel.append(label);
+      if(prize.type==="gift" && prize.imageUrl){
+        const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
+      }else label.append(makePrizeEmoji(prize));
+      const text=document.createElement("span");text.className="slice-text";
+      text.textContent=prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
+      label.append(text);wheel.append(label);
     });
   }
   function renderCatalog(prizes){
