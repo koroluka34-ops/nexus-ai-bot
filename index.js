@@ -437,7 +437,28 @@ async function refundQuota(userId, kind) {
 function premiumStatusText(memory) {
   const tier = currentPlan(memory), plan = PREMIUM_PLANS[tier], usage = resetDailyUsage(memory);
   const model = tier === "free" ? "GPT-OSS 120B" : (memory.selectedModel || "qwen/qwen3.8-27b");
-  return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" +
+  const premium = memory.premium || {};
+  const expiry = Number(premium.expiresAt) || 0;
+  const hasPaidTier = ["plus", "ultra"].includes(premium.tier);
+  let subscriptionLine;
+  if (tier !== "free" && expiry > Date.now()) {
+    const remainingMs = expiry - Date.now();
+    const remainingDays = Math.floor(remainingMs / 86400000);
+    const remainingHours = Math.floor((remainingMs % 86400000) / 3600000);
+    const expiryText = new Intl.DateTimeFormat("ru-RU", {
+      timeZone: "Europe/Kyiv", day: "2-digit", month: "long", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: false
+    }).format(new Date(expiry));
+    subscriptionLine = "🟢 Статус: <b>активна</b>\n📅 Закончится: <b>" + expiryText + " (Киев)</b>\n⏳ Осталось: <b>" +
+      (remainingDays > 0 ? remainingDays + " дн. " : "") + remainingHours + " ч.</b>\n🔁 Автопродление: выключено";
+  } else if (hasPaidTier && expiry > 0) {
+    subscriptionLine = "🔴 Статус: <b>истекла</b>\n📅 Закончилась: <b>" +
+      new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Kyiv", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(expiry)) +
+      " (Киев)</b>\n🔁 Автопродление: выключено";
+  } else {
+    subscriptionLine = "⚪ Статус: <b>бесплатный тариф</b>\n💳 Активной подписки нет";
+  }
+  return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" + subscriptionLine + "\n\n" +
     "Текстовых запросов в день: " + usage.text + "/" + plan.text + "\n" +
     "Глубоких исследований в день: " + usage.research + "/" + plan.research + "\n" +
     "Документов в базе знаний: " + (memory.knowledgeBase || []).length + "/" + plan.kbDocs + "\n" +
@@ -447,8 +468,7 @@ function premiumStatusText(memory) {
     "Всего фото и видео: " + usage.media + "/" + plan.media + "\n" +
     "Модель: <code>" + model + "</code>\n" +
     "Голос: " + (memory.ttsVoice || "svetlana") + "\n" +
-    "Приоритет генерации: " + (tier === "ultra" ? "высокий" : tier === "plus" ? "повышенный" : "обычный") +
-    (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
+    "Приоритет генерации: " + (tier === "ultra" ? "высокий" : tier === "plus" ? "повышенный" : "обычный");
 }
 
 
