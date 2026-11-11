@@ -4234,7 +4234,7 @@ bot.callbackQuery("menu_premium", async ctx => {
   await ctx.answerCallbackQuery();
   const memory = await loadMemory(ctx.from.id);
   await ctx.reply(
-    premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars",
+    premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars\nУсловия покупки: /terms",
     { parse_mode: "HTML", reply_markup: premiumPurchaseKeyboard() }
   );
 });
