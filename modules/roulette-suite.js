@@ -471,13 +471,14 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
     try {
-      const [balance, queue, winners, event, settings, blocked] = await Promise.all([
+      const [balance, queue, winners, event, settings, blocked, stats] = await Promise.all([
         getStarBalance(), readPendingQueue(), readGlobal("winners", []),
         readGlobal("event", { active: false }), readGlobal("settings", { giftPercent: 38 }),
-        readGlobal("blocked", [])
+        readGlobal("blocked", []), readGlobal("stats", { totalSpins: 0, wins: 0, losses: 0 })
       ]);
       return ctx.reply("🛠 <b>NEXUS ROULETTE ADMIN</b>\n\n⭐ Баланс: " + balance +
-        "\n🎁 Ожидают выдачи: " + queue.length + "\n🏆 Выигрышей в ленте: " + winners.length +
+        "\n🎰 Всего прокруток: " + (stats.totalSpins || 0) + "\n🎁 Выигрышей: " + (stats.wins || 0) + "\n🍀 Без приза: " + (stats.losses || 0) +
+        "\n⏳ Ожидают выдачи: " + queue.length + "\n🏆 Победителей в ленте: " + winners.length +
         "\n🎯 Шанс подарков: " + settings.giftPercent + "%\n🔥 Ивент: " + (event.active ? "включён" : "выключен") +
         "\n🚫 Заблокировано: " + blocked.length, { parse_mode: "HTML" });
     } catch (error) { return ctx.reply("❌ " + String(error.message || error).slice(0, 200)); }
@@ -660,6 +661,16 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           fresh.history.push(row);
           fresh.history = fresh.history.slice(-100);
           await writeState(user.id, fresh);
+          try {
+            const stats = await readGlobal("stats", { totalSpins: 0, wins: 0, losses: 0 });
+            stats.totalSpins = (Number(stats.totalSpins) || 0) + 1;
+            if (prize.type === "none") stats.losses = (Number(stats.losses) || 0) + 1;
+            else stats.wins = (Number(stats.wins) || 0) + 1;
+            stats.updatedAt = Date.now();
+            await writeGlobal("stats", stats);
+          } catch (statsError) {
+            console.error("NEXUS roulette stats:", String(statsError.message || statsError).slice(0, 180));
+          }
 
           let delivered = false, deliveryMessage = "";
           if (prize.type === "gift" || prize.type === "telegram_premium") {
