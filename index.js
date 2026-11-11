@@ -3521,7 +3521,7 @@ bot.command("premiumgrant", async ctx => {
   else if (parts[0] && parts[0].startsWith("@")) {
     targetId = await resolveUsername(parts[0]);
     tier = (parts[1] || "plus").toLowerCase(); days = Number(parts[2] || 30);
-    if (!targetId) return ctx.reply("Не нашёл " + parts[0] + ". Пользователь должен хотя бы раз написать боту после включения этой функции. Можно ответить на его сообщение командой /premiumgrant plus 30.");
+    if (!targetId) return ctx.reply("Не нашёл " + parts[0] + ". Telegram не позволяет боту находить личный аккаунт только по @username. Пусть пользователь откроет бота и нажмёт /start, затем повтори команду. Или ответь на его сообщение в группе командой /premiumgrant plus 30 — тогда ID подтянется автоматически.");
   } else { targetId = parts[0] || ""; tier = (parts[1] || "").toLowerCase(); days = Number(parts[2]); }
   if (!targetId || !["plus","ultra","free"].includes(tier) || !Number.isInteger(days) || days < 1 || days > 3650) {
     return ctx.reply("Форматы:\n/premiumgrant @username plus 30\n/premiumgrant @username ultra 90\nОтветом на сообщение: /premiumgrant plus 30\nСтарый формат ID: /premiumgrant 123456 plus 30");
@@ -5135,7 +5135,7 @@ async function start() {
     ...commonCommands,
     ...groupCommands.slice(commonCommands.length),
     { command: "giftgrant", description: "Выдать виртуальные подарки пользователю (админ)" },
-    { command: "premiumgrant", description: "Выдать Premium пользователю (админ)" }
+    { command: "premiumgrant", description: "Выдать Premium по @username или ответом (админ)" }
   ];
 
   try {
