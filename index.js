@@ -3485,10 +3485,109 @@ bot.command("giftgrant", async ctx => {
 });
 
 // ======================================================
+function premiumPurchaseKeyboard() {
+  return new InlineKeyboard()
+    .text("💎 NEXUS Premium — 50 ⭐", "buy_plus")
+    .row()
+    .text("🚀 NEXUS Ultra — 100 ⭐", "buy_ultra");
+}
+
 bot.command("premium", async ctx => {
-  const memory = await loadMemory(ctx.from.id);
-  const suffix = currentPlan(memory) === "free" ? "\n\n💎 Для активации NEXUS Premium обратись к администратору." : "";
-  await ctx.reply(premiumStatusText(memory) + suffix, { parse_mode: "HTML" });
+  const memory = await loadMemory(String(ctx.from.id));
+  await ctx.reply(
+    premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars",
+    { parse_mode: "HTML", reply_markup: premiumPurchaseKeyboard() }
+  );
+});
+
+bot.callbackQuery(/^buy_(plus|ultra)$/, async ctx => {
+  const tier = ctx.match[1];
+  const price = tier === "ultra" ? 100 : 50;
+  const title = tier === "ultra" ? "NEXUS Ultra на 30 дней" : "NEXUS Premium на 30 дней";
+  const description = tier === "ultra"
+    ? "Расширенные лимиты, приоритет и функции NEXUS AI на 30 дней."
+    : "Увеличенные лимиты и Premium-возможности NEXUS AI на 30 дней.";
+  const payload = "nexus-premium:" + tier + ":" + ctx.from.id + ":" + crypto.randomBytes(8).toString("hex");
+  await ctx.answerCallbackQuery();
+  try {
+    await ctx.api.sendInvoice(
+      ctx.from.id,
+      title,
+      description,
+      payload,
+      "",
+      "XTR",
+      [{ label: title, amount: price }]
+    );
+  } catch (error) {
+    console.error("NEXUS Stars invoice:", error.message);
+    await ctx.reply("❌ Не удалось создать счёт Telegram Stars. Попробуй ещё раз позже.");
+  }
+});
+
+bot.on("pre_checkout_query", async ctx => {
+  const query = ctx.preCheckoutQuery;
+  const parts = String(query.invoice_payload || "").split(":");
+  const tier = parts[1];
+  const ownerId = parts[2];
+  const expected = tier === "ultra" ? 100 : tier === "plus" ? 50 : 0;
+  const valid = parts.length === 4 &&
+    parts[0] === "nexus-premium" &&
+    ownerId === String(query.from.id) &&
+    expected > 0 &&
+    query.currency === "XTR" &&
+    query.total_amount === expected;
+  await ctx.answerPreCheckoutQuery(valid, valid ? undefined : "Счёт недействителен. Открой /premium и создай новый.");
+});
+
+bot.on("message:successful_payment", async ctx => {
+  const payment = ctx.message.successful_payment;
+  const parts = String(payment.invoice_payload || "").split(":");
+  const tier = parts[1];
+  const expected = tier === "ultra" ? 100 : tier === "plus" ? 50 : 0;
+  if (parts[0] !== "nexus-premium" || parts.length !== 4 ||
+      parts[2] !== String(ctx.from.id) || !expected ||
+      payment.currency !== "XTR" || payment.total_amount !== expected) {
+    console.error("NEXUS payment rejected: invalid payload or amount", ctx.from.id);
+    return ctx.reply("⚠️ Платёж получен, но данные счёта не совпали. Напиши /paysupport.");
+  }
+
+  const userId = String(ctx.from.id);
+  const memory = await loadMemory(userId);
+  memory.processedStarPayments = Array.isArray(memory.processedStarPayments) ? memory.processedStarPayments : [];
+  if (memory.processedStarPayments.includes(payment.telegram_payment_charge_id)) {
+    return ctx.reply("✅ Этот платёж уже обработан.\n/premium");
+  }
+
+  const ranks = { free: 0, plus: 1, ultra: 2 };
+  const activeTier = currentPlan(memory);
+  const finalTier = ranks[activeTier] > ranks[tier] ? activeTier : tier;
+  const now = Date.now();
+  const baseExpiry = activeTier !== "free" ? Math.max(now, Number(memory.premium?.expiresAt) || now) : now;
+  memory.premium = {
+    tier: finalTier,
+    expiresAt: baseExpiry + 30 * 24 * 60 * 60 * 1000,
+    source: "telegram_stars",
+    lastChargeId: payment.telegram_payment_charge_id
+  };
+  memory.processedStarPayments.push(payment.telegram_payment_charge_id);
+  memory.processedStarPayments = memory.processedStarPayments.slice(-50);
+
+  if (!await saveMemory(userId)) {
+    console.error("NEXUS PAYMENT ACTIVATION FAILED:", payment.telegram_payment_charge_id);
+    return ctx.reply("⚠️ Telegram подтвердил оплату, но не удалось сохранить подписку. Не оплачивай повторно — напиши /paysupport.");
+  }
+
+  await ctx.reply(
+    "🎉 Оплата прошла!\n\nАктивирован <b>" + PREMIUM_PLANS[finalTier].name +
+    "</b> на 30 дней.\nСумма: " + expected + " ⭐\n/premium",
+    { parse_mode: "HTML" }
+  );
+});
+
+bot.command("paysupport", async ctx => {
+  await ctx.reply("💳 Поддержка платежей NEXUS AI\n\nЕсли Stars списались, а подписка не появилась, отправь администратору свой Telegram ID: " +
+    ctx.from.id + "\nНе оплачивай покупку повторно до проверки.");
 });
 
 bot.command("model", async ctx => {
