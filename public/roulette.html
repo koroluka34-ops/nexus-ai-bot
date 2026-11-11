@@ -137,7 +137,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(no){const item=document.createElement("div");item.className="prize no-prize";const b=document.createElement("b");b.textContent="🍀 Без подарка";const s=document.createElement("span");s.textContent="Шанс: "+no.probability;item.append(b,s);prizesBox.append(item);}
   }
   function showResult(prize,message,delivered){
-    result.classList.add("show");$("resultTitle").textContent=prize?.label||"Результат";$("resultText").textContent=message+(delivered===false?" Напиши /paysupport — результат сохранён.":"");
+    result.classList.add("show");$("resultTitle").textContent=prize?.label||"Результат";
+    let art=$("resultArtwork");if(!art){art=document.createElement("img");art.id="resultArtwork";art.style.cssText="display:block;max-width:180px;max-height:180px;object-fit:contain;margin:12px auto;border-radius:18px";$("resultTitle").after(art);}
+    if(prize?.imageUrl){art.src=prize.imageUrl;art.alt=prize.label||"Приз";art.style.display="block";}else{art.removeAttribute("src");art.style.display="none";}
+    $("resultText").textContent=message+(delivered===false?" Напиши /paysupport — результат сохранён.":"");
   }
   async function refresh(){
     if(!initData){spinStatus.textContent="Открой через Telegram";balanceNote.textContent="Запусти Mini App кнопкой /roulette в боте.";spinButton.disabled=true;return;}
