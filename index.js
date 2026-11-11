@@ -321,13 +321,18 @@ async function submitFeatureSuggestion(ctx, suggestion) {
   const deliveries = await Promise.allSettled(adminIds.map(adminId =>
     ctx.api.sendMessage(adminId, card, { reply_markup: keyboard })
   ));
-  const delivered = deliveries.some(result => result.status === "fulfilled");
-  if (!delivered) {
-    await writeKvJson("nexus:devtask:" + taskId, { ...task, status: "delivery_failed" });
-    await ctx.reply("❌ Не удалось доставить предложение администраторам. Пусть они откроют бота и нажмут /start.");
+  const deliveredIds = adminIds.filter((_, index) => deliveries[index].status === "fulfilled");
+  const failedIds = adminIds.filter((_, index) => deliveries[index].status !== "fulfilled");
+  if (!deliveredIds.length) {
+    await ctx.reply("❌ Не удалось доставить предложение ни одному администратору. Пусть администраторы откроют личный чат с ботом и нажмут /start. Предложение сохранено, повтори отправку позже.");
     return false;
   }
-  await ctx.reply("✅ Предложение отправлено администраторам NEXUS. Когда кто-нибудь из них рассмотрит его, я сообщу тебе результат.");
+  let deliveryNotice = "✅ Предложение отправлено администраторам NEXUS: " + deliveredIds.length + " из " + adminIds.length + ".";
+  if (failedIds.length) {
+    deliveryNotice += "\n⚠️ Не удалось доставить администраторам с ID: " + failedIds.join(", ") + ". Им нужно открыть бота и нажать /start.";
+  }
+  deliveryNotice += "\nКогда кто-нибудь рассмотрит предложение, я сообщу тебе результат.";
+  await ctx.reply(deliveryNotice);
   return true;
 }
 
@@ -3959,17 +3964,20 @@ bot.callbackQuery(/^devtask:(approve|reject):([a-z0-9]+)$/i, async ctx => {
     { reply_markup: new InlineKeyboard() }
   ).catch(() => {});
 
-  if (action === "approve") {
-    const implementationCard =
-      "🛠 ОДОБРЕННОЕ ПРЕДЛОЖЕНИЕ ДЛЯ РЕАЛИЗАЦИИ\n" +
-      "Автор: " + task.author + " (ID " + task.authorId + ")\n" +
-      "Одобрил: " + reviewerRole + " " + reviewerName + "\n\n" +
-      task.text +
-      "\n\nОдобрение означает, что идея принята к рассмотрению. Изменения в код автоматически не вносятся — реализацию нужно выполнить отдельно.";
-    await Promise.allSettled((await getNexusAdmins()).map(adminId =>
-      ctx.api.sendMessage(adminId, implementationCard)
-    ));
-  }
+  const decisionLabel = action === "approve" ? "✅ ОДОБРЕНО" : "❌ ОТКЛОНЕНО";
+  const adminDecisionNotice =
+    decisionLabel + " — ПРЕДЛОЖЕНИЕ NEXUS\n" +
+    "Автор: " + task.author + " (ID " + task.authorId + ")\n" +
+    "Решение принял: " + reviewerRole + " " + reviewerName + "\n\n" +
+    "Предложение:\n" + task.text +
+    (action === "approve"
+      ? "\n\nСтатус: идея принята к рассмотрению. Для появления функции её ещё нужно реализовать в коде."
+      : "\n\nСтатус: предложение отклонено.");
+
+  // Сообщаем о каждом решении всем администраторам, а не только при одобрении.
+  await Promise.allSettled((await getNexusAdmins()).map(adminId =>
+    ctx.api.sendMessage(adminId, adminDecisionNotice)
+  ));
 
   const userNotice = action === "approve"
     ? "✅ Твоё предложение одобрено " + reviewerRole + "ом NEXUS (" + reviewerName + ")! Идея принята к рассмотрению и добавлению."
