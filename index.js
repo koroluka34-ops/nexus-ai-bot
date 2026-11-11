@@ -5407,7 +5407,7 @@ async function start() {
   const server = http.createServer((req, res) => {
     if (req.method === "GET" && req.url.startsWith("/assets/")) {
       const asset = req.url.slice("/assets/".length);
-      const allowed = new Set(["telegram-premium.svg", "nexus-premium.svg", "nexus-ultra.svg"]);
+      const allowed = new Set(["telegram-premium.svg", "nexus-premium.svg", "nexus-ultra.svg", "teddy-bear.svg"]);
       if (allowed.has(asset)) {
         fs.readFile(path.join(__dirname, "public", asset)).then(data => { res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }); res.end(data); }).catch(() => { res.writeHead(404); res.end(); });
         return;
