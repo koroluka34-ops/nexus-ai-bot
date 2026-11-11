@@ -5462,7 +5462,8 @@ async function start() {
           const update = JSON.parse(body);
 
           bot.handleUpdate(update).catch(error => {
-            console.error("Telegram update:", error);
+            // Never log the full GrammyError object: it contains Context/API credentials.
+            console.error("Telegram update:", error?.stack || error?.message || String(error));
           });
         } catch (error) {
           console.error("Webhook parse:", error);
