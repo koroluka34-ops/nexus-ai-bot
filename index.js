@@ -221,6 +221,56 @@ function kvValueUrl(key) {
   );
 }
 
+async function readKvJson(key, fallback) {
+  if (!kvConfigured()) return fallback;
+  try {
+    const response = await fetch(kvValueUrl(key), {
+      headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (response.status === 404) return fallback;
+    if (!response.ok) throw new Error("KV HTTP " + response.status);
+    return await response.json();
+  } catch (error) {
+    console.error("KV JSON READ:", error.message);
+    return fallback;
+  }
+}
+
+async function writeKvJson(key, value) {
+  if (!kvConfigured()) return false;
+  try {
+    const response = await fetch(kvValueUrl(key), {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(value),
+      signal: AbortSignal.timeout(8000)
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("KV JSON WRITE:", error.message);
+    return false;
+  }
+}
+
+async function getNexusAdmins() {
+  const value = await readKvJson("nexus:admins", []);
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+async function isNexusAdmin(userId) {
+  const id = String(userId);
+  return Boolean(PREMIUM_ADMIN_ID && id === PREMIUM_ADMIN_ID) ||
+    (await getNexusAdmins()).includes(id);
+}
+
+async function isDevVoiceModeEnabled() {
+  return (await readKvJson("nexus:dev_voice_mode", false)) === true;
+}
+
 function kvUrl(userId) {
   return kvValueUrl(memoryKey(userId));
 }
@@ -3836,6 +3886,46 @@ bot.command("model", async ctx => {
   await ctx.reply("✅ Режим моделей сохранён: " + (mode === "auto" ? "автоматический выбор" : mode.toUpperCase()));
 });;
 
+bot.command("admin", async ctx => {
+  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
+    return ctx.reply("⛔ Только владелец бота может управлять администраторами.");
+  }
+  if (!kvConfigured()) return ctx.reply("❌ Cloudflare KV не настроен.");
+  const parts = String(ctx.match || "").trim().split(/\\s+/).filter(Boolean);
+  const action = (parts[0] || "list").toLowerCase();
+  const admins = await getNexusAdmins();
+
+  if (action === "list") {
+    return ctx.reply("👮 АДМИНИСТРАТОРЫ NEXUS\\n\\n" +
+      (admins.length ? admins.map((id, i) => (i + 1) + ". " + id).join("\\n") : "Дополнительных администраторов пока нет.") +
+      "\\n\\nДобавить: /admin add 123456789\\nУдалить: /admin remove 123456789");
+  }
+  const id = String(parts[1] || "").replace(/^@/, "");
+  if (!["add", "remove"].includes(action) || !/^\\d{5,20}$/.test(id)) {
+    return ctx.reply("Формат:\\n/admin add 123456789\\n/admin remove 123456789\\n/admin list\\nНужен числовой Telegram ID.");
+  }
+  if (id === PREMIUM_ADMIN_ID) return ctx.reply("Это владелец бота — его нельзя удалить из списка владельцев.");
+  const next = action === "add"
+    ? [...new Set([...admins, id])]
+    : admins.filter(value => value !== id);
+  if (!await writeKvJson("nexus:admins", next)) return ctx.reply("❌ Не удалось сохранить список администраторов.");
+  return ctx.reply(action === "add" ? "✅ Администратор добавлен: " + id : "✅ Администратор удалён: " + id);
+});
+
+bot.command("devmode", async ctx => {
+  if (!await isNexusAdmin(ctx.from.id)) return ctx.reply("⛔ Только администраторы NEXUS.");
+  if (String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Включать и выключать режим разработки может только владелец.");
+  const mode = String(ctx.match || "").trim().toLowerCase();
+  if (!["on", "off", "status"].includes(mode)) {
+    return ctx.reply("🛠 РЕЖИМ ГОЛОСОВЫХ ЗАДАНИЙ\\n/devmode on — включить\\n/devmode off — выключить\\n/devmode status — проверить");
+  }
+  if (mode === "status") return ctx.reply("🎙 Режим голосовых заданий: " + ((await isDevVoiceModeEnabled()) ? "ВКЛЮЧЁН" : "ВЫКЛЮЧЕН"));
+  if (!await writeKvJson("nexus:dev_voice_mode", mode === "on")) return ctx.reply("❌ Не удалось сохранить настройку в Cloudflare KV.");
+  return ctx.reply(mode === "on"
+    ? "✅ Режим разработки включён. Голосовые сообщения администраторов будут превращаться в задания для NEXUS."
+    : "⏸ Режим разработки выключен.");
+});
+
 bot.command("premiumgrant", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Только администратор. Настрой ADMIN_ID в Render.");
   const parts = String(ctx.match || "").trim().split(/\s+/).filter(Boolean);
@@ -4655,6 +4745,26 @@ bot.on("message:voice", async ctx => {
       status.message_id,
       "📝 Распознано:\n" + transcript
     ).catch(() => {});
+
+    // Голосовой режим разработки: админ диктует задачу, владелец получает её для реализации.
+    if (await isDevVoiceModeEnabled() && await isNexusAdmin(userId)) {
+      const ownerId = PREMIUM_ADMIN_ID;
+      const taskText =
+        "🛠 НОВОЕ ГОЛОСОВОЕ ЗАДАНИЕ ДЛЯ NEXUS\\n" +
+        "От администратора: " + (ctx.from.username ? "@" + ctx.from.username : ctx.from.first_name || "без имени") + "\\n" +
+        "Telegram ID: " + userId + "\\n\\n" +
+        "Текст задания:\\n" + transcript;
+      if (ownerId && String(userId) !== ownerId) {
+        await ctx.api.sendMessage(ownerId, taskText);
+        await ctx.api.editMessageText(ctx.chat.id, status.message_id,
+          "✅ Задание распознано и отправлено владельцу NEXUS на рассмотрение. Код автоматически не менялся.").catch(() => {});
+      } else {
+        await ctx.api.editMessageText(ctx.chat.id, status.message_id,
+          "🛠 ЗАДАНИЕ ДЛЯ РАЗРАБОТКИ\\n\\n" + transcript +
+          "\\n\\nСкопируй это задание в чат разработки NEXUS. Код будет изменён только после проверки.").catch(() => {});
+      }
+      return;
+    }
 
     // Безопасные голосовые команды: Unicode-safe matching для русской речи.
     const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
