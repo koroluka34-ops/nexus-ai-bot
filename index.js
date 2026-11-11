@@ -3589,8 +3589,27 @@ bot.callbackQuery(/^accept_terms_(plus|ultra)$/, async ctx => {
   try {
     await sendPremiumInvoice(ctx, tier);
   } catch (error) {
-    console.error("NEXUS Stars invoice:", error.message);
-    await ctx.reply("❌ Не удалось создать счёт Telegram Stars. Попробуй ещё раз позже.");
+    const description = String(
+      error?.description ||
+      error?.response?.description ||
+      error?.message ||
+      "Неизвестная ошибка Telegram API"
+    ).slice(0, 700);
+    const errorCode = Number(error?.error_code || error?.response?.error_code || 0);
+    console.error("NEXUS Stars invoice creation failed:", {
+      userId: ctx.from.id,
+      tier,
+      errorCode,
+      description,
+      method: error?.method || "sendInvoice"
+    });
+    let userMessage = "❌ Telegram не смог создать счёт. Причина: " + description;
+    if (/STAR.*BALANCE|BALANCE.*LOW|INSUFFICIENT.*STAR|NOT_ENOUGH.*STAR/i.test(description)) {
+      userMessage = "⭐ На балансе твоего Telegram-аккаунта недостаточно Stars для этой покупки. Пополни личный баланс Stars и попробуй снова.";
+    } else if (/BOT.*PAYMENT|PAYMENT.*BOT|CURRENCY|PROVIDER_TOKEN/i.test(description)) {
+      userMessage = "⚠️ Telegram отклонил настройки оплаты бота. Ошибка: " + description + ". Администратору нужно проверить настройки платежей.";
+    }
+    await ctx.reply(userMessage + "\n\nЕсли ошибка повторится, отправь это сообщение в /paysupport.");
   }
 });
 
