@@ -44,7 +44,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .section-head span{font-size:10px;color:#93a4c2}
 .prizes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .prize{min-width:0;padding:11px;border-radius:14px;background:linear-gradient(145deg,#101a31,#0a1224);border:1px solid #2d3d5e}
-.prize b{display:block;font-size:11px;line-height:1.35;color:#f3f6ff;margin-bottom:5px;overflow-wrap:anywhere}
+.gift-art{display:block;width:64px;height:64px;object-fit:contain;margin:0 auto 8px;filter:drop-shadow(0 5px 10px #0008)}.emoji-art{display:grid;place-items:center;font-size:42px}.prize b{display:block;font-size:11px;line-height:1.35;color:#f3f6ff;margin-bottom:5px;overflow-wrap:anywhere}
 .prize span{font-size:10px;color:#a8b7d1}
 .prize.no-prize{border-color:#4b5267}
 .disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}
@@ -54,7 +54,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 <body>
 <main>
   <div class="header"><div class="logo">NEXUS <span>✦</span> AI</div><div class="live">● DAILY GIFT DROP</div></div>
-  <div class="hero"><div class="eyebrow">ТВОЙ ЕЖЕДНЕВНЫЙ ШАНС</div><h1>Gift Roulette</h1><p class="subtitle">Крути колесо и выигрывай подарки Telegram или подписки NEXUS Premium и Ultra. Приз автоматически появится в твоём аккаунте.</p></div>
+  <div class="hero"><div class="eyebrow">ТВОЙ ЕЖЕДНЕВНЫЙ ШАНС</div><h1>Gift Roulette</h1><p class="subtitle">Крути колесо и выигрывай настоящие подарки Telegram или подписки NEXUS Premium и Ultra. На карточках показаны изображения подарков и цена в Stars.</p></div>
   <section class="panel">
     <div class="stats"><span>Твоя попытка</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
     <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
@@ -69,7 +69,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
-    <p class="hint">Шанс не получить приз — 50%. NEXUS Premium — 0,10%, NEXUS Ultra — 0,20%. Остальные 49,70% распределяются между доступными подарками Telegram. Один бесплатный прокрут в сутки.</p>
+    <p class="hint">Шанс не получить приз — 50%. NEXUS Premium — 10%, NEXUS Ultra — 0,20%. Остальные 39,80% распределяются между доступными подарками Telegram. Один бесплатный прокрут в сутки.</p>
   </section>
   <p class="disclaimer">Подарки отправляются официальным методом Telegram Bot API. Их можно показать в профиле, но отправленные ботом подарки этим способом нельзя обменять на Stars. Попытка обновляется каждый день по времени Киева.</p>
 </main>
@@ -110,6 +110,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     prizesBox.replaceChildren();
     rewards.forEach(prize=>{
       const item=document.createElement("div");item.className="prize";
+      if(prize.type==="gift" && prize.imageUrl){
+        const img=document.createElement("img");img.className="gift-art";img.src=prize.imageUrl;img.alt=prize.label;img.loading="lazy";
+        img.onerror=()=>{img.style.display="none";};item.append(img);
+      }else{
+        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="nexus_ultra"?"🚀":"💎";item.append(art);
+      }
       const b=document.createElement("b");b.textContent=prize.label;
       const s=document.createElement("span");s.textContent="Шанс: "+prize.probability;
       item.append(b,s);prizesBox.append(item);
