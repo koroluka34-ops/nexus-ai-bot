@@ -128,7 +128,7 @@ function makeWebAppUrl() {
   const raw = configured || (host ? "https://" + host : "");
   try {
     const u = new URL(raw);
-    return u.protocol === "https:" ? u.toString().replace(/\/$/, "") + "/roulette" : "";
+    return u.protocol === "https:" ? (u.pathname.replace(/\/$/, "") === "/roulette" ? u.toString() : u.toString().replace(/\/$/, "") + "/roulette") : "";
   } catch { return ""; }
 }
 function installRoulette(bot, memoryApi) {
@@ -189,6 +189,7 @@ function installRoulette(bot, memoryApi) {
         return true;
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/spin") {
+        await readBody(req);
         if (locks.has(String(user.id))) { json(res, 409, { ok: false, error: "Рулетка уже обрабатывает твою попытку." }); return true; }
         locks.add(String(user.id));
         try {
