@@ -75,7 +75,7 @@ installQrSuite(bot);
 const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
-const { installPremium, checkAndRecord } = require("./modules/premium-suite");
+const { installPremium, resolveUsername } = require("./modules/premium-suite");
 installPremium(bot);
 
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
@@ -355,9 +355,9 @@ async function saveMemory(userId) {
 }
 
 const PREMIUM_PLANS = {
-  free: { name: "Бесплатный", text: 30, images: 3, priority: 0 },
-  plus: { name: "NEXUS PLUS", text: 120, images: 15, priority: 1 },
-  ultra: { name: "NEXUS ULTRA", text: 300, images: 40, priority: 2 }
+  free: { name: "Бесплатный", text: 30, images: 10, videos: 1, media: 10, priority: 0 },
+  plus: { name: "NEXUS PLUS", text: 120, images: 60, videos: 10, media: 60, priority: 1 },
+  ultra: { name: "NEXUS ULTRA", text: 300, images: 180, videos: 30, media: 180, priority: 2 }
 };
 
 function currentPlan(memory) {
@@ -368,7 +368,8 @@ function currentPlan(memory) {
 
 function resetDailyUsage(memory) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
-  if (!memory.usage || memory.usage.day !== day) memory.usage = { day, text: 0, images: 0, videos: 0 };
+  if (!memory.usage || memory.usage.day !== day) memory.usage = { day, text: 0, images: 0, videos: 0, media: 0 };
+  if (!Number.isFinite(memory.usage.media)) memory.usage.media = (memory.usage.images || 0) + (memory.usage.videos || 0);
   return memory.usage;
 }
 
@@ -378,26 +379,42 @@ async function consumeQuota(userId, kind) {
   const plan = PREMIUM_PLANS[tier];
   const usage = resetDailyUsage(memory);
   const key = kind === "image" ? "images" : kind === "video" ? "videos" : "text";
-  const limit = kind === "image" ? plan.images : kind === "video" ? (tier === "free" ? 0 : tier === "plus" ? 3 : 10) : plan.text;
+  const limit = kind === "image" ? plan.images : kind === "video" ? plan.videos : plan.text;
+  if ((kind === "image" || kind === "video") && usage.media >= plan.media) {
+    await saveMemory(userId);
+    return { ok: false, tier, limit: plan.media, storageError: false, combined: true };
+  }
   if (usage[key] >= limit) {
     await saveMemory(userId);
     return { ok: false, tier, limit, storageError: false };
   }
   usage[key]++;
+  if (kind === "image" || kind === "video") usage.media++;
   if (!await saveMemory(userId)) {
     usage[key]--;
+    if (kind === "image" || kind === "video") usage.media--;
     return { ok: false, tier, limit, storageError: true };
   }
   return { ok: true, tier, limit };
+}
+
+async function refundQuota(userId, kind) {
+  const memory = await loadMemory(userId);
+  const usage = resetDailyUsage(memory);
+  const key = kind === "image" ? "images" : "videos";
+  usage[key] = Math.max(0, (usage[key] || 0) - 1);
+  usage.media = Math.max(0, (usage.media || 0) - 1);
+  await saveMemory(userId);
 }
 
 function premiumStatusText(memory) {
   const tier = currentPlan(memory), plan = PREMIUM_PLANS[tier], usage = resetDailyUsage(memory);
   const model = tier === "free" ? "GPT-OSS 120B" : (memory.selectedModel || "qwen/qwen3.8-27b");
   return "💎 <b>NEXUS Premium</b>\n\nТариф: <b>" + plan.name + "</b>\n" +
-    "Запросы: без лимита\n" +
-    "Изображения: без лимита\n" +
-    "Видео: без лимита\n" +
+    "Текстовых запросов в день: " + usage.text + "/" + plan.text + "\n" +
+    "ИИ-фото в день: " + usage.images + "/" + plan.images + "\n" +
+    "ИИ-видео в день: " + usage.videos + "/" + plan.videos + "\n" +
+    "Всего фото и видео: " + usage.media + "/" + plan.media + "\n" +
     "Модель: <code>" + model + "</code>\n" +
     "Приоритет генерации: " + (tier === "ultra" ? "высокий" : tier === "plus" ? "повышенный" : "обычный") +
     (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
@@ -411,7 +428,7 @@ let generationRunning = false;
 async function enqueueGeneration(userId, task) {
   const memory = await loadMemory(userId);
   const tier = currentPlan(memory);
-  const priority = 0; // Фото и видео доступны всем на равных условиях.
+  const priority = PREMIUM_PLANS[tier].priority; // Ultra → Plus → Free.
   return new Promise((resolve, reject) => {
     generationQueue.push({ userId, priority, createdAt: Date.now(), task, resolve, reject });
     generationQueue.sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt);
@@ -1125,8 +1142,8 @@ async function handleImage(ctx, prompt) {
     await ctx.reply("⏳ Подожди предыдущий запрос.");
     return;
   }
-  const quota = await checkAndRecord(ctx, "image");
-  if (!quota.allowed) return ctx.reply(quota.message);
+  const quota = await consumeQuota(userId, "image");
+  if (!quota.ok) return ctx.reply(quota.storageError ? "❌ Не удалось сохранить лимит в Cloudflare KV." : "⛔ Лимит ИИ-фото исчерпан. Тариф и остаток: /premium");
 
   busyUsers.add(userId);
 
@@ -1144,9 +1161,8 @@ async function handleImage(ctx, prompt) {
       new InputFile(image, "nexus-image.jpg"),
       { caption: "🖼 Готово!" }
     );
-    await quota.finish(true);
   } catch (error) {
-    await quota.finish(false);
+    await refundQuota(userId, "image");
     await ctx.api.editMessageText(
       ctx.chat.id,
       status.message_id,
@@ -1263,8 +1279,8 @@ async function handleVideoPrompt(ctx, prompt) {
     return;
   }
   if (busyUsers.has(userId)) { await ctx.reply("⏳ Подожди предыдущую задачу."); return; }
-  const quota = await checkAndRecord(ctx, "video");
-  if (!quota.allowed) return ctx.reply(quota.message);
+  const quota = await consumeQuota(userId, "video");
+  if (!quota.ok) return ctx.reply(quota.storageError ? "❌ Не удалось сохранить лимит в Cloudflare KV." : "⛔ Лимит ИИ-видео исчерпан. Тариф и остаток: /premium");
   busyUsers.add(userId);
   const status = await ctx.reply("🎬 <b>NEXUS AI создаёт настоящее ИИ-видео.</b>\n⏳ Это может занять несколько минут.", { parse_mode: "HTML" });
   let videoPath;
@@ -1277,9 +1293,8 @@ async function handleVideoPrompt(ctx, prompt) {
       caption: "🎬 <b>NEXUS AI — видео готово!</b>\nМодель: <code>" + POLLINATIONS_VIDEO_MODEL + "</code>\nДлительность: " + POLLINATIONS_VIDEO_DURATION + " сек.",
       parse_mode: "HTML"
     });
-    await quota.finish(true);
   } catch (error) {
-    await quota.finish(false);
+    await refundQuota(userId, "video");
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось создать ИИ-видео:\n" + String(error.message).slice(0, 1400)).catch(() => {});
   } finally {
     if (videoPath) await fs.unlink(videoPath).catch(() => {});
@@ -2011,8 +2026,8 @@ bot.command("sticker", async ctx => {
     return;
   }
 
-  const quota = prompt ? await checkAndRecord(ctx, "sticker") : { allowed: true, finish: async () => {} };
-  if (!quota.allowed) return ctx.reply(quota.message);
+  const quota = prompt ? await consumeQuota(userId, "image") : { ok: true };
+  if (!quota.ok) return ctx.reply(quota.storageError ? "❌ Не удалось сохранить лимит в Cloudflare KV." : "⛔ Лимит ИИ-фото исчерпан. Проверь /premium");
   busyUsers.add(userId);
   const status = await ctx.reply("🎨 Готовлю стикер...");
   try {
@@ -2026,9 +2041,8 @@ bot.command("sticker", async ctx => {
       new InputFile(webp, "nexus-sticker.webp"),
       { reply_to_message_id: ctx.message.message_id }
     );
-    if (prompt) await quota.finish(true);
   } catch (error) {
-    if (prompt) await quota.finish(false);
+    if (prompt) await refundQuota(userId, "image");
     await ctx.api.editMessageText(
       ctx.chat.id, status.message_id,
       "❌ Не удалось создать стикер: " + String(error.message).slice(0, 1400)
@@ -2141,8 +2155,8 @@ bot.command("editphoto", async ctx => {
   if (!prompt) return ctx.reply("Пример: /editphoto замени фон на ночной город.");
   if (!POLLINATIONS_API_KEY) return ctx.reply("Нужен POLLINATIONS_API_KEY в Render. У API возможна тарификация.");
   if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
-  const quota = await checkAndRecord(ctx, "edit");
-  if (!quota.allowed) return ctx.reply(quota.message);
+  const quota = await consumeQuota(ctx.from.id, "image");
+  if (!quota.ok) return ctx.reply(quota.storageError ? "❌ Не удалось сохранить лимит в Cloudflare KV." : "⛔ Лимит обработки фото исчерпан. Проверь /premium");
   busyUsers.add(ctx.from.id);
   const status = await ctx.reply("🎨 Редактирую фото...");
   try {
@@ -2170,9 +2184,8 @@ bot.command("editphoto", async ctx => {
     if (!result || !isImageBuffer(result)) throw new Error("Провайдер не вернул корректное изображение.");
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
     await ctx.replyWithPhoto(new InputFile(result, "nexus-edited.jpg"), { caption: "✨ Фото обработано ИИ." });
-    await quota.finish(true);
   } catch (error) {
-    await quota.finish(false); await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка редактирования: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+    await refundQuota(ctx.from.id, "image"); await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка редактирования: " + String(error.message).slice(0, 1200)).catch(() => {}); }
   finally { busyUsers.delete(ctx.from.id); }
 });
 
@@ -3495,13 +3508,24 @@ bot.command("model", async ctx => {
 
 bot.command("premiumgrant", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Только администратор. Настрой ADMIN_ID в Render.");
-  const m = String(ctx.match || "").trim().match(/^(\d+)\s+(plus|ultra|free)\s+(\d+)$/i);
-  if (!m) return ctx.reply("Формат: /premiumgrant TELEGRAM_ID plus|ultra|free ДНИ");
-  const targetId = Number(m[1]), tier = m[2].toLowerCase(), days = Math.min(3650, Number(m[3]));
+  const parts = String(ctx.match || "").trim().split(/\s+/).filter(Boolean);
+  const replied = ctx.message.reply_to_message?.from;
+  let targetId = replied ? String(replied.id) : "";
+  let tier, days;
+  if (replied) { tier = (parts[0] || "plus").toLowerCase(); days = Number(parts[1] || 30); }
+  else if (parts[0] && parts[0].startsWith("@")) {
+    targetId = await resolveUsername(parts[0]);
+    tier = (parts[1] || "plus").toLowerCase(); days = Number(parts[2] || 30);
+    if (!targetId) return ctx.reply("Не нашёл " + parts[0] + ". Пользователь должен хотя бы раз написать боту после включения этой функции. Можно ответить на его сообщение командой /premiumgrant plus 30.");
+  } else { targetId = parts[0] || ""; tier = (parts[1] || "").toLowerCase(); days = Number(parts[2]); }
+  if (!targetId || !["plus","ultra","free"].includes(tier) || !Number.isInteger(days) || days < 1 || days > 3650) {
+    return ctx.reply("Форматы:\n/premiumgrant @username plus 30\n/premiumgrant @username ultra 90\nОтветом на сообщение: /premiumgrant plus 30\nСтарый формат ID: /premiumgrant 123456 plus 30");
+  }
   const memory = await loadMemory(targetId);
   memory.premium = { tier, expiresAt: tier === "free" ? 0 : Date.now() + days * 86400000 };
   if (!await saveMemory(targetId)) return ctx.reply("❌ Не удалось сохранить тариф в Cloudflare KV.");
-  await ctx.reply("✅ " + tier.toUpperCase() + " выдан пользователю " + targetId + (tier === "free" ? "." : " на " + days + " дней."));
+  const label = replied?.username ? "@" + replied.username : parts[0]?.startsWith("@") ? parts[0] : targetId;
+  await ctx.reply("✅ " + tier.toUpperCase() + " выдан пользователю " + label + (tier === "free" ? "." : " на " + days + " дней."));
   if (tier !== "free") await bot.api.sendMessage(targetId, "💎 Тебе активирован NEXUS " + tier.toUpperCase() + " на " + days + " дней. /premium").catch(() => {});
 });
 
