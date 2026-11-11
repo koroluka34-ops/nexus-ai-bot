@@ -201,7 +201,8 @@ function choosePrize(prizes) {
   return { ...prizes[prizes.length - 1], wheelIndex: prizes.length - 1 };
 }
 function publicPrize(prize) {
-  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
+  const hiddenSecret = prize.type === "secret";
+  return { id: prize.id, label: hiddenSecret ? "❔ Неизвестный приз" : prize.label, short: hiddenSecret ? "???" : prize.short, probability: hiddenSecret ? "Сюрприз" : prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
