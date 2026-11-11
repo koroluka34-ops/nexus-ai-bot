@@ -113,8 +113,8 @@ h1{font-size:29px;line-height:1.05;margin:5px 0 0;letter-spacing:-.04em}
       spinButton.disabled=!data.canSpin;
       spinButton.textContent=data.canSpin?"🎰 КРУТИТЬ БЕСПЛАТНО":"ВОЗВРАЩАЙСЯ ЗАВТРА";
       balanceNote.textContent=data.grandPrizeAvailable?"⭐ Главный приз доступен — на балансе бота достаточно Stars.": "Главный приз временно отключён: на балансе бота пока недостаточно Stars.";
-      if(data.lastResult?.day===new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())&&data.lastResult.status==="delivered"){
-        showResult({label:data.lastResult.label},"Твой последний результат за сегодня.",true);
+      if(data.lastResult?.day===new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())){
+        showResult({label:data.lastResult.label},data.lastResult.status==="pending"?"Приз ожидает проверки. Напиши /paysupport, не запускай повторную попытку.":"Твой последний результат за сегодня.",data.lastResult.status!=="pending");
       }
     }catch(e){spinStatus.textContent="Ошибка загрузки";balanceNote.textContent=e.message;spinButton.disabled=true;}
   }
@@ -125,6 +125,9 @@ h1{font-size:29px;line-height:1.05;margin:5px 0 0;letter-spacing:-.04em}
     wheel.style.transform="rotate("+rotation+"deg)";
     try{
       const data=await api("/roulette/api/spin","POST");
+      const segmentIds=["telegram_premium_3m","nexus_premium_7d","nexus_premium_3d","bonus_50","bonus_25","bonus_10","try_tomorrow"];
+      const segmentIndex=Math.max(0,segmentIds.indexOf(data.prize?.id));
+      wheel.style.transform="rotate("+(360*7-segmentIndex*(360/7))+"deg)";
       await new Promise(resolve=>setTimeout(resolve,4900));
       showResult(data.prize,data.message,data.delivered);
       spinStatus.textContent="Попытка использована";
