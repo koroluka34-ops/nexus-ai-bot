@@ -3758,8 +3758,9 @@ bot.command("starcheck", async ctx => {
     const needle = String(ctx.match || "").trim().toLowerCase();
     const incoming = transactions.filter(tx =>
       tx?.source?.type === "user" &&
-      tx.source.transaction_type === "invoice_payment" &&
-      Number(tx.amount) > 0
+      Number(tx.amount) > 0 &&
+      typeof tx.source.invoice_payload === "string" &&
+      tx.source.invoice_payload.length > 0
     );
     const matched = needle
       ? incoming.filter(tx =>
