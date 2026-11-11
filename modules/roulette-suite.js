@@ -111,7 +111,7 @@ async function getGiftCatalog(bot) {
       giftId: g.id,
       label: (g.sticker?.emoji ? g.sticker.emoji + " " : "🎁 ") + "Подарок Telegram · " + Number(g.star_count) + " ⭐",
       short: (g.sticker?.emoji || "🎁") + " " + Number(g.star_count) + " ⭐",
-      stickerFileId: g.sticker?.file_id || "",
+      stickerFileId: g.sticker?.thumbnail?.file_id || g.sticker?.file_id || "",
       stickerFormat: g.sticker?.format || "",
       probability: "",
       type: "gift",
@@ -239,7 +239,7 @@ function installRoulette(bot, { grantPrize } = {}) {
         const giftId = decodeURIComponent(url.pathname.slice("/roulette/api/gift-image/".length));
         const result = await bot.api.callApi("getAvailableGifts", {});
         const gift = (result?.gifts || []).find(item => item.id === giftId);
-        const fileId = gift?.sticker?.file_id;
+        const fileId = gift?.sticker?.thumbnail?.file_id || gift?.sticker?.file_id;
         if (!fileId) { res.writeHead(404); res.end(); return true; }
         const file = await bot.api.getFile(fileId);
         if (!file?.file_path) { res.writeHead(404); res.end(); return true; }
