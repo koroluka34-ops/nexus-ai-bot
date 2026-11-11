@@ -262,8 +262,10 @@ async function getNexusAdmins() {
   const disabled = await readKvJson("nexus:admins:disabled", []);
   const stored = Array.isArray(value) ? value.map(String) : [];
   const blocked = new Set(Array.isArray(disabled) ? disabled.map(String) : []);
-  return [...new Set([...stored, ...BUILTIN_NEXUS_ADMIN_IDS])]
-    .filter(id => !blocked.has(id));
+  // Владелец из ADMIN_ID / OWNER_ID всегда получает предложения и уведомления.
+  const ownerIds = PREMIUM_ADMIN_ID ? [PREMIUM_ADMIN_ID] : [];
+  return [...new Set([...ownerIds, ...stored, ...BUILTIN_NEXUS_ADMIN_IDS])]
+    .filter(id => ownerIds.includes(id) || !blocked.has(id));
 }
 
 async function isNexusAdmin(userId) {
