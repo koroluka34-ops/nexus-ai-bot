@@ -333,6 +333,37 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     }
   });
 
+  bot.command("roulettewins", async ctx => {
+    try {
+      const userId = String(ctx.from.id);
+      const queue = await readPendingQueue();
+      const pending = queue.filter(item => String(item.userId) === userId);
+      if (!pending.length) return ctx.reply("🎁 У тебя нет подарков, ожидающих отправки. Выигранные подарки появятся здесь, если на балансе бота пока недостаточно Stars.");
+      const keyboard = new InlineKeyboard();
+      const lines = pending.map((item, index) => {
+        const label = item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram");
+        keyboard.text("❌ Отказаться от подарка №" + (index + 1), "rdecline_" + item.spinId).row();
+        return (index + 1) + ". " + label + " — ожидает отправки" + (item.cost ? " (" + item.cost + " ⭐)" : "");
+      });
+      return ctx.reply("🎁 <b>ТВОИ ОЖИДАЮЩИЕ ПОДАРКИ</b>\n\n" + lines.join("\n") + "\n\nПодарки отправятся автоматически, когда у бота появятся нужные Stars. Чтобы отказаться, нажми кнопку под списком.", { parse_mode: "HTML", reply_markup: keyboard });
+    } catch (error) { return ctx.reply("❌ Не удалось загрузить подарки: " + String(error.message || error).slice(0, 200)); }
+  });
+
+  bot.callbackQuery(/^rdecline_([a-f0-9-]{36})$/i, async ctx => {
+    const spinId = ctx.match[1];
+    try {
+      const queue = await readPendingQueue();
+      const item = queue.find(entry => entry.spinId === spinId && String(entry.userId) === String(ctx.from.id));
+      if (!item) { await ctx.answerCallbackQuery({ text: "Подарок уже отправлен или удалён.", show_alert: true }); return; }
+      await writePendingQueue(queue.filter(entry => entry.spinId !== spinId));
+      const state = await readState(ctx.from.id);
+      const row = state.history.find(entry => entry.spinId === spinId);
+      if (row) { row.status = "declined"; row.deliveryMessage = "Пользователь отказался от подарка."; row.declinedAt = Date.now(); await writeState(ctx.from.id, state); }
+      await ctx.answerCallbackQuery({ text: "Подарок удалён. Бот не будет его отправлять." });
+      await ctx.editMessageText("❌ Ты отказался от подарка. Он удалён из очереди и не будет отправлен.");
+    } catch (error) { await ctx.answerCallbackQuery({ text: "Не удалось отказаться: " + String(error.message || error).slice(0, 150), show_alert: true }); }
+  });
+
   bot.command("roulettebalance", async ctx => {
     const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
