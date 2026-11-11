@@ -3570,7 +3570,15 @@ bot.command("api", async ctx => {
 // ======================================================
 
 bot.command("id", async ctx => {
-  await ctx.reply("Твой Telegram ID: <code>" + ctx.from.id + "</code>", { parse_mode: "HTML" });
+  const repliedUser = ctx.message?.reply_to_message?.from;
+  const targetId = repliedUser?.id ?? ctx.from?.id;
+  const targetName = repliedUser
+    ? (repliedUser.username ? "@" + repliedUser.username : [repliedUser.first_name, repliedUser.last_name].filter(Boolean).join(" "))
+    : "";
+  const prefix = repliedUser
+    ? "🆔 Telegram ID автора сообщения" + (targetName ? " (" + targetName + ")" : "") + ": "
+    : "Твой Telegram ID: ";
+  await ctx.reply(prefix + "<code>" + targetId + "</code>", { parse_mode: "HTML" });
 });
 
 bot.command("chatid", async ctx => {
