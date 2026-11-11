@@ -3551,34 +3551,71 @@ function premiumPurchaseKeyboard() {
 bot.command("premium", async ctx => {
   const memory = await loadMemory(ctx.from.id);
   await ctx.reply(
-    premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars",
+    premiumStatusText(memory) + "\n\n💳 <b>Подписка на 30 дней</b>\n💎 NEXUS Premium — 50 Telegram Stars\n🚀 NEXUS Ultra — 100 Telegram Stars\nУсловия покупки: /terms",
     { parse_mode: "HTML", reply_markup: premiumPurchaseKeyboard() }
   );
 });
 
-bot.callbackQuery(/^buy_(plus|ultra)$/, async ctx => {
-  const tier = ctx.match[1];
+bot.command("terms", async ctx => {
+  await ctx.reply(
+    "📜 <b>УСЛОВИЯ NEXUS AI</b>\n\n" +
+    "1. NEXUS Premium и NEXUS Ultra — цифровые услуги бота на 30 дней.\n" +
+    "2. Стоимость: Premium — 50 ⭐, Ultra — 100 ⭐. Оплата проходит только через официальный платёжный интерфейс Telegram Stars.\n" +
+    "3. Подписка активируется после подтверждения успешного платежа Telegram. Автоматического продления нет.\n" +
+    "4. Дневные лимиты, доступные инструменты и сроки действия указаны в /premium. Суточные лимиты обновляются по времени Europe/Kyiv.\n" +
+    "5. Не передавай третьим лицам доступ к своему Telegram-аккаунту.\n" +
+    "6. Если платёж прошёл, но услуга не активировалась, или возникла другая проблема, используй /paysupport. Не оплачивай повторно до проверки.\n\n" +
+    "Нажимая «Согласен, оплатить», ты подтверждаешь, что ознакомился с условиями.",
+    { parse_mode: "HTML" }
+  );
+});
+
+async function sendPremiumInvoice(ctx, tier) {
   const price = tier === "ultra" ? 100 : 50;
   const title = tier === "ultra" ? "NEXUS Ultra на 30 дней" : "NEXUS Premium на 30 дней";
   const description = tier === "ultra"
-    ? "Расширенные лимиты, приоритет и функции NEXUS AI на 30 дней."
-    : "Увеличенные лимиты и Premium-возможности NEXUS AI на 30 дней.";
+    ? "Расширенные лимиты, 20 глубоких исследований в день и база знаний до 50 документов на 30 дней."
+    : "Увеличенные лимиты, 5 глубоких исследований в день и база знаний до 15 документов на 30 дней.";
   const payload = "nexus-premium:" + tier + ":" + ctx.from.id + ":" + crypto.randomBytes(8).toString("hex");
+  await ctx.api.sendInvoice(
+    ctx.from.id,
+    title,
+    description,
+    payload,
+    "",
+    "XTR",
+    [{ label: title, amount: price }]
+  );
+}
+
+bot.callbackQuery(/^buy_(plus|ultra)$/, async ctx => {
+  const tier = ctx.match[1];
+  await ctx.answerCallbackQuery();
+  const keyboard = new InlineKeyboard()
+    .text("✅ Согласен, оплатить", "accept_terms_" + tier)
+    .row()
+    .text("Отмена", "cancel_purchase");
+  await ctx.reply(
+    "Перед оплатой ознакомься с условиями: /terms\n\n" +
+    (tier === "ultra" ? "🚀 NEXUS Ultra — 100 ⭐ за 30 дней." : "💎 NEXUS Premium — 50 ⭐ за 30 дней.") +
+    "\nНажми «Согласен, оплатить», чтобы открыть официальный счёт Telegram.",
+    { reply_markup: keyboard }
+  );
+});
+
+bot.callbackQuery(/^accept_terms_(plus|ultra)$/, async ctx => {
+  const tier = ctx.match[1];
   await ctx.answerCallbackQuery();
   try {
-    await ctx.api.sendInvoice(
-      ctx.from.id,
-      title,
-      description,
-      payload,
-      "",
-      "XTR",
-      [{ label: title, amount: price }]
-    );
+    await sendPremiumInvoice(ctx, tier);
   } catch (error) {
     console.error("NEXUS Stars invoice:", error.message);
     await ctx.reply("❌ Не удалось создать счёт Telegram Stars. Попробуй ещё раз позже.");
   }
+});
+
+bot.callbackQuery("cancel_purchase", async ctx => {
+  await ctx.answerCallbackQuery({ text: "Покупка отменена." });
 });
 
 bot.on("pre_checkout_query", async ctx => {
@@ -5267,6 +5304,7 @@ async function start() {
     { command: "gift", description: "Отправить виртуальный подарок" },
     { command: "mygifts", description: "Посмотреть свои подарки" },
     { command: "premium", description: "Проверить статус и купить Premium за Stars" },
+    { command: "terms", description: "Условия покупки NEXUS Premium и Ultra" },
     { command: "roulette", description: "Бесплатная ежедневная рулетка NEXUS" },
     { command: "roulettehistory", description: "Посмотреть историю рулетки" },
     { command: "roulettebalance", description: "Проверить баланс Stars бота (админ)" },
