@@ -3605,7 +3605,6 @@ async function sendPremiumInvoice(ctx, tier) {
     title,
     description,
     payload,
-    "",
     "XTR",
     [{ label: title, amount: price }]
   );
