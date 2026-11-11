@@ -140,7 +140,7 @@ async function getGiftCatalog(bot) {
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: premiumAvailable ? "0,01%" : "Пока недоступен", type: "telegram_premium", cost: 2500, available: premiumAvailable, weight: premiumAvailable ? TELEGRAM_PREMIUM_WEIGHT : 0 },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    ...(available.length ? [{ id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: "49,3%", type: "gift_random", cost: 0, weight: GIFT_TOTAL_WEIGHT }] : []),
+    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: available.length ? "49,3%" : "Нет доступных подарков", type: "gift_random", cost: 0, available: available.length > 0, weight: available.length ? GIFT_TOTAL_WEIGHT : 0 },
     { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (available.length ? (premiumAvailable ? "49,99%" : "50%") : premiumAvailable ? "99,29%" : "99,3%"), type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
   ];
   return { balance, gifts: available, prizes };
