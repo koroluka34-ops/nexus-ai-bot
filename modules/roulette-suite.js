@@ -533,6 +533,13 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           }
           const usedBonusSpin = fresh.lastSpinDay === today;
           if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
+          else if (fresh.lastStreakDay !== today) {
+            const yesterday = new Date(Date.parse(today + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
+            fresh.streak = fresh.lastStreakDay === yesterday ? fresh.streak + 1 : 1;
+            fresh.lastStreakDay = today;
+            const streakBonus = fresh.streak === 30 ? 5 : fresh.streak === 7 ? 2 : fresh.streak === 3 ? 1 : 0;
+            fresh.bonusSpins = Math.min(100000, fresh.bonusSpins + streakBonus);
+          }
           
           let prizeList = catalog.prizes.map(item => ({ ...item }));
           const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
@@ -551,26 +558,6 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             prize = selectedGift
               ? { ...selectedGift, label: sourceType === "jackpot" ? "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐" : sourceType === "secret" ? "🎁 СЕКРЕТНЫЙ ПОДАРОК · " + selectedGift.cost + " ⭐" : selectedGift.label, short: sourceType === "jackpot" ? "ДЖЕКПОТ · 1000 ⭐" : sourceType === "secret" ? "Секрет · " + selectedGift.cost + " ⭐" : selectedGift.short, wheelIndex, sectorId: sourceType === "jackpot" ? "jackpot_1000" : sourceType === "secret" ? "secret_gift" : "telegram_gift_random", type: "gift", jackpot: sourceType === "jackpot", secret: sourceType === "secret" }
               : { id: sourceType === "jackpot" ? "gift:pending-jackpot" : "gift:pending-random", giftId: "", label: sourceType === "jackpot" ? "💎 ДЖЕКПОТ · подарок за 1000 ⭐ (ожидает отправки)" : sourceType === "secret" ? "🎁 Секретный подарок (ожидает отправки)" : "🧸 Подарок Telegram · 15–999 ⭐", short: sourceType === "jackpot" ? "ДЖЕКПОТ · ожидание" : sourceType === "secret" ? "Секретный приз" : "Мишка · подарок ожидает", type: "gift", cost: sourceType === "jackpot" ? 1000 : 0, wheelIndex, sectorId: sourceType === "jackpot" ? "jackpot_1000" : sourceType === "secret" ? "secret_gift" : "telegram_gift_random", jackpot: sourceType === "jackpot", secret: sourceType === "secret" };
-          }
-          if (false && prize.type === "gift_random") {
-            const wheelIndex = prize.wheelIndex;
-            const selectedGift = catalog.gifts.length
-              ? catalog.gifts[crypto.randomInt(0, catalog.gifts.length)]
-              : null;
-            // Keep the win even if Telegram currently returns no eligible gifts.
-            // The queue worker will choose a real 15–500 ⭐ gift after it appears.
-            prize = selectedGift
-              ? { ...selectedGift, wheelIndex, sectorId: "telegram_gift_random" }
-              : {
-                  id: "gift:pending-random",
-                  giftId: "",
-                  label: "🧸 Подарок Telegram · 15–500 ⭐",
-                  short: "Мишка · подарок ожидает",
-                  type: "gift",
-                  cost: 0,
-                  wheelIndex,
-                  sectorId: "telegram_gift_random"
-                };
           }
           const spinId = crypto.randomUUID();
           const row = {
