@@ -9,10 +9,10 @@ const TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const NAMESPACE = process.env.CLOUDFLARE_KV_NAMESPACE_ID || "";
 const locks = new Set();
 const NO_PRIZE_WEIGHT = 500000;
-const PLUS_WEIGHT = 1000; // 0.10%
+const PLUS_WEIGHT = 100000; // 10.00%
 const ULTRA_WEIGHT = 2000; // 0.20%
-const GIFT_TOTAL_WEIGHT = 497000; // 49.70%, split between currently affordable gifts
-const MAX_GIFTS_IN_WHEEL = 6;
+const GIFT_TOTAL_WEIGHT = 398000; // 39.80%, split between currently affordable gifts
+const MAX_GIFTS_IN_WHEEL = 20;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
 function kvUrl(userId) {
@@ -103,26 +103,28 @@ async function getGiftCatalog(bot) {
   const available = gifts
     .filter(g => g && typeof g.id === "string" && Number(g.star_count) > 0)
     .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
-    .filter(g => Number(g.star_count) <= balance)
+    .filter(g => Number(g.star_count) >= 15 && Number(g.star_count) <= 500 && Number(g.star_count) <= balance)
     .sort((a, b) => Number(a.star_count) - Number(b.star_count))
     .slice(0, MAX_GIFTS_IN_WHEEL)
     .map(g => ({
       id: "gift:" + g.id,
       giftId: g.id,
-      label: (g.sticker?.emoji ? g.sticker.emoji + " " : "🎁 ") + "Подарок · " + Number(g.star_count) + " ⭐",
+      label: (g.sticker?.emoji ? g.sticker.emoji + " " : "🎁 ") + "Подарок Telegram · " + Number(g.star_count) + " ⭐",
       short: (g.sticker?.emoji || "🎁") + " " + Number(g.star_count) + " ⭐",
+      stickerFileId: g.sticker?.file_id || "",
+      stickerFormat: g.sticker?.format || "",
       probability: "",
       type: "gift",
       cost: Number(g.star_count)
     }));
-  const chanceEach = available.length ? (49.7 / available.length) : 0;
+  const chanceEach = available.length ? (39.8 / available.length) : 0;
   for (const gift of available) {
     gift.weight = available.length ? Math.floor(GIFT_TOTAL_WEIGHT / available.length) : 0;
     gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 3 }) + "%";
   }
   const prizes = [
-    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "Premium", probability: "0,10%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
-    { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
+    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "10%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
+    { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     ...available,
     { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "50%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
   ];
@@ -138,7 +140,7 @@ function choosePrize(prizes) {
   return { ...prizes[prizes.length - 1], wheelIndex: prizes.length - 1 };
 }
 function publicPrize(prize) {
-  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0 };
+  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : "" };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
@@ -229,6 +231,32 @@ function installRoulette(bot, { grantPrize } = {}) {
       } catch {
         res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
         res.end("Roulette page not found");
+      }
+      return true;
+    }
+    if (req.method === "GET" && url.pathname.startsWith("/roulette/api/gift-image/")) {
+      try {
+        const giftId = decodeURIComponent(url.pathname.slice("/roulette/api/gift-image/".length));
+        const result = await bot.api.callApi("getAvailableGifts", {});
+        const gift = (result?.gifts || []).find(item => item.id === giftId);
+        const fileId = gift?.sticker?.file_id;
+        if (!fileId) { res.writeHead(404); res.end(); return true; }
+        const file = await bot.api.getFile(fileId);
+        if (!file?.file_path) { res.writeHead(404); res.end(); return true; }
+        const remote = await fetch("https://api.telegram.org/file/bot" + BOT_TOKEN + "/" + file.file_path);
+        if (!remote.ok) { res.writeHead(502); res.end(); return true; }
+        res.writeHead(200, {
+          "Content-Type": remote.headers.get("content-type") || "application/octet-stream",
+          "Cache-Control": "public, max-age=3600",
+          "X-Content-Type-Options": "nosniff"
+        });
+        if (remote.body) {
+          const { Readable } = require("node:stream");
+          Readable.fromWeb(remote.body).pipe(res);
+        } else res.end();
+      } catch (error) {
+        console.error("NEXUS gift sticker proxy:", error.message);
+        res.writeHead(502); res.end();
       }
       return true;
     }
