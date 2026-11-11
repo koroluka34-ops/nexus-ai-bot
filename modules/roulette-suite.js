@@ -160,8 +160,8 @@ async function getGiftCatalog(bot) {
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: premiumAvailable ? "0,01%" : "Пока недоступен", type: "telegram_premium", cost: 2500, available: premiumAvailable, weight: premiumAvailable ? TELEGRAM_PREMIUM_WEIGHT : 0 },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
-    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: available.length ? "49,3%" : "Нет подарков в каталоге", type: "gift_random", cost: 0, available: available.length > 0, weight: available.length ? GIFT_TOTAL_WEIGHT : 0 },
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (available.length ? (premiumAvailable ? "49,99%" : "50%") : premiumAvailable ? "99,29%" : "99,3%"), type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
+    { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–500 ⭐", short: "Мишка · 15–500 ⭐", probability: "49,3%", type: "gift_random", cost: 0, available: true, weight: GIFT_TOTAL_WEIGHT },
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: premiumAvailable ? "49,99%" : "50%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
   ];
   return { balance, gifts: available, prizes };
 }
@@ -195,18 +195,28 @@ function installRoulette(bot, { grantPrize } = {}) {
     try {
       let queue = await readPendingQueue();
       if (!queue.length) return;
-      const [balance, catalog] = await Promise.all([getStarBalance(), telegramApi("getAvailableGifts")]);
-      const gifts = Array.isArray(catalog?.gifts) ? catalog.gifts : [];
+      let balance = await getStarBalance();
+      const catalog = await telegramApi("getAvailableGifts");
+      const gifts = (Array.isArray(catalog?.gifts) ? catalog.gifts : [])
+        .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 500)
+        .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
       for (const item of [...queue]) {
-        const gift = gifts.find(g => g.id === item.giftId);
+        // If the catalog was empty at spin time, select a real gift only when
+        // it becomes available and the bot can afford it.
+        let gift = item.giftId ? gifts.find(g => g.id === item.giftId) : null;
+        if (!gift && !item.giftId) {
+          const affordable = gifts.filter(g => Number(g.star_count) <= balance);
+          if (affordable.length) gift = affordable[crypto.randomInt(0, affordable.length)];
+        }
         const cost = Number(gift?.star_count || item.cost || 0);
-        if (!gift || (gift.remaining_count !== undefined && Number(gift.remaining_count) <= 0) || !cost || balance < cost) continue;
+        if (!gift || !cost || balance < cost) continue;
         try {
           await telegramApi("sendGift", {
             user_id: Number(item.userId),
-            gift_id: item.giftId,
+            gift_id: gift.id,
             text: "Поздравляем! Твой подарок из NEXUS Gift Roulette готов — спасибо за ожидание! 🎉"
           });
+          balance = Math.max(0, balance - cost);
           queue = queue.filter(q => q.spinId !== item.spinId);
           await writePendingQueue(queue);
           const state = await readState(item.userId);
@@ -374,10 +384,24 @@ function installRoulette(bot, { grantPrize } = {}) {
           let prize = choosePrize(catalog.prizes);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
           if (prize.type === "gift_random") {
-            if (!catalog.gifts.length) throw new Error("Сейчас в каталоге Telegram нет подарков стоимостью 15–500 ⭐.");
             const wheelIndex = prize.wheelIndex;
-            const selectedGift = catalog.gifts[crypto.randomInt(0, catalog.gifts.length)];
-            prize = { ...selectedGift, wheelIndex, sectorId: "telegram_gift_random" };
+            const selectedGift = catalog.gifts.length
+              ? catalog.gifts[crypto.randomInt(0, catalog.gifts.length)]
+              : null;
+            // Keep the win even if Telegram currently returns no eligible gifts.
+            // The queue worker will choose a real 15–500 ⭐ gift after it appears.
+            prize = selectedGift
+              ? { ...selectedGift, wheelIndex, sectorId: "telegram_gift_random" }
+              : {
+                  id: "gift:pending-random",
+                  giftId: "",
+                  label: "🧸 Подарок Telegram · 15–500 ⭐",
+                  short: "Мишка · подарок ожидает",
+                  type: "gift",
+                  cost: 0,
+                  wheelIndex,
+                  sectorId: "telegram_gift_random"
+                };
           }
           const spinId = crypto.randomUUID();
           const row = {
@@ -394,7 +418,7 @@ function installRoulette(bot, { grantPrize } = {}) {
           if (prize.type === "gift") {
             const queue = await readPendingQueue();
             if (!queue.some(item => item.spinId === spinId)) {
-              queue.push({ spinId, userId: user.id, giftId: prize.giftId, cost: prize.cost, createdAt: Date.now() });
+              queue.push({ spinId, userId: user.id, giftId: prize.giftId || "", cost: prize.cost || 0, createdAt: Date.now() });
               await writePendingQueue(queue);
             }
             await processPendingGiftQueue();
