@@ -92,13 +92,30 @@ function readBody(req, limit = 12000) {
     req.on("error", reject);
   });
 }
-async function getStarBalance(bot) {
-  const value = await bot.api.callApi("getMyStarBalance", {});
+async function telegramApi(method, payload = {}) {
+  if (!BOT_TOKEN) throw new Error("BOT_TOKEN не настроен.");
+  const response = await fetch("https://api.telegram.org/bot" + BOT_TOKEN + "/" + method, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(12000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) {
+    const description = String(data.description || ("Telegram API HTTP " + response.status));
+    const error = new Error(description);
+    error.error_code = data.error_code || response.status;
+    throw error;
+  }
+  return data.result;
+}
+async function getStarBalance() {
+  const value = await telegramApi("getMyStarBalance");
   return Number(value?.amount || 0);
 }
 async function getGiftCatalog(bot) {
-  const balance = await getStarBalance(bot);
-  const result = await bot.api.callApi("getAvailableGifts", {});
+  const balance = await getStarBalance();
+  const result = await telegramApi("getAvailableGifts");
   const gifts = Array.isArray(result?.gifts) ? result.gifts : [];
   const available = gifts
     .filter(g => g && typeof g.id === "string" && Number(g.star_count) > 0)
@@ -126,7 +143,7 @@ async function getGiftCatalog(bot) {
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "10%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     ...available,
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: "50%", type: "none", cost: 0, weight: NO_PRIZE_WEIGHT }
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: available.length ? "50%" : "89,8%", type: "none", cost: 0, weight: available.length ? NO_PRIZE_WEIGHT : 898000 }
   ];
   return { balance, gifts: available, prizes };
 }
@@ -237,7 +254,7 @@ function installRoulette(bot, { grantPrize } = {}) {
     if (req.method === "GET" && url.pathname.startsWith("/roulette/api/gift-image/")) {
       try {
         const giftId = decodeURIComponent(url.pathname.slice("/roulette/api/gift-image/".length));
-        const result = await bot.api.callApi("getAvailableGifts", {});
+        const result = await telegramApi("getAvailableGifts");
         const gift = (result?.gifts || []).find(item => item.id === giftId);
         const fileId = gift?.sticker?.thumbnail?.file_id || gift?.sticker?.file_id;
         if (!fileId) { res.writeHead(404); res.end(); return true; }
@@ -269,13 +286,13 @@ function installRoulette(bot, { grantPrize } = {}) {
     try {
       if (req.method === "GET" && url.pathname === "/roulette/api/status") {
         const [state, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
-        const canSpin = state.lastSpinDay !== kyivDay() && catalog.gifts.length > 0;
+        const canSpin = state.lastSpinDay !== kyivDay();
         json(res, 200, {
           ok: true, canSpin, lastSpinDay: state.lastSpinDay,
           balance: catalog.balance,
           giftsAvailable: catalog.gifts.length,
           prizes: catalog.prizes.map(publicPrize),
-          unavailableReason: catalog.gifts.length ? "" : "На балансе бота пока недостаточно Stars для доступных подарков.",
+          unavailableReason: catalog.gifts.length ? "" : "Подарки временно недоступны: проверь баланс Stars бота.",
           lastResult: state.history.at(-1) || null
         });
         return true;
@@ -291,10 +308,7 @@ function installRoulette(bot, { grantPrize } = {}) {
             json(res, 409, { ok: false, error: "Сегодня ты уже использовал бесплатную попытку.", canSpin: false });
             return true;
           }
-          if (!catalog.gifts.length) {
-            json(res, 503, { ok: false, error: "Сейчас нет доступных подарков: на балансе бота недостаточно Stars. Попробуй позже.", canSpin: false });
-            return true;
-          }
+          
           const prize = choosePrize(catalog.prizes);
           const spinId = crypto.randomUUID();
           const row = {
@@ -310,7 +324,7 @@ function installRoulette(bot, { grantPrize } = {}) {
           let delivered = false, deliveryMessage = "";
           try {
             if (prize.type === "gift") {
-              await bot.api.callApi("sendGift", {
+              await telegramApi("sendGift", {
                 user_id: user.id,
                 gift_id: prize.giftId,
                 text: "Поздравляем! Ты выиграл этот подарок в NEXUS Gift Roulette 🎉"
