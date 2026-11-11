@@ -33,6 +33,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PREMIUM_ADMIN_ID = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+const BUILTIN_NEXUS_ADMIN_IDS = ["6706377482"]; // Костя — постоянный администратор NEXUS
 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
@@ -60,10 +61,10 @@ const { installSecurityMonitor } = require("./modules/security-monitor");
 installSecurityMonitor(bot);
 
 const { installOpsSuite } = require("./modules/ops-suite");
-installOpsSuite(bot, askAI);
+installOpsSuite(bot, askAI, isNexusAdmin);
 
 const { installCommunitySuite } = require("./modules/community-suite");
-installCommunitySuite(bot);
+installCommunitySuite(bot, isNexusAdmin);
 
 const { installPersonalSuite, installKVCheck } = require("./modules/personal-suite");
 installPersonalSuite(bot);
@@ -258,7 +259,11 @@ async function writeKvJson(key, value) {
 
 async function getNexusAdmins() {
   const value = await readKvJson("nexus:admins", []);
-  return Array.isArray(value) ? value.map(String) : [];
+  const disabled = await readKvJson("nexus:admins:disabled", []);
+  const stored = Array.isArray(value) ? value.map(String) : [];
+  const blocked = new Set(Array.isArray(disabled) ? disabled.map(String) : []);
+  return [...new Set([...stored, ...BUILTIN_NEXUS_ADMIN_IDS])]
+    .filter(id => !blocked.has(id));
 }
 
 async function isNexusAdmin(userId) {
@@ -272,9 +277,9 @@ async function isDevVoiceModeEnabled() {
 }
 
 async function submitFeatureSuggestion(ctx, suggestion) {
-  const ownerId = PREMIUM_ADMIN_ID;
-  if (!ownerId) {
-    await ctx.reply("❌ Владелец ещё не настроил ADMIN_ID в Render. Предложение пока не отправлено.");
+  const adminIds = await getNexusAdmins();
+  if (!adminIds.length) {
+    await ctx.reply("❌ Администраторы NEXUS ещё не настроены. Предложение пока не отправлено.");
     return false;
   }
   if (!kvConfigured()) {
@@ -306,23 +311,23 @@ async function submitFeatureSuggestion(ctx, suggestion) {
   const keyboard = new InlineKeyboard()
     .text("✅ Одобрить", "devtask:approve:" + taskId)
     .text("❌ Отклонить", "devtask:reject:" + taskId);
-  try {
-    await ctx.api.sendMessage(
-      ownerId,
-      "💡 НОВОЕ ПРЕДЛОЖЕНИЕ ФУНКЦИИ NEXUS\n" +
-      "От: " + author + "\n" +
-      "Telegram ID: " + ctx.from.id + "\n\n" +
-      "Предложение:\n" + cleanText +
-      "\n\nID предложения: " + taskId +
-      "\nВыбери, добавлять ли эту функцию.",
-      { reply_markup: keyboard }
-    );
-  } catch (error) {
+  const card =
+    "💡 НОВОЕ ПРЕДЛОЖЕНИЕ ФУНКЦИИ NEXUS\n" +
+    "От: " + author + "\n" +
+    "Telegram ID: " + ctx.from.id + "\n\n" +
+    "Предложение:\n" + cleanText +
+    "\n\nID предложения: " + taskId +
+    "\nЛюбой администратор NEXUS может принять решение.";
+  const deliveries = await Promise.allSettled(adminIds.map(adminId =>
+    ctx.api.sendMessage(adminId, card, { reply_markup: keyboard })
+  ));
+  const delivered = deliveries.some(result => result.status === "fulfilled");
+  if (!delivered) {
     await writeKvJson("nexus:devtask:" + taskId, { ...task, status: "delivery_failed" });
-    await ctx.reply("❌ Не получилось отправить предложение владельцу. Пусть владелец сначала откроет бота и нажмёт /start.");
+    await ctx.reply("❌ Не удалось доставить предложение администраторам. Пусть они откроют бота и нажмут /start.");
     return false;
   }
-  await ctx.reply("✅ Предложение отправлено владельцу NEXUS. Когда он рассмотрит его, я сообщу тебе результат.");
+  await ctx.reply("✅ Предложение отправлено администраторам NEXUS. Когда кто-нибудь из них рассмотрит его, я сообщу тебе результат.");
   return true;
 }
 
@@ -3656,8 +3661,8 @@ bot.command("mygifts", async ctx => {
 });
 
 bot.command("giftgrant", async ctx => {
-  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
-    return ctx.reply("⛔ Эта команда доступна только администратору.");
+  if (!await isNexusAdmin(ctx.from.id)) {
+    return ctx.reply("⛔ Эта команда доступна только администраторам NEXUS.");
   }
   const match = String(ctx.match || "").trim().match(/^(\\d+)\s+(\\d+)$/);
   if (!match) return ctx.reply("Формат: /giftgrant TELEGRAM_ID НОМЕР_ПОДАРКА\nНомера: 1–" + FREE_GIFTS.length);
@@ -3861,8 +3866,8 @@ bot.on("message:successful_payment", async ctx => {
 });
 
 bot.command("starcheck", async ctx => {
-  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
-    return ctx.reply("⛔ Команда доступна только администратору.");
+  if (!await isNexusAdmin(ctx.from.id)) {
+    return ctx.reply("⛔ Команда доступна только администраторам NEXUS.");
   }
 
   try {
@@ -3925,8 +3930,8 @@ bot.command("starcheck", async ctx => {
 });
 
 bot.callbackQuery(/^devtask:(approve|reject):([a-z0-9]+)$/i, async ctx => {
-  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
-    return ctx.answerCallbackQuery({ text: "Только владелец может принимать решение.", show_alert: true });
+  if (!await isNexusAdmin(ctx.from.id)) {
+    return ctx.answerCallbackQuery({ text: "Только администраторы NEXUS могут принимать решения.", show_alert: true });
   }
   const action = ctx.match[1];
   const taskId = ctx.match[2];
@@ -3934,32 +3939,41 @@ bot.callbackQuery(/^devtask:(approve|reject):([a-z0-9]+)$/i, async ctx => {
   if (!task || task.status !== "pending") {
     return ctx.answerCallbackQuery({ text: "Предложение уже обработано или не найдено.", show_alert: true });
   }
+  const reviewerName = ctx.from.username
+    ? "@" + ctx.from.username
+    : [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ") || "администратор";
+  const reviewerRole = String(ctx.from.id) === PREMIUM_ADMIN_ID ? "владелец" : "администратор";
   task.status = action === "approve" ? "approved" : "rejected";
   task.reviewedAt = Date.now();
   task.reviewedBy = String(ctx.from.id);
+  task.reviewedByName = reviewerName;
+  task.reviewedByRole = reviewerRole;
   if (!await writeKvJson("nexus:devtask:" + taskId, task)) {
     return ctx.answerCallbackQuery({ text: "Не удалось сохранить решение.", show_alert: true });
   }
   await ctx.answerCallbackQuery({ text: action === "approve" ? "Предложение одобрено" : "Предложение отклонено" });
   await ctx.editMessageText(
     (ctx.callbackQuery.message?.text || "Предложение") + "\n\n" +
-    (action === "approve" ? "✅ ОДОБРЕНО ВЛАДЕЛЬЦЕМ" : "❌ ОТКЛОНЕНО ВЛАДЕЛЬЦЕМ"),
+    (action === "approve" ? "✅ ОДОБРЕНО" : "❌ ОТКЛОНЕНО") +
+    "\nРешение: " + reviewerRole + " " + reviewerName,
     { reply_markup: new InlineKeyboard() }
   ).catch(() => {});
 
   if (action === "approve") {
-    await ctx.api.sendMessage(
-      PREMIUM_ADMIN_ID,
+    const implementationCard =
       "🛠 ОДОБРЕННОЕ ПРЕДЛОЖЕНИЕ ДЛЯ РЕАЛИЗАЦИИ\n" +
-      "Автор: " + task.author + " (ID " + task.authorId + ")\n\n" +
+      "Автор: " + task.author + " (ID " + task.authorId + ")\n" +
+      "Одобрил: " + reviewerRole + " " + reviewerName + "\n\n" +
       task.text +
-      "\n\nСтатус означает, что ты одобрил идею. Изменения в код автоматически не вносятся — реализацию нужно выполнить отдельно."
-    );
+      "\n\nОдобрение означает, что идея принята к рассмотрению. Изменения в код автоматически не вносятся — реализацию нужно выполнить отдельно.";
+    await Promise.allSettled((await getNexusAdmins()).map(adminId =>
+      ctx.api.sendMessage(adminId, implementationCard)
+    ));
   }
 
   const userNotice = action === "approve"
-    ? "✅ Твоё предложение одобрено администратором NEXUS! Идея принята к рассмотрению и добавлению."
-    : "❌ Администратор отклонил твоё предложение. Спасибо, что предложил идею для NEXUS!";
+    ? "✅ Твоё предложение одобрено " + reviewerRole + "ом NEXUS (" + reviewerName + ")! Идея принята к рассмотрению и добавлению."
+    : "❌ Твоё предложение отклонил " + reviewerRole + " NEXUS (" + reviewerName + "). Спасибо, что предложил идею!";
   try {
     await ctx.api.sendMessage(task.authorId, userNotice);
   } catch (error) {
@@ -4002,6 +4016,29 @@ bot.command("suggest", async ctx => {
   return submitFeatureSuggestion(ctx, String(ctx.match || "").trim());
 });
 
+bot.command("adminhelp", async ctx => {
+  if (!await isNexusAdmin(ctx.from.id)) return ctx.reply("⛔ Эта команда доступна только администраторам NEXUS.");
+  return ctx.reply(
+    "🛡 ПАНЕЛЬ АДМИНИСТРАТОРА NEXUS\n\n" +
+    "👥 Пользователи и подписки:\n" +
+    "/premiumgrant ID plus 30 — выдать Premium\n" +
+    "/premiumgrant ID ultra 30 — выдать Ultra\n" +
+    "/premiumgrant ID free 1 — снять тариф\n" +
+    "/giftgrant ID НОМЕР — выдать подарок\n" +
+    "/starcheck — проверить реальные оплаты Stars\n\n" +
+    "💡 Предложения:\n" +
+    "Пользователи отправляют /suggest текст. Ты можешь одобрить или отклонить заявку кнопками.\n\n" +
+    "📊 Состояние и группы:\n" +
+    "/nexushealth — состояние процесса\n" +
+    "/groupstats — статистика группы\n" +
+    "/antispam on|off|status — антиспам\n" +
+    "/autoflow — сценарии группы\n" +
+    "/rule add фраза | текст — правило группы\n" +
+    "/rule list и /rule remove ID\n\n" +
+    "🔒 Только владелец:\n/admin — управление администраторами\n/devmode — режим разработки"
+  );
+});
+
 bot.command("admin", async ctx => {
   if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
     return ctx.reply("⛔ Только владелец бота может управлять администраторами.");
@@ -4021,10 +4058,17 @@ bot.command("admin", async ctx => {
     return ctx.reply("Форматы:\\nОтветом на сообщение: /admin add или /admin remove\\nПо ID: /admin add 123456789\\n/admin remove 123456789\\n/admin list\\nНужен числовой Telegram ID.");
   }
   if (id === PREMIUM_ADMIN_ID) return ctx.reply("Это владелец бота — его нельзя удалить из списка владельцев.");
+  const disabled = await readKvJson("nexus:admins:disabled", []);
+  const disabledSet = new Set(Array.isArray(disabled) ? disabled.map(String) : []);
   const next = action === "add"
     ? [...new Set([...admins, id])]
     : admins.filter(value => value !== id);
-  if (!await writeKvJson("nexus:admins", next)) return ctx.reply("❌ Не удалось сохранить список администраторов.");
+  if (BUILTIN_NEXUS_ADMIN_IDS.includes(id)) {
+    if (action === "remove") disabledSet.add(id);
+    else disabledSet.delete(id);
+    if (!await writeKvJson("nexus:admins:disabled", [...disabledSet])) return ctx.reply("❌ Не удалось сохранить права администратора.");
+  }
+  if (!await writeKvJson("nexus:admins", next.filter(value => !BUILTIN_NEXUS_ADMIN_IDS.includes(value)))) return ctx.reply("❌ Не удалось сохранить список администраторов.");
   const person = replied ? (replied.username ? "@" + replied.username : (replied.first_name || "пользователь")) : id;
   return ctx.reply(action === "add" ? "✅ Администратор добавлен: " + person + " (ID " + id + ")" : "✅ Администратор удалён: " + person + " (ID " + id + ")");
 });
@@ -4044,7 +4088,7 @@ bot.command("devmode", async ctx => {
 });
 
 bot.command("premiumgrant", async ctx => {
-  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) return ctx.reply("⛔ Только администратор. Настрой ADMIN_ID в Render.");
+  if (!await isNexusAdmin(ctx.from.id)) return ctx.reply("⛔ Команда доступна только администраторам NEXUS.");
   const parts = String(ctx.match || "").trim().split(/\s+/).filter(Boolean);
   const replied = ctx.message.reply_to_message?.from;
   let targetId = replied ? String(replied.id) : "";
