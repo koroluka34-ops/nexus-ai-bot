@@ -13,7 +13,6 @@ const PLUS_WEIGHT = 5000; // 0.50%
 const ULTRA_WEIGHT = 2000; // 0.20%
 const GIFT_TOTAL_WEIGHT = 493000; // 49.30%, split between currently affordable gifts
 const TELEGRAM_PREMIUM_WEIGHT = 100; // 0.01%, 12 months
-const TELEGRAM_PREMIUM_WEIGHT = 100; // 0.01%, 12 months
 const MAX_GIFTS_IN_WHEEL = 20;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
