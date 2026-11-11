@@ -76,7 +76,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
-    <p class="hint">Подарок Telegram — 38%, NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%, Telegram Premium на 12 месяцев — 0,01%. Остальные 61,29% — без приза.</p>
+    <p class="hint">Обычные подарки Telegram — 38% (15–1000 ⭐), джекпот — подарок ровно за 1000 ⭐ (0,01%), секретный подарок — 0,01%. NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%, Telegram Premium — 0,01%. Без приза — 61,27%. Шансы подарков растут за серию дней и во время NEXUS EVENT.</p>
   </section>
   <p class="disclaimer">В секторах показаны изображения подарков и подписок. Настоящий подарок отправляется только после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева.</p>
 </main>
@@ -105,7 +105,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function makePrizeEmoji(prize){
     const art=document.createElement("span");art.className="slice-emoji";
-    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="nexus_plus"?"💎":prize.type==="none"?"🍀":prize.type==="gift_random"?"🧸":"🎁";
+    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="nexus_plus"?"💎":prize.type==="jackpot"?"💎":prize.type==="secret"?"🎁":prize.type==="none"?"🍀":prize.type==="gift_random"?"🧸":"🎁";
     return art;
   }
   function drawWheel(prizes){
@@ -121,9 +121,19 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
       }else label.append(makePrizeEmoji(prize));
       const text=document.createElement("span");text.className="slice-text";
-      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="gift_random"?"15–500 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
+      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"SECRET GIFT":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
     });
+  }
+  function renderLeaderboard(items){
+    const box=$("leaderboardList");box.replaceChildren();
+    if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🏆 Победителей пока нет";card.append(b);box.append(card);return;}
+    items.slice(0,10).forEach((item,index)=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=(index+1)+". "+(item.name||"Игрок");const meta=document.createElement("span");meta.textContent=(item.label||"Приз")+(item.cost?" · "+item.cost+" ⭐":"");card.append(b,meta);box.append(card);});
+  }
+  function renderCollection(items){
+    const box=$("collectionList");box.replaceChildren();
+    if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎁 Здесь будут твои выигранные подарки";const meta=document.createElement("span");meta.textContent="Все доставленные призы сохраняются в коллекции.";card.append(b,meta);box.append(card);return;}
+    items.forEach(item=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=item.label||"🎁 Выигранный приз";const meta=document.createElement("span");meta.textContent=item.day||"NEXUS Gift Roulette";card.append(b,meta);box.append(card);});
   }
   function renderPendingGifts(items){
     const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();
@@ -145,7 +155,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function renderCatalog(prizes){
     drawWheel(prizes);
-    const rewards=(prizes||[]).filter(p=>["gift_random","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
+    const rewards=(prizes||[]).filter(p=>["gift_random","jackpot","secret","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
     const giftCount=rewards.filter(p=>p.type==="gift_random").length;
     $("giftCount").textContent=giftCount+" случайный подарок · "+rewards.filter(p=>p.type!=="gift_random").length+" подписки";
     prizesBox.replaceChildren();
@@ -157,14 +167,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       }else if(prize.imageUrl){
         const img=document.createElement("img");img.className="gift-art";img.src=prize.imageUrl;img.alt=prize.label;item.append(img);
       }else{
-        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="telegram_premium"?"⭐":prize.type==="nexus_ultra"?"🚀":prize.type==="gift_random"?"🧸":"💎";item.append(art);
+        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="telegram_premium"?"⭐":prize.type==="nexus_ultra"?"🚀":prize.type==="jackpot"?"💎":prize.type==="secret"?"🎁":prize.type==="gift_random"?"🧸":"💎";item.append(art);
       }
       const b=document.createElement("b");b.textContent=prize.label;
       const s=document.createElement("span");s.textContent=prize.available===false?"Сейчас недоступен · нужно 2500 ⭐ на балансе бота":"Шанс: "+prize.probability;
       item.append(b,s);prizesBox.append(item);
     });
-    if(!giftCount){
-      const item=document.createElement("div");item.className="prize";const b=document.createElement("b");b.textContent="🧸 Случайные подарки Telegram временно недоступны";const s=document.createElement("span");s.textContent="Нужен доступный подарок стоимостью от 15 до 500 ⭐ и достаточный баланс бота";item.append(b,s);prizesBox.append(item);
+    if(!rewards.some(p=>p.type==="gift_random")){
+      const item=document.createElement("div");item.className="prize";const b=document.createElement("b");b.textContent="🧸 Случайные подарки Telegram временно недоступны";const s=document.createElement("span");s.textContent="Нужен доступный подарок стоимостью от 15 до 1000 ⭐ и достаточный баланс бота";item.append(b,s);prizesBox.append(item);
     }
     const no=(prizes||[]).find(p=>p.type==="none");
     if(no){const item=document.createElement("div");item.className="prize no-prize";const b=document.createElement("b");b.textContent="🍀 Без подарка";const s=document.createElement("span");s.textContent="Шанс: "+no.probability;item.append(b,s);prizesBox.append(item);}
@@ -221,9 +231,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const data=await api("/roulette/api/status");
       renderCatalog(data.prizes);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
+      $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"");
+      renderLeaderboard(data.leaderboard||[]);
+      renderCollection(data.collection||[]);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
       spinButton.disabled=!data.canSpin;spinButton.textContent=data.canSpin?"🎁 КРУТИТЬ КОЛЕСО":"ВОЗВРАЩАЙСЯ ЗАВТРА";
-      balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–500 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
+      balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–1000 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
       if(data.lastResult?.day===new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())){
         showResult({label:data.lastResult.label,type:data.lastResult.giftId||data.lastResult.cost?"gift":"none"},data.lastResult.status==="pending"?"Подарок сохранён в ожидании.":"Твой результат за сегодня.",data.lastResult.status!=="pending",data.lastResult.spinId);
       }
