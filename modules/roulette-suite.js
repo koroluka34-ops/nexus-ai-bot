@@ -154,6 +154,30 @@ function installRoulette(bot, memoryApi) {
     await ctx.answerCallbackQuery({ text: "Нужно настроить адрес Mini App в Render.", show_alert: true });
   });
 
+  bot.command("roulettehistory", async ctx => {
+    try {
+      const state = await readState(ctx.from.id);
+      if (!state.history.length) return ctx.reply("🎰 История рулетки пока пуста. Открыть: /roulette");
+      const rows = state.history.slice(-10).reverse().map((item, index) =>
+        (index + 1) + ". " + item.day + " — " + item.label + " [" + (item.status === "delivered" ? "выдано" : item.status === "pending" ? "ожидает проверки" : "обрабатывается") + "]"
+      );
+      return ctx.reply("🎰 <b>ПОСЛЕДНИЕ ПОПЫТКИ</b>\n\n" + rows.join("\n"), { parse_mode: "HTML" });
+    } catch (error) {
+      return ctx.reply("❌ Не удалось загрузить историю: " + String(error.message).slice(0, 250));
+    }
+  });
+
+  bot.command("roulettebalance", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    try {
+      const balance = await bot.api.callApi("getMyStarBalance", {});
+      return ctx.reply("⭐ Баланс Stars бота: <b>" + Number(balance?.amount || 0) + " ⭐</b>\n\nДля главного приза Telegram Premium на 3 месяца нужно минимум 1000 ⭐.", { parse_mode: "HTML" });
+    } catch (error) {
+      return ctx.reply("❌ Не удалось получить баланс: " + String(error.message).slice(0, 250));
+    }
+  });
+
   async function handleHttp(req, res) {
     const url = new URL(req.url, "https://nexus.local");
     if (req.method === "GET" && url.pathname === "/roulette") {
