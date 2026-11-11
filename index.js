@@ -402,9 +402,9 @@ async function consumeQuota(userId, kind) {
 async function refundQuota(userId, kind) {
   const memory = await loadMemory(userId);
   const usage = resetDailyUsage(memory);
-  const key = kind === "image" ? "images" : "videos";
+  const key = kind === "image" ? "images" : kind === "video" ? "videos" : "text";
   usage[key] = Math.max(0, (usage[key] || 0) - 1);
-  usage.media = Math.max(0, (usage.media || 0) - 1);
+  if (kind === "image" || kind === "video") usage.media = Math.max(0, (usage.media || 0) - 1);
   await saveMemory(userId);
 }
 
@@ -4951,6 +4951,7 @@ bot.on("message:text", async ctx => {
 
     await deliverAnswer(ctx, userId, result);
   } catch (error) {
+    await refundQuota(userId, "text");
     await ctx.api.editMessageText(
       ctx.chat.id,
       status.message_id,
