@@ -142,11 +142,11 @@ async function getGiftCatalog(bot) {
     gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 3 }) + "%";
   }
   const prizes = [
-    { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, weight: TELEGRAM_PREMIUM_WEIGHT },
+    ...(balance >= 2500 ? [{ id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, weight: TELEGRAM_PREMIUM_WEIGHT }] : []),
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     ...available,
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: available.length ? "50%" : "99,3%", type: "none", cost: 0, weight: available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT }
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: available.length ? "50%" : "99,3%", type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (balance >= 2500 ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
   ];
   return { balance, gifts: available, prizes };
 }
