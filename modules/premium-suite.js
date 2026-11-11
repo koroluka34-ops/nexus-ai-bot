@@ -72,8 +72,8 @@ function monthUsage(record) {
 function admin(ctx) { return Boolean(ADMIN_ID) && String(ctx.from && ctx.from.id) === ADMIN_ID; }
 
 async function installPremium(bot) {
-  await load();
   bot.use(async (ctx, next) => {
+    await load();
     if (ctx.from) {
       const id = String(ctx.from.id);
       const username = String(ctx.from.username || "").replace(/^@/, "").toLowerCase();
@@ -112,6 +112,10 @@ async function installPremium(bot) {
       return ctx.reply("Формат: /premium @username 30d\nИли ответь на сообщение пользователя командой /premium 30d.\n\nПользователь должен хотя бы один раз написать боту, чтобы NEXUS знал его username. Можно также выдать навсегда: /premium @username forever, снять: /premium @username off.");
     }
     const record = state.users[targetId] || (state.users[targetId] = {});
+    if (!repliedUser && targetName.startsWith("@")) {
+      record.username = targetName.slice(1);
+      state.usernames[record.username.toLowerCase()] = targetId;
+    }
     if (repliedUser) {
       record.username = repliedUser.username || record.username || "";
       if (record.username) state.usernames[record.username.toLowerCase()] = targetId;
