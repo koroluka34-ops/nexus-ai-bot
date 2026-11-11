@@ -3747,6 +3747,69 @@ bot.on("message:successful_payment", async ctx => {
   }
 });
 
+bot.command("starcheck", async ctx => {
+  if (!PREMIUM_ADMIN_ID || String(ctx.from.id) !== PREMIUM_ADMIN_ID) {
+    return ctx.reply("⛔ Команда доступна только администратору.");
+  }
+
+  try {
+    const result = await ctx.api.getStarTransactions({ offset: 0, limit: 50 });
+    const transactions = Array.isArray(result?.transactions) ? result.transactions : [];
+    const needle = String(ctx.match || "").trim().toLowerCase();
+    const incoming = transactions.filter(tx =>
+      tx?.source?.type === "user" &&
+      tx.source.transaction_type === "invoice_payment" &&
+      Number(tx.amount) > 0
+    );
+    const matched = needle
+      ? incoming.filter(tx =>
+          String(tx.id || "").toLowerCase().includes(needle) ||
+          String(tx.source?.user?.id || "").includes(needle) ||
+          String(tx.source?.invoice_payload || "").toLowerCase().includes(needle)
+        )
+      : incoming;
+    const rows = matched.slice(0, 15);
+
+    if (!rows.length) {
+      return ctx.reply(
+        "🔎 В последних 50 операциях не найдено входящих оплат по счетам Telegram Stars." +
+        (needle ? "\\nФильтр: " + needle : "") +
+        "\\n\\nЭто проверка реальной истории Stars бота, а не сообщений или скриншотов пользователей."
+      );
+    }
+
+    const lines = rows.map((tx, index) => {
+      const user = tx.source?.user || {};
+      const date = new Date(Number(tx.date) * 1000);
+      const dateText = Number.isFinite(date.getTime())
+        ? date.toLocaleString("ru-RU", { timeZone: "Europe/Kyiv" })
+        : "дата неизвестна";
+      const payload = String(tx.source?.invoice_payload || "не указан");
+      return (
+        (index + 1) + ") ✅ " + Number(tx.amount) + " ⭐ — " + dateText + "\\n" +
+        "Пользователь ID: " + (user.id ?? "неизвестен") +
+        (user.username ? " (@" + user.username + ")" : "") + "\\n" +
+        "Payload: " + payload + "\\n" +
+        "Charge ID: " + String(tx.id || "не указан")
+      );
+    });
+
+    await ctx.reply(
+      "🧾 ПРОВЕРКА ОПЛАТ NEXUS (Telegram Stars)\\n\\n" +
+      "Показаны реальные входящие платежи по счетам из истории Telegram.\\n\\n" +
+      lines.join("\\n\\n") +
+      "\\n\\nПроверено операций: " + transactions.length +
+      "\\nДля поиска: /starcheck <ID пользователя, charge ID или payload>"
+    );
+  } catch (error) {
+    console.error("Star transactions lookup failed:", error?.message || error);
+    await ctx.reply(
+      "❌ Не удалось получить историю Telegram Stars.\\n" +
+      "Проверь, что Telegram Bot API поддерживает getStarTransactions, и повтори команду позже."
+    );
+  }
+});
+
 bot.command("paysupport", async ctx => {
   await ctx.reply("💳 Поддержка платежей и призов NEXUS AI\n\nЕсли Stars списались, а тариф не появился, или рулетка сообщила, что приз ожидает проверки, отправь администратору свой Telegram ID: " +
     ctx.from.id + "\nНе оплачивай повторно и не запускай новую попытку до проверки.");
@@ -5377,6 +5440,7 @@ async function start() {
     { command: "roulette", description: "Бесплатная ежедневная рулетка NEXUS" },
     { command: "roulettehistory", description: "Посмотреть историю рулетки" },
     { command: "roulettebalance", description: "Проверить баланс Stars бота (админ)" },
+    { command: "starcheck", description: "Проверить реальные оплаты Stars (админ)" },
     { command: "paysupport", description: "Помощь с оплатой Telegram Stars" },
     { command: "model", description: "Посмотреть или выбрать модель ИИ" },
     { command: "status", description: "Проверить состояние бота" },
