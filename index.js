@@ -590,6 +590,8 @@ function premiumStatusText(memory) {
 
 
 const rouletteSuite = installRoulette(bot, {
+  isAdmin: isNexusAdmin,
+  resolveUsername,
   grantPrize: async (userId, tier) => {
     if (tier !== "plus" && tier !== "ultra") throw new Error("Неизвестный тариф приза.");
     const memory = await loadMemory(userId);
@@ -4035,6 +4037,7 @@ bot.command("adminhelp", async ctx => {
     "/premiumgrant ID ultra 30 — выдать Ultra\n" +
     "/premiumgrant ID free 1 — снять тариф\n" +
     "/giftgrant ID НОМЕР — выдать подарок\n" +
+    "/spinadd ID КОЛИЧЕСТВО — выдать прокрутки рулетки\n" +
     "/starcheck — проверить реальные оплаты Stars\n\n" +
     "💡 Предложения:\n" +
     "Пользователи отправляют /suggest текст. Ты можешь одобрить или отклонить заявку кнопками.\n\n" +
@@ -5739,6 +5742,7 @@ async function start() {
     { command: "terms", description: "Условия покупки NEXUS Premium и Ultra" },
     { command: "roulette", description: "Бесплатная ежедневная рулетка NEXUS" },
     { command: "roulettehistory", description: "Посмотреть историю рулетки" },
+    { command: "spinadd", description: "Выдать дополнительные прокрутки (админ)" },
     { command: "roulettebalance", description: "Проверить баланс Stars бота (админ)" },
     { command: "starcheck", description: "Проверить реальные оплаты Stars (админ)" },
     { command: "paysupport", description: "Помощь с оплатой Telegram Stars" },
