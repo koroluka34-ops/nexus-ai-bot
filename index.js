@@ -450,7 +450,28 @@ function premiumStatusText(memory) {
 }
 
 
-const rouletteSuite = installRoulette(bot);
+const rouletteSuite = installRoulette(bot, {
+  grantPrize: async (userId, tier) => {
+    if (tier !== "plus" && tier !== "ultra") throw new Error("Неизвестный тариф приза.");
+    const memory = await loadMemory(userId);
+    const ranks = { free: 0, plus: 1, ultra: 2 };
+    const activeTier = currentPlan(memory);
+    const finalTier = ranks[activeTier] > ranks[tier] ? activeTier : tier;
+    const now = Date.now();
+    const baseExpiry = activeTier !== "free"
+      ? Math.max(now, Number(memory.premium?.expiresAt) || now)
+      : now;
+    memory.premium = {
+      tier: finalTier,
+      expiresAt: baseExpiry + 30 * 24 * 60 * 60 * 1000,
+      source: "roulette_reward"
+    };
+    if (!await saveMemory(userId)) {
+      throw new Error("Не удалось сохранить выигранную подписку в Cloudflare KV.");
+    }
+    return { tier: finalTier, expiresAt: memory.premium.expiresAt };
+  }
+});
 
 // Shared generation queue: Premium jobs are picked before Free jobs.
 const generationQueue = [];
