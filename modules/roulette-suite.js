@@ -140,12 +140,13 @@ async function getGiftCatalog(bot) {
     gift.weight = available.length ? Math.floor(GIFT_TOTAL_WEIGHT / available.length) : 0;
     gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 3 }) + "%";
   }
+  const premiumAvailable = balance >= 2500;
   const prizes = [
-    ...(balance >= 2500 ? [{ id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, weight: TELEGRAM_PREMIUM_WEIGHT }] : []),
+    { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: premiumAvailable ? "0,01%" : "Пока недоступен", type: "telegram_premium", cost: 2500, available: premiumAvailable, weight: premiumAvailable ? TELEGRAM_PREMIUM_WEIGHT : 0 },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     ...available,
-    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (available.length ? "49,99%" : balance >= 2500 ? "99,29%" : "99,3%"), type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (balance >= 2500 ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
+    { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (available.length ? (premiumAvailable ? "49,99%" : "50%") : premiumAvailable ? "99,29%" : "99,3%"), type: "none", cost: 0, weight: (available.length ? NO_PRIZE_WEIGHT : NO_PRIZE_WEIGHT + GIFT_TOTAL_WEIGHT) + (premiumAvailable ? 0 : TELEGRAM_PREMIUM_WEIGHT) }
   ];
   return { balance, gifts: available, prizes };
 }
@@ -159,7 +160,7 @@ function choosePrize(prizes) {
   return { ...prizes[prizes.length - 1], wheelIndex: prizes.length - 1 };
 }
 function publicPrize(prize) {
-  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
+  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
@@ -331,9 +332,6 @@ function installRoulette(bot, { grantPrize } = {}) {
                 gift_id: prize.giftId,
                 text: "Поздравляем! Ты выиграл этот подарок в NEXUS Gift Roulette 🎉"
               });
-              delivered = true;
-            } else if (prize.type === "telegram_premium") {
-              await telegramApi("giftPremiumSubscription", { user_id: user.id, month_count: 12, star_count: 2500, text: "Ты выиграл Telegram Premium на 12 месяцев в NEXUS!" });
               delivered = true;
             } else if (prize.type === "telegram_premium") {
               await telegramApi("giftPremiumSubscription", { user_id: user.id, month_count: 12, star_count: 2500, text: "Ты выиграл Telegram Premium на 12 месяцев в NEXUS!" });
