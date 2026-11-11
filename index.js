@@ -356,9 +356,9 @@ async function saveMemory(userId) {
 }
 
 const PREMIUM_PLANS = {
-  free: { name: "Бесплатный", text: 30, images: 10, videos: 1, media: 10, priority: 0 },
-  plus: { name: "NEXUS PLUS", text: 120, images: 60, videos: 10, media: 60, priority: 1 },
-  ultra: { name: "NEXUS ULTRA", text: 300, images: 180, videos: 30, media: 180, priority: 2 }
+  free: { name: "Бесплатный", text: 150, images: 20, videos: 2, media: 20, priority: 0 },
+  plus: { name: "NEXUS PLUS", text: 300, images: 100, videos: 20, media: 100, priority: 1 },
+  ultra: { name: "NEXUS ULTRA", text: 600, images: 300, videos: 60, media: 300, priority: 2 }
 };
 
 function currentPlan(memory) {
@@ -417,6 +417,7 @@ function premiumStatusText(memory) {
     "ИИ-видео в день: " + usage.videos + "/" + plan.videos + "\n" +
     "Всего фото и видео: " + usage.media + "/" + plan.media + "\n" +
     "Модель: <code>" + model + "</code>\n" +
+    "Голос: " + (memory.ttsVoice || "svetlana") + "\n" +
     "Приоритет генерации: " + (tier === "ultra" ? "высокий" : tier === "plus" ? "повышенный" : "обычный") +
     (tier !== "free" && memory.premium?.expiresAt ? "\nДо: " + new Date(memory.premium.expiresAt).toLocaleDateString("ru-RU") : "");
 }
@@ -600,7 +601,7 @@ function allCommandsText() {
 <code>/voice</code> — включить или выключить голосовые ответы.
 <code>/voice_on</code> — включить голосовые ответы.
 <code>/voice_off</code> — выключить голосовые ответы.
-<code>/say текст</code> — озвучить текст.
+<code>/say текст</code> — озвучить текст аудиофайлом.\n<code>/sayvoice текст</code> — отправить как Telegram voice message.\n<code>/voicepick</code> — выбрать голос (дополнительные голоса Premium).
 <code>/transcribe</code> — расшифровать аудио (ответом на аудио).
 
 ━━━━━━━━━━━━━━━━━━
@@ -1632,7 +1633,7 @@ async function transcribeVoice(ctx) {
 // TEXT TO SPEECH — EDGE TTS
 // ======================================================
 
-async function makeSpeech(text) {
+async function makeSpeech(text, voice = "ru-RU-SvetlanaNeural") {
   // Бесплатная озвучка через Microsoft Edge TTS — без вызова ElevenLabs.
   const filename = path.join(
     os.tmpdir(),
@@ -1641,7 +1642,7 @@ async function makeSpeech(text) {
 
   try {
     const tts = new EdgeTTS({
-      voice: "ru-RU-SvetlanaNeural",
+      voice,
       lang: "ru-RU",
       outputFormat: "audio-24khz-48kbitrate-mono-mp3",
       timeout: 45000
@@ -1659,7 +1660,10 @@ async function makeSpeech(text) {
 }
 
 async function sendSpeech(ctx, text) {
-  const audio = await makeSpeech(text);
+  const memory = await loadMemory(ctx.from.id);
+  const allowedVoices = { svetlana: "ru-RU-SvetlanaNeural", dmitry: "ru-RU-DmitryNeural", dariya: "ru-RU-DariyaNeural" };
+  const voice = allowedVoices[memory.ttsVoice] || allowedVoices.svetlana;
+  const audio = await makeSpeech(text, voice);
 
   await ctx.replyWithAudio(
     new InputFile(audio, "nexus-ai.mp3"),
@@ -3960,6 +3964,60 @@ bot.command("voice_off", async ctx => {
   await ctx.reply("🔇 Голосовые ответы выключены.");
 });
 
+bot.command("voicepick", async ctx => {
+  const choice = String(ctx.match || "").trim().toLowerCase();
+  const memory = await loadMemory(ctx.from.id);
+  const tier = currentPlan(memory);
+  if (!choice || choice === "list") {
+    return ctx.reply(
+      "🎙 Голоса NEXUS\nsvetlana — женский, мягкий (доступен всем)\n" +
+      (tier === "free" ? "Голоса Дмитрия и Дарьи доступны с PLUS." : "dmitry — мужской, спокойный\ndariya — женский, выразительный") +
+      "\n\nВыбрать: /voicepick svetlana|dmitry|dariya"
+    );
+  }
+  if (!["svetlana","dmitry","dariya"].includes(choice)) return ctx.reply("Выбери: svetlana, dmitry или dariya.");
+  if (choice !== "svetlana" && tier === "free") return ctx.reply("🔒 Дополнительные голоса доступны в NEXUS PLUS и ULTRA.");
+  memory.ttsVoice = choice;
+  if (!await saveMemory(ctx.from.id)) return ctx.reply("❌ Не удалось сохранить голос в Cloudflare KV.");
+  return ctx.reply("✅ Голос для озвучивания изменён: " + choice + ".");
+});
+
+async function convertMp3ToVoice(mp3) {
+  if (!ffmpegPath) throw new Error("FFmpeg недоступен.");
+  return await new Promise((resolve, reject) => {
+    const child = spawn(ffmpegPath, ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-vn", "-c:a", "libopus", "-b:a", "48k", "-vbr", "on", "-f", "ogg", "pipe:1"], { stdio: ["pipe","pipe","pipe"] });
+    const chunks = [], errors = [];
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) { settled = true; child.kill("SIGKILL"); reject(new Error("Тайм-аут конвертации аудио.")); } }, 30000);
+    child.stdout.on("data", chunk => chunks.push(chunk));
+    child.stderr.on("data", chunk => errors.push(chunk));
+    child.on("error", error => { if (settled) return; settled = true; clearTimeout(timer); reject(error); });
+    child.on("close", code => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      if (code === 0 && chunks.length) resolve(Buffer.concat(chunks));
+      else reject(new Error(Buffer.concat(errors).toString("utf8").slice(0,500) || "FFmpeg не смог создать голосовое сообщение."));
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(mp3);
+  });
+}
+
+bot.command("sayvoice", async ctx => {
+  const text = String(ctx.match || ctx.message.reply_to_message?.text || "").trim();
+  if (!text) return ctx.reply("Формат: /sayvoice Привет! Или ответь этой командой на сообщение.");
+  try {
+    const memory = await loadMemory(ctx.from.id);
+    const voices = { svetlana: "ru-RU-SvetlanaNeural", dmitry: "ru-RU-DmitryNeural", dariya: "ru-RU-DariyaNeural" };
+    const voice = voices[memory.ttsVoice] || voices.svetlana;
+    const mp3 = await makeSpeech(text, voice);
+    const ogg = await convertMp3ToVoice(mp3);
+    await ctx.replyWithVoice(new InputFile(ogg, "nexus-voice.ogg"));
+  } catch (error) {
+    await ctx.reply("❌ Не удалось отправить голосовое: " + String(error.message).slice(0,500));
+  }
+});
+
 bot.command("say", async ctx => {
   const text = String(ctx.match || "").trim();
 
@@ -5049,7 +5107,9 @@ async function start() {
     { command: "voice", description: "Настройки голосового ответа" },
     { command: "voice_on", description: "Включить голосовые ответы" },
     { command: "voice_off", description: "Выключить голосовые ответы" },
-    { command: "say", description: "Озвучить текст голосом" },
+    { command: "say", description: "Озвучить текст аудиофайлом" },
+    { command: "sayvoice", description: "Отправить текст как голосовое сообщение" },
+    { command: "voicepick", description: "Выбрать голос озвучивания" },
     { command: "reset", description: "Сбросить контекст диалога" }
   ];
 
