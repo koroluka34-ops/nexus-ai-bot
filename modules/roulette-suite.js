@@ -8,6 +8,8 @@ const ACCOUNT = process.env.CLOUDFLARE_ACCOUNT_ID || "";
 const TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const NAMESPACE = process.env.CLOUDFLARE_KV_NAMESPACE_ID || "";
 const locks = new Set();
+const NO_PRIZE_WEIGHT = 500000;
+const MAX_GIFTS_IN_WHEEL = 6;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
 function kvUrl(userId) {
@@ -88,39 +90,46 @@ function readBody(req, limit = 12000) {
   });
 }
 async function getStarBalance(bot) {
-  try {
-    const value = await bot.api.callApi("getMyStarBalance", {});
-    return Number(value?.amount || 0);
-  } catch (error) {
-    console.warn("NEXUS roulette balance check:", error.message);
-    return 0;
-  }
+  const value = await bot.api.callApi("getMyStarBalance", {});
+  return Number(value?.amount || 0);
 }
-const PRIZES = [
-  { id: "telegram_premium_3m", label: "Telegram Premium · 3 месяца", short: "3 месяца Premium", weight: 100, probability: "0,01%", type: "telegram_premium" },
-  { id: "nexus_premium_7d", label: "NEXUS Premium · 7 дней", short: "Premium 7 дней", weight: 4900, probability: "0,49%", type: "nexus_premium", days: 7 },
-  { id: "nexus_premium_3d", label: "NEXUS Premium · 3 дня", short: "Premium 3 дня", weight: 20000, probability: "2%", type: "nexus_premium", days: 3 },
-  { id: "bonus_50", label: "50 дополнительных AI-запросов", short: "+50 AI-запросов", weight: 75000, probability: "7,5%", type: "bonus", amount: 50 },
-  { id: "bonus_25", label: "25 дополнительных AI-запросов", short: "+25 AI-запросов", weight: 150000, probability: "15%", type: "bonus", amount: 25 },
-  { id: "bonus_10", label: "10 дополнительных AI-запросов", short: "+10 AI-запросов", weight: 250000, probability: "25%", type: "bonus", amount: 10 },
-  { id: "try_tomorrow", label: "Сегодня без приза. Попробуй завтра!", short: "Попробуй завтра", weight: 500000, probability: "50%", type: "none" }
-];
-function choosePrize(grandPrizeAvailable) {
-  const roll = crypto.randomInt(0, 1000000);
-  let cursor = 0;
-  for (const prize of PRIZES) {
-    cursor += prize.weight;
-    if (roll < cursor) {
-      if (prize.type === "telegram_premium" && !grandPrizeAvailable) {
-        return PRIZES[PRIZES.length - 1];
-      }
-      return prize;
-    }
+async function getGiftCatalog(bot) {
+  const [balance, result] = await Promise.all([
+    getStarBalance(bot),
+    bot.api.callApi("getAvailableGifts", {})
+  ]);
+  const gifts = Array.isArray(result?.gifts) ? result.gifts : [];
+  const available = gifts
+    .filter(g => g && typeof g.id === "string" && Number(g.star_count) > 0)
+    .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
+    .filter(g => Number(g.star_count) <= balance)
+    .sort((a, b) => Number(a.star_count) - Number(b.star_count))
+    .slice(0, MAX_GIFTS_IN_WHEEL)
+    .map(g => ({
+      id: "gift:" + g.id,
+      giftId: g.id,
+      label: (g.sticker?.emoji ? g.sticker.emoji + " " : "🎁 ") + "Подарок · " + Number(g.star_count) + " ⭐",
+      short: (g.sticker?.emoji || "🎁") + " " + Number(g.star_count) + " ⭐",
+      probability: "",
+      type: "gift",
+      cost: Number(g.star_count)
+    }));
+  const chanceEach = available.length ? (50 / available.length) : 0;
+  for (const gift of available) gift.probability = chanceEach.toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + "%";
+  const prizes = [...available, {
+    id: "no_prize", label: "Сегодня без подарка. Попробуй завтра!", short: "Попробуй завтра",
+    probability: "50%", type: "none", cost: 0
+  }];
+  return { balance, gifts: available, prizes };
+}
+function choosePrize(gifts) {
+  if (!gifts.length || crypto.randomInt(0, 1000000) < NO_PRIZE_WEIGHT) {
+    return { id: "no_prize", label: "Сегодня без подарка. Попробуй завтра!", short: "Попробуй завтра", probability: "50%", type: "none", cost: 0 };
   }
-  return PRIZES[PRIZES.length - 1];
+  return gifts[crypto.randomInt(0, gifts.length)];
 }
 function publicPrize(prize) {
-  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability };
+  return { id: prize.id, label: prize.label, short: prize.short, probability: prize.probability, type: prize.type, cost: prize.cost || 0 };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
@@ -131,22 +140,22 @@ function makeWebAppUrl() {
     return u.protocol === "https:" ? (u.pathname.replace(/\/$/, "") === "/roulette" ? u.toString() : u.toString().replace(/\/$/, "") + "/roulette") : "";
   } catch { return ""; }
 }
-function installRoulette(bot, memoryApi) {
+function installRoulette(bot) {
   const webAppUrl = makeWebAppUrl();
   const openKeyboard = () => webAppUrl
-    ? new InlineKeyboard().webApp("🎰 Открыть рулетку", webAppUrl)
+    ? new InlineKeyboard().webApp("🎁 Открыть рулетку подарков", webAppUrl)
     : new InlineKeyboard().text("⚠️ Рулетка пока не настроена", "roulette_not_configured");
 
   bot.command("roulette", async ctx => {
-    if (!webAppUrl) return ctx.reply("🎰 Для Mini App настрой NEXUS_WEBAPP_URL или проверь RENDER_EXTERNAL_HOSTNAME.");
-    return ctx.reply("🎰 <b>NEXUS DAILY ROULETTE</b>\n\nОдна бесплатная попытка каждый день. Главный приз — настоящая подписка Telegram Premium на 3 месяца.\n\nВероятность главного приза: 0,01%.", {
+    if (!webAppUrl) return ctx.reply("🎁 Для Mini App настрой NEXUS_WEBAPP_URL или проверь RENDER_EXTERNAL_HOSTNAME.");
+    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. При выигрыше бот отправит настоящий Telegram-подарок прямо в этот чат. Подарки доступны, пока на балансе бота хватает Stars.", {
       parse_mode: "HTML", reply_markup: openKeyboard()
     });
   });
   bot.callbackQuery("menu_roulette", async ctx => {
     await ctx.answerCallbackQuery();
-    if (!webAppUrl) return ctx.reply("🎰 Mini App не настроен. Добавь NEXUS_WEBAPP_URL в переменные Render.");
-    return ctx.reply("🎰 <b>NEXUS DAILY ROULETTE</b>\nОдна бесплатная попытка в сутки.", {
+    if (!webAppUrl) return ctx.reply("🎁 Mini App не настроен. Добавь NEXUS_WEBAPP_URL в переменные Render.");
+    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\nОдна бесплатная попытка в сутки.", {
       parse_mode: "HTML", reply_markup: openKeyboard()
     });
   });
@@ -157,11 +166,12 @@ function installRoulette(bot, memoryApi) {
   bot.command("roulettehistory", async ctx => {
     try {
       const state = await readState(ctx.from.id);
-      if (!state.history.length) return ctx.reply("🎰 История рулетки пока пуста. Открыть: /roulette");
+      if (!state.history.length) return ctx.reply("🎁 История рулетки пока пуста. Открыть: /roulette");
       const rows = state.history.slice(-10).reverse().map((item, index) =>
-        (index + 1) + ". " + item.day + " — " + item.label + " [" + (item.status === "delivered" ? "выдано" : item.status === "pending" ? "ожидает проверки" : "обрабатывается") + "]"
+        (index + 1) + ". " + item.day + " — " + item.label + " [" +
+        (item.status === "delivered" ? "подарок отправлен" : item.status === "pending" ? "ожидает проверки" : "обрабатывается") + "]"
       );
-      return ctx.reply("🎰 <b>ПОСЛЕДНИЕ ПОПЫТКИ</b>\n\n" + rows.join("\n"), { parse_mode: "HTML" });
+      return ctx.reply("🎁 <b>ИСТОРИЯ РУЛЕТКИ</b>\n\n" + rows.join("\n"), { parse_mode: "HTML" });
     } catch (error) {
       return ctx.reply("❌ Не удалось загрузить историю: " + String(error.message).slice(0, 250));
     }
@@ -171,10 +181,31 @@ function installRoulette(bot, memoryApi) {
     const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
     try {
-      const balance = await bot.api.callApi("getMyStarBalance", {});
-      return ctx.reply("⭐ Баланс Stars бота: <b>" + Number(balance?.amount || 0) + " ⭐</b>\n\nДля главного приза Telegram Premium на 3 месяца нужно минимум 1000 ⭐.", { parse_mode: "HTML" });
+      const catalog = await getGiftCatalog(bot);
+      const cheapest = catalog.gifts[0];
+      return ctx.reply(
+        "⭐ Баланс Stars бота: <b>" + catalog.balance + " ⭐</b>\n" +
+        "🎁 Доступно подарков для рулетки: <b>" + catalog.gifts.length + "</b>\n" +
+        (cheapest ? "Самый дешёвый доступный подарок: <b>" + cheapest.cost + " ⭐</b>" : "Пока нет подарков, которые можно оплатить с текущего баланса.") +
+        "\n\nПодарки отправляются через официальный Bot API. Получатель может показать их в профиле, но подарок от бота нельзя обменять на Stars.",
+        { parse_mode: "HTML" }
+      );
     } catch (error) {
-      return ctx.reply("❌ Не удалось получить баланс: " + String(error.message).slice(0, 250));
+      return ctx.reply("❌ Не удалось проверить баланс и каталог подарков: " + String(error.message).slice(0, 250));
+    }
+  });
+
+  bot.command("roulettegifts", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Команда доступна только администратору.");
+    try {
+      const catalog = await getGiftCatalog(bot);
+      if (!catalog.gifts.length) return ctx.reply("🎁 Сейчас нет подарков, которые можно купить с текущего баланса (" + catalog.balance + " ⭐).");
+      return ctx.reply("🎁 <b>ПОДАРКИ В РУЛЕТКЕ</b>\n\n" + catalog.gifts.map((g, i) =>
+        (i + 1) + ". " + g.label + " — шанс " + g.probability
+      ).join("\n"), { parse_mode: "HTML" });
+    } catch (error) {
+      return ctx.reply("❌ Не удалось получить каталог: " + String(error.message).slice(0, 250));
     }
   });
 
@@ -199,15 +230,15 @@ function installRoulette(bot, memoryApi) {
     if (!kvReady()) { json(res, 503, { ok: false, error: "Cloudflare KV не настроен — рулетка временно недоступна." }); return true; }
 
     try {
-      const state = await readState(user.id);
-      const today = kyivDay();
-      const canSpin = state.lastSpinDay !== today;
-      const balance = await getStarBalance(bot);
       if (req.method === "GET" && url.pathname === "/roulette/api/status") {
+        const [state, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
+        const canSpin = state.lastSpinDay !== kyivDay() && catalog.gifts.length > 0;
         json(res, 200, {
           ok: true, canSpin, lastSpinDay: state.lastSpinDay,
-          grandPrizeAvailable: balance >= 1000,
-          grandPrizeText: balance >= 1000 ? "Главный приз активен" : "Главный приз временно отключён",
+          balance: catalog.balance,
+          giftsAvailable: catalog.gifts.length,
+          prizes: catalog.prizes.map(publicPrize),
+          unavailableReason: catalog.gifts.length ? "" : "На балансе бота пока недостаточно Stars для доступных подарков.",
           lastResult: state.history.at(-1) || null
         });
         return true;
@@ -217,14 +248,23 @@ function installRoulette(bot, memoryApi) {
         if (locks.has(String(user.id))) { json(res, 409, { ok: false, error: "Рулетка уже обрабатывает твою попытку." }); return true; }
         locks.add(String(user.id));
         try {
-          const fresh = await readState(user.id);
+          const [fresh, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
+          const today = kyivDay();
           if (fresh.lastSpinDay === today) {
             json(res, 409, { ok: false, error: "Сегодня ты уже использовал бесплатную попытку.", canSpin: false });
             return true;
           }
-          const prize = choosePrize(balance >= 1000);
+          if (!catalog.gifts.length) {
+            json(res, 503, { ok: false, error: "Сейчас нет доступных подарков: на балансе бота недостаточно Stars. Попробуй позже.", canSpin: false });
+            return true;
+          }
+          const prize = choosePrize(catalog.gifts);
           const spinId = crypto.randomUUID();
-          const row = { spinId, day: today, prize: prize.id, label: prize.label, status: "processing", at: Date.now() };
+          const row = {
+            spinId, day: today, prize: prize.id, label: prize.label,
+            giftId: prize.giftId || "", cost: prize.cost || 0,
+            status: "processing", at: Date.now()
+          };
           fresh.lastSpinDay = today;
           fresh.history.push(row);
           fresh.history = fresh.history.slice(-30);
@@ -232,21 +272,19 @@ function installRoulette(bot, memoryApi) {
 
           let delivered = false, deliveryMessage = "";
           try {
-            if (prize.type === "telegram_premium") {
-              await bot.api.callApi("giftPremiumSubscription", {
-                user_id: user.id, month_count: 3, star_count: 1000,
-                text: "Поздравляем! Ты выиграл Telegram Premium на 3 месяца в NEXUS Roulette 🎉"
+            if (prize.type === "gift") {
+              await bot.api.callApi("sendGift", {
+                user_id: user.id,
+                gift_id: prize.giftId,
+                text: "Поздравляем! Ты выиграл этот подарок в NEXUS Gift Roulette 🎉"
               });
-              delivered = true;
-            } else if (prize.type === "nexus_premium" || prize.type === "bonus") {
-              await memoryApi.grantPrize(user.id, prize, spinId);
               delivered = true;
             } else {
               delivered = true;
             }
           } catch (error) {
             deliveryMessage = String(error.message || error).slice(0, 300);
-            console.error("NEXUS roulette reward delivery:", user.id, prize.id, deliveryMessage);
+            console.error("NEXUS gift roulette delivery:", user.id, prize.id, deliveryMessage);
           }
           row.status = delivered ? "delivered" : "pending";
           row.deliveryMessage = deliveryMessage;
@@ -256,8 +294,8 @@ function installRoulette(bot, memoryApi) {
             prize: publicPrize(prize),
             delivered,
             message: delivered
-              ? (prize.type === "telegram_premium" ? "Telegram отправил тебе настоящую Premium-подписку на 3 месяца." : prize.type === "none" ? "В этот раз без приза. Новая попытка будет завтра." : "Приз успешно добавлен в твой аккаунт NEXUS.")
-              : "Приз выпал, но его выдача ожидает проверки. Напиши /paysupport — повторно крутить колесо не нужно."
+              ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : "Сегодня без подарка. Новая попытка будет завтра.")
+              : "Подарок выпал, но Telegram не подтвердил отправку. Выигрыш сохранён для проверки — напиши /paysupport, повторно крутить не нужно."
           });
           return true;
         } finally {
@@ -267,7 +305,7 @@ function installRoulette(bot, memoryApi) {
       json(res, 404, { ok: false, error: "Маршрут не найден." });
       return true;
     } catch (error) {
-      console.error("NEXUS roulette HTTP:", error.message);
+      console.error("NEXUS gift roulette HTTP:", error.message);
       json(res, 500, { ok: false, error: "Не удалось обработать рулетку. Попробуй позже." });
       return true;
     }
