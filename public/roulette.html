@@ -86,7 +86,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const options={method,headers:{"X-Telegram-Init-Data":initData},cache:"no-store"};
     if(method==="POST"){options.headers["Content-Type"]="application/json";options.body="{}";}
     const response=await fetch(path,options);
-    const data=await response.json().catch(()=>({ok:false,error:"Сервер вернул некорректный ответ."}));
+    const raw=await response.text();
+    let data;
+    try{data=JSON.parse(raw);}catch{
+      const type=response.headers.get("content-type")||"не указан";
+      const preview=raw.replace(/\s+/g," ").slice(0,120);
+      throw new Error("Сервер вернул не JSON (HTTP "+response.status+", "+type+"). "+(preview||"Пустой ответ"));
+    }
     if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
     return data;
   }
