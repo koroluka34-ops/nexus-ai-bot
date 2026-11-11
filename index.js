@@ -3709,14 +3709,42 @@ bot.on("message:successful_payment", async ctx => {
 
   if (!await saveMemory(userId)) {
     console.error("NEXUS PAYMENT ACTIVATION FAILED:", payment.telegram_payment_charge_id);
-    return ctx.reply("⚠️ Telegram подтвердил оплату, но не удалось сохранить подписку. Не оплачивай повторно — напиши /paysupport.");
+    if (PREMIUM_ADMIN_ID) {
+      await ctx.api.sendMessage(
+        PREMIUM_ADMIN_ID,
+        "🚨 ПЛАТЁЖ ПОЛУЧЕН, НО ПОДПИСКА НЕ СОХРАНИЛАСЬ!\n" +
+        "Пользователь ID: " + userId + "\nТариф: " + PREMIUM_PLANS[tier].name +
+        "\nСумма: " + expected + " ⭐ (XTR)\nTelegram charge ID: " +
+        payment.telegram_payment_charge_id + "\nПроверь Cloudflare KV и восстанови подписку вручную."
+      ).catch(error => console.error("Admin payment alert failed:", error.message));
+    }
+    return ctx.reply(
+      "⚠️ Telegram подтвердил оплату, но подписку пока не удалось сохранить.\n" +
+      "Не оплачивай повторно! Напиши в техподдержку: @Lonely00009"
+    );
   }
 
   await ctx.reply(
-    "🎉 Оплата прошла!\n\nАктивирован <b>" + PREMIUM_PLANS[finalTier].name +
-    "</b> на 30 дней.\nСумма: " + expected + " ⭐\n/premium",
+    "🎉 Поздравляем с покупкой!\n\n" +
+    "💎 Тебе успешно активирован <b>" + PREMIUM_PLANS[finalTier].name +
+    "</b> на 30 дней.\n" +
+    "💳 Оплата: " + expected + " ⭐ Telegram Stars\n\n" +
+    "Если ты оплатил подписку, но Premium не появился или возникла проблема, " +
+    "обратись в техническую поддержку: @Lonely00009\n\n" +
+    "Проверить подписку: /premium",
     { parse_mode: "HTML" }
   );
+
+  if (PREMIUM_ADMIN_ID) {
+    await ctx.api.sendMessage(
+      PREMIUM_ADMIN_ID,
+      "✅ ПОДТВЕРЖДЁННЫЙ ПЛАТЁЖ NEXUS\n" +
+      "Пользователь ID: " + userId + "\n" +
+      "Тариф: " + PREMIUM_PLANS[tier].name + "\n" +
+      "Сумма: " + expected + " ⭐ (XTR)\n" +
+      "Telegram charge ID: " + payment.telegram_payment_charge_id
+    ).catch(error => console.error("Admin payment notification failed:", error.message));
+  }
 });
 
 bot.command("paysupport", async ctx => {
