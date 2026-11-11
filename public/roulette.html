@@ -71,6 +71,18 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <p class="hint">Подарки отправятся автоматически, когда у бота появятся нужные Stars. Нажми «Отказаться», если не хочешь получать подарок.</p>
   </section>
   <section class="panel">
+    <div class="section-head"><strong>🔥 Серия удачи</strong><span id="luckStatus">Считаем серию…</span></div>
+    <p class="hint" id="streakInfo">3 дня подряд — +1 прокрутка · 7 дней — +2 · 30 дней — +5. Серия повышает шанс подарочных секторов.</p>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🏆 Последние победители</strong><span>Лента NEXUS</span></div>
+    <div id="leaderboardList" class="prizes"><div class="prize"><b>Победители появятся здесь</b></div></div>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🗃️ Моя коллекция</strong><span>Выигранные призы</span></div>
+    <div id="collectionList" class="prizes"><div class="prize"><b>Коллекция пока пуста</b></div></div>
+  </section>
+  <section class="panel">
     <div class="section-head"><strong>🎁 Что может выпасть</strong><span id="giftCount">Загрузка каталога</span></div>
     <div class="prizes" id="prizes">
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
@@ -78,7 +90,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     </div>
     <p class="hint">Обычные подарки Telegram — 38% (15–1000 ⭐), джекпот — подарок ровно за 1000 ⭐ (0,01%), секретный подарок — 0,01%. NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%, Telegram Premium — 0,01%. Без приза — 61,27%. Шансы подарков растут за серию дней и во время NEXUS EVENT.</p>
   </section>
-  <p class="disclaimer">В секторах показаны изображения подарков и подписок. Настоящий подарок отправляется только после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева.</p>
+  <p class="disclaimer">В секторах показаны призы NEXUS. Настоящие Telegram-подарки отправляются ботом после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
 </main>
 <script>
 (()=> {
@@ -156,8 +168,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function renderCatalog(prizes){
     drawWheel(prizes);
     const rewards=(prizes||[]).filter(p=>["gift_random","jackpot","secret","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
-    const giftCount=rewards.filter(p=>p.type==="gift_random").length;
-    $("giftCount").textContent=giftCount+" случайный подарок · "+rewards.filter(p=>p.type!=="gift_random").length+" подписки";
+    const giftCount=rewards.filter(p=>["gift_random","jackpot","secret"].includes(p.type)).length;
+    $("giftCount").textContent=giftCount+" подарочных сектора · "+rewards.filter(p=>!["gift_random","jackpot","secret"].includes(p.type)).length+" подписки";
     prizesBox.replaceChildren();
     rewards.forEach(prize=>{
       const item=document.createElement("div");item.className="prize"+(prize.available===false?" unavailable":"");
