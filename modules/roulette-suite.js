@@ -298,7 +298,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
 
   bot.command("roulette", async ctx => {
     if (!webAppUrl) return ctx.reply("🎁 Для Mini App настрой NEXUS_WEBAPP_URL или проверь RENDER_EXTERNAL_HOSTNAME.");
-    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. При выигрыше бот отправит настоящий Telegram-подарок прямо в этот чат. Сектор с мишкой выдаёт случайный настоящий подарок стоимостью 15–1000 ⭐, если он доступен на балансе бота.", {
+    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. Выигрывай настоящие Telegram-подарки от 15 до 1000 ⭐, секретные призы и джекпот — подарок ровно за 1000 ⭐. За серию дней начисляются дополнительные прокрутки и повышается удача.", {
       parse_mode: "HTML", reply_markup: openKeyboard()
     });
   });
