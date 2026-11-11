@@ -75,6 +75,9 @@ installQrSuite(bot);
 const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
 installDeviceBridge(bot);
 
+const { installPremium, checkAndRecord } = require("./modules/premium-suite");
+installPremium(bot);
+
 // В группах отвечаем только на упоминание NEXUS или ответ на сообщение бота.
 function isGroupChat(ctx) {
   return ctx.chat?.type === "group" || ctx.chat?.type === "supergroup";
@@ -1122,6 +1125,8 @@ async function handleImage(ctx, prompt) {
     await ctx.reply("⏳ Подожди предыдущий запрос.");
     return;
   }
+  const quota = await checkAndRecord(ctx, "image");
+  if (!quota.allowed) return ctx.reply(quota.message);
 
   busyUsers.add(userId);
 
@@ -1139,7 +1144,9 @@ async function handleImage(ctx, prompt) {
       new InputFile(image, "nexus-image.jpg"),
       { caption: "🖼 Готово!" }
     );
+    await quota.finish(true);
   } catch (error) {
+    await quota.finish(false);
     await ctx.api.editMessageText(
       ctx.chat.id,
       status.message_id,
@@ -1256,6 +1263,8 @@ async function handleVideoPrompt(ctx, prompt) {
     return;
   }
   if (busyUsers.has(userId)) { await ctx.reply("⏳ Подожди предыдущую задачу."); return; }
+  const quota = await checkAndRecord(ctx, "video");
+  if (!quota.allowed) return ctx.reply(quota.message);
   busyUsers.add(userId);
   const status = await ctx.reply("🎬 <b>NEXUS AI создаёт настоящее ИИ-видео.</b>\n⏳ Это может занять несколько минут.", { parse_mode: "HTML" });
   let videoPath;
@@ -1268,7 +1277,9 @@ async function handleVideoPrompt(ctx, prompt) {
       caption: "🎬 <b>NEXUS AI — видео готово!</b>\nМодель: <code>" + POLLINATIONS_VIDEO_MODEL + "</code>\nДлительность: " + POLLINATIONS_VIDEO_DURATION + " сек.",
       parse_mode: "HTML"
     });
+    await quota.finish(true);
   } catch (error) {
+    await quota.finish(false);
     await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Не удалось создать ИИ-видео:\n" + String(error.message).slice(0, 1400)).catch(() => {});
   } finally {
     if (videoPath) await fs.unlink(videoPath).catch(() => {});
@@ -2000,6 +2011,8 @@ bot.command("sticker", async ctx => {
     return;
   }
 
+  const quota = prompt ? await checkAndRecord(ctx, "sticker") : { allowed: true, finish: async () => {} };
+  if (!quota.allowed) return ctx.reply(quota.message);
   busyUsers.add(userId);
   const status = await ctx.reply("🎨 Готовлю стикер...");
   try {
@@ -2013,7 +2026,9 @@ bot.command("sticker", async ctx => {
       new InputFile(webp, "nexus-sticker.webp"),
       { reply_to_message_id: ctx.message.message_id }
     );
+    if (prompt) await quota.finish(true);
   } catch (error) {
+    if (prompt) await quota.finish(false);
     await ctx.api.editMessageText(
       ctx.chat.id, status.message_id,
       "❌ Не удалось создать стикер: " + String(error.message).slice(0, 1400)
@@ -2126,6 +2141,8 @@ bot.command("editphoto", async ctx => {
   if (!prompt) return ctx.reply("Пример: /editphoto замени фон на ночной город.");
   if (!POLLINATIONS_API_KEY) return ctx.reply("Нужен POLLINATIONS_API_KEY в Render. У API возможна тарификация.");
   if (busyUsers.has(ctx.from.id)) return ctx.reply("⏳ Дождись предыдущей задачи.");
+  const quota = await checkAndRecord(ctx, "edit");
+  if (!quota.allowed) return ctx.reply(quota.message);
   busyUsers.add(ctx.from.id);
   const status = await ctx.reply("🎨 Редактирую фото...");
   try {
@@ -2153,7 +2170,9 @@ bot.command("editphoto", async ctx => {
     if (!result || !isImageBuffer(result)) throw new Error("Провайдер не вернул корректное изображение.");
     await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
     await ctx.replyWithPhoto(new InputFile(result, "nexus-edited.jpg"), { caption: "✨ Фото обработано ИИ." });
-  } catch (error) { await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка редактирования: " + String(error.message).slice(0, 1200)).catch(() => {}); }
+    await quota.finish(true);
+  } catch (error) {
+    await quota.finish(false); await ctx.api.editMessageText(ctx.chat.id, status.message_id, "❌ Ошибка редактирования: " + String(error.message).slice(0, 1200)).catch(() => {}); }
   finally { busyUsers.delete(ctx.from.id); }
 });
 
