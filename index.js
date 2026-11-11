@@ -5742,6 +5742,7 @@ async function start() {
     { command: "terms", description: "Условия покупки NEXUS Premium и Ultra" },
     { command: "roulette", description: "Бесплатная ежедневная рулетка NEXUS" },
     { command: "roulettehistory", description: "Посмотреть историю рулетки" },
+    { command: "roulettewins", description: "Список выигранных подарков и отказ от них" },
     { command: "spinadd", description: "Выдать дополнительные прокрутки (админ)" },
     { command: "roulettebalance", description: "Проверить баланс Stars бота (админ)" },
     { command: "starcheck", description: "Проверить реальные оплаты Stars (админ)" },
