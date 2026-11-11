@@ -56,13 +56,19 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   <div class="header"><div class="logo">NEXUS <span>✦</span> AI</div><div class="live">● DAILY GIFT DROP</div></div>
   <div class="hero"><div class="eyebrow">ТВОЙ ЕЖЕДНЕВНЫЙ ШАНС</div><h1>Gift Roulette</h1><p class="subtitle">Крути колесо и выигрывай настоящие подарки Telegram, Telegram Premium на 12 месяцев или подписки NEXUS.</p></div>
   <section class="panel">
-    <div class="stats"><span>Твоя попытка</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
+    <div class="stats"><span>Твои прокрутки</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
     <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
     <button class="spin" id="spinButton" disabled>ПОДКЛЮЧАЕМ РУЛЕТКУ…</button>
     <p class="hint" id="balanceNote">Получаем список реальных подарков Telegram…</p>
+    <p class="hint" id="spinsRemaining" style="color:#f4d47e;font-weight:850">Прокруток осталось: —</p>
     <div class="hint" id="rouletteCountdown" style="margin-top:8px;text-align:center;font-weight:800;color:#f4d47e">⏳ До обновления рулетки: считаем…</div>
     <div class="error" id="errorBox"></div>
     <div class="result" id="result"><small>РЕЗУЛЬТАТ РУЛЕТКИ</small><h2 id="resultTitle"></h2><p id="resultText"></p></div>
+  </section>
+  <section class="panel" id="pendingPanel" style="display:none">
+    <div class="section-head"><strong>🎁 Твои ожидающие подарки</strong><span>Пока хранятся у бота</span></div>
+    <div id="pendingGifts" class="prizes"></div>
+    <p class="hint">Подарки отправятся автоматически, когда у бота появятся нужные Stars. Нажми «Отказаться», если не хочешь получать подарок.</p>
   </section>
   <section class="panel">
     <div class="section-head"><strong>🎁 Что может выпасть</strong><span id="giftCount">Загрузка каталога</span></div>
@@ -70,7 +76,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
-    <p class="hint">NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%, Telegram Premium на 12 месяцев — 0,01% при наличии 2500 ⭐ на балансе бота. Остальные шансы распределяются между доступными подарками и сектором «без приза».</p>
+    <p class="hint">Подарок Telegram — 38%, NEXUS Premium — 0,5%, NEXUS Ultra — 0,2%, Telegram Premium на 12 месяцев — 0,01%. Остальные 61,29% — без приза.</p>
   </section>
   <p class="disclaimer">В секторах показаны изображения подарков и подписок. Настоящий подарок отправляется только после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева.</p>
 </main>
@@ -83,9 +89,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
   let busy=false,currentPrizes=[];
-  async function api(path,method="GET"){
+  async function api(path,method="GET",body=null){
     const options={method,headers:{"X-Telegram-Init-Data":initData},cache:"no-store"};
-    if(method==="POST"){options.headers["Content-Type"]="application/json";options.body="{}";}
+    if(method==="POST"){options.headers["Content-Type"]="application/json";options.body=JSON.stringify(body||{});}
     const response=await fetch(path,options);
     const raw=await response.text();
     let data;
@@ -117,6 +123,24 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const text=document.createElement("span");text.className="slice-text";
       text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="gift_random"?"15–500 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
+    });
+  }
+  function renderPendingGifts(items){
+    const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();
+    if(!Array.isArray(items)||!items.length){panel.style.display="none";return;}
+    panel.style.display="block";
+    items.forEach(item=>{
+      const card=document.createElement("div");card.className="prize";
+      const title=document.createElement("b");title.textContent=item.label||"🎁 Подарок Telegram";
+      const meta=document.createElement("span");meta.textContent="Ожидает отправки · "+(item.cost||"цена уточняется")+" ⭐";
+      const button=document.createElement("button");button.className="spin";button.style.cssText="margin-top:10px;padding:9px 8px;font-size:11px";button.textContent="ОТКАЗАТЬСЯ ОТ ПОДАРКА";
+      button.addEventListener("click",async()=>{
+        if(!confirm("Точно отказаться от этого подарка? Отменить действие будет нельзя."))return;
+        button.disabled=true;
+        try{await api("/roulette/api/decline","POST",{spinId:item.spinId});await refresh();}
+        catch(error){button.disabled=false;errorBox.textContent=error.message;errorBox.classList.add("show");}
+      });
+      card.append(title,meta,button);box.append(card);
     });
   }
   function renderCatalog(prizes){
@@ -177,8 +201,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(!initData){spinStatus.textContent="Открой через Telegram";balanceNote.textContent="Запусти Mini App кнопкой /roulette в боте.";spinButton.disabled=true;return;}
     try{
       const data=await api("/roulette/api/status");
-      renderCatalog(data.prizes);balanceValue.textContent="⭐ "+data.balance;
-      spinStatus.textContent=data.canSpin?"Доступна":"Уже использована сегодня";
+      renderCatalog(data.prizes);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;
+      $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
+      spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
       spinButton.disabled=!data.canSpin;spinButton.textContent=data.canSpin?"🎁 КРУТИТЬ КОЛЕСО":"ВОЗВРАЩАЙСЯ ЗАВТРА";
       balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–500 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
       if(data.lastResult?.day===new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())){
@@ -199,8 +224,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const data=await api("/roulette/api/spin","POST");
       const count=currentPrizes.length||2,index=Number.isInteger(data.prizeIndex)?data.prizeIndex:count-1,step=360/count;
       const target=((360-((index+.5)*step))%360+360)%360;
-      wheel.style.transform="rotate("+(360*7+target)+"deg)";
-      await new Promise(resolve=>setTimeout(resolve,5100));
+      wheel.style.transition="none";wheel.style.transform="rotate(0deg)";void wheel.offsetWidth;wheel.style.transition="transform 5s cubic-bezier(.12,.72,.12,1)";wheel.style.transform="rotate("+(360*7+target)+"deg)";
+      await new Promise(resolve=>setTimeout(resolve,5200));
       showResult(data.prize,data.message,data.delivered);
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
