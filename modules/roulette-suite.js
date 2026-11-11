@@ -48,11 +48,12 @@ async function readState(userId) {
     headers: { Authorization: "Bearer " + TOKEN },
     signal: AbortSignal.timeout(9000)
   });
-  if (r.status === 404) return { lastSpinDay: "", history: [] };
+  if (r.status === 404) return { lastSpinDay: "", bonusSpins: 0, history: [] };
   if (!r.ok) throw new Error("Cloudflare KV HTTP " + r.status);
   const value = JSON.parse(await r.text());
   return {
     lastSpinDay: String(value.lastSpinDay || ""),
+    bonusSpins: Math.max(0, Math.min(100000, Math.floor(Number(value.bonusSpins) || 0))),
     history: Array.isArray(value.history) ? value.history.slice(-30) : []
   };
 }
@@ -186,7 +187,7 @@ function makeWebAppUrl() {
     return u.protocol === "https:" ? (u.pathname.replace(/\/$/, "") === "/roulette" ? u.toString() : u.toString().replace(/\/$/, "") + "/roulette") : "";
   } catch { return ""; }
 }
-function installRoulette(bot, { grantPrize } = {}) {
+function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
   const webAppUrl = makeWebAppUrl();
   let queueWorkerRunning = false;
   async function processPendingGiftQueue() {
@@ -284,6 +285,38 @@ function installRoulette(bot, { grantPrize } = {}) {
   });
   bot.callbackQuery("roulette_not_configured", async ctx => {
     await ctx.answerCallbackQuery({ text: "Нужно настроить адрес Mini App в Render.", show_alert: true });
+  });
+
+  bot.command("spinadd", async ctx => {
+    if (typeof isAdmin !== "function" || !await isAdmin(ctx.from.id)) {
+      return ctx.reply("⛔ Команда доступна только администраторам NEXUS.");
+    }
+    const parts = String(ctx.match || "").trim().split(/\\s+/).filter(Boolean);
+    const replied = ctx.message.reply_to_message?.from;
+    let targetId = replied ? String(replied.id) : "";
+    let amount;
+    if (replied) amount = Number(parts[0]);
+    else if (parts[0]?.startsWith("@")) {
+      targetId = typeof resolveUsername === "function" ? await resolveUsername(parts[0]) : "";
+      amount = Number(parts[1]);
+      if (!targetId) return ctx.reply("Не удалось найти " + parts[0] + ". Пусть пользователь сначала напишет боту /start, или ответь на его сообщение командой /spinadd КОЛИЧЕСТВО.");
+    } else {
+      targetId = parts[0] || "";
+      amount = Number(parts[1]);
+    }
+    if (!/^\\d{1,20}$/.test(targetId) || !Number.isSafeInteger(Number(targetId)) ||
+        !Number.isInteger(amount) || amount < 1 || amount > 10000) {
+      return ctx.reply("Формат: /spinadd ID КОЛИЧЕСТВО\nПример: /spinadd 123456789 5\nМожно ответить на сообщение пользователя: /spinadd 5\nИли указать @username: /spinadd @username 5");
+    }
+    try {
+      const state = await readState(targetId);
+      state.bonusSpins = Math.min(100000, state.bonusSpins + amount);
+      await writeState(targetId, state);
+      await ctx.reply("✅ Выдано " + amount + " прокруток пользователю " + targetId + ".\n🎰 Всего дополнительных прокруток: " + state.bonusSpins);
+      await bot.api.sendMessage(Number(targetId), "🎁 Тебе выдано " + amount + " дополнительных прокруток рулетки NEXUS! Открой /roulette.").catch(() => {});
+    } catch (error) {
+      return ctx.reply("❌ Не удалось выдать прокрутки: " + String(error.message || error).slice(0, 220));
+    }
   });
 
   bot.command("roulettehistory", async ctx => {
@@ -384,9 +417,9 @@ function installRoulette(bot, { grantPrize } = {}) {
     try {
       if (req.method === "GET" && url.pathname === "/roulette/api/status") {
         const [state, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
-        const canSpin = state.lastSpinDay !== kyivDay();
+        const canSpin = state.lastSpinDay !== kyivDay() || state.bonusSpins > 0;
         json(res, 200, {
-          ok: true, canSpin, lastSpinDay: state.lastSpinDay,
+          ok: true, canSpin, lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins,
           balance: catalog.balance,
           giftsAvailable: catalog.gifts.length,
           prizes: catalog.prizes.map(publicPrize),
@@ -402,10 +435,12 @@ function installRoulette(bot, { grantPrize } = {}) {
         try {
           const [fresh, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
           const today = kyivDay();
-          if (fresh.lastSpinDay === today) {
-            json(res, 409, { ok: false, error: "Сегодня ты уже использовал бесплатную попытку.", canSpin: false });
+          if (fresh.lastSpinDay === today && fresh.bonusSpins <= 0) {
+            json(res, 409, { ok: false, error: "Сегодня ты уже использовал бесплатную попытку.", canSpin: false, bonusSpins: 0 });
             return true;
           }
+          const usedBonusSpin = fresh.lastSpinDay === today;
+          if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
           
           let prize = choosePrize(catalog.prizes);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
@@ -477,7 +512,7 @@ function installRoulette(bot, { grantPrize } = {}) {
           row.deliveryMessage = deliveryMessage;
           await writeState(user.id, fresh);
           json(res, 200, {
-            ok: true, canSpin: false, spinId,
+            ok: true, canSpin: fresh.bonusSpins > 0, bonusSpins: fresh.bonusSpins, spinId,
             prize: publicPrize(prize),
             prizeIndex: prize.wheelIndex,
             delivered,
