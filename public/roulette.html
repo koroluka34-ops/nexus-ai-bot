@@ -63,7 +63,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <p class="hint" id="spinsRemaining" style="color:#f4d47e;font-weight:850">Прокруток осталось: —</p>
     <div class="hint" id="rouletteCountdown" style="margin-top:8px;text-align:center;font-weight:800;color:#f4d47e">⏳ До обновления рулетки: считаем…</div>
     <div class="error" id="errorBox"></div>
-    <div class="result" id="result"><small>РЕЗУЛЬТАТ РУЛЕТКИ</small><h2 id="resultTitle"></h2><p id="resultText"></p></div>
+    <div class="result" id="result"><small>РЕЗУЛЬТАТ РУЛЕТКИ</small><h2 id="resultTitle"></h2><p id="resultText"></p><div id="resultActions" style="display:flex;flex-direction:column;gap:8px;margin-top:13px"></div></div>
   </section>
   <section class="panel" id="pendingPanel" style="display:none">
     <div class="section-head"><strong>🎁 Твои ожидающие подарки</strong><span>Пока хранятся у бота</span></div>
@@ -169,11 +169,29 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const no=(prizes||[]).find(p=>p.type==="none");
     if(no){const item=document.createElement("div");item.className="prize no-prize";const b=document.createElement("b");b.textContent="🍀 Без подарка";const s=document.createElement("span");s.textContent="Шанс: "+no.probability;item.append(b,s);prizesBox.append(item);}
   }
-  function showResult(prize,message,delivered){
+  function showResult(prize,message,delivered,spinId=""){
     result.classList.add("show");$("resultTitle").textContent=prize?.label||"Результат";
     let art=$("resultArtwork");if(!art){art=document.createElement("img");art.id="resultArtwork";art.style.cssText="display:block;max-width:180px;max-height:180px;object-fit:contain;margin:12px auto;border-radius:18px";$("resultTitle").after(art);}
     if(prize?.imageUrl){art.src=prize.imageUrl;art.alt=prize.label||"Приз";art.style.display="block";}else{art.removeAttribute("src");art.style.display="none";}
-    $("resultText").textContent=message+(delivered===false?" Напиши /paysupport — результат сохранён.":"");
+    const actions=$("resultActions");actions.replaceChildren();
+    const isGift=["gift","telegram_premium"].includes(prize?.type);
+    const waiting=isGift&&delivered===false;
+    $("resultText").textContent=waiting
+      ? "🎉 Ты выиграл(а): "+(prize?.label||"подарок")+". Подарок пока не отправлен: у бота недостаточно Stars или Telegram временно не позволяет его отправить. Он сохранён в ожидании — повторно крутить колесо не нужно."
+      : message;
+    if(waiting){
+      const view=document.createElement("button");view.className="spin";view.style.cssText="padding:12px;font-size:12px";view.textContent="🎁 ПОСМОТРЕТЬ ПОДАРОК В ОЖИДАНИИ";
+      view.addEventListener("click",()=>{$("pendingPanel").scrollIntoView({behavior:"smooth",block:"center"});});
+      const decline=document.createElement("button");decline.className="spin";decline.style.cssText="padding:12px;font-size:12px;background:linear-gradient(100deg,#8f3547,#d75c69);border-color:#f5a0a8;color:white";decline.textContent="❌ ОТКАЗАТЬСЯ ОТ ЭТОГО ПОДАРКА";
+      decline.addEventListener("click",async()=>{
+        if(!spinId){$("resultText").textContent="Не удалось определить этот подарок. Открой список ожидающих подарков ниже и откажись от него там.";return;}
+        if(!confirm("Отказаться именно от этого подарка? Другие ожидающие подарки останутся."))return;
+        decline.disabled=true;
+        try{await api("/roulette/api/decline","POST",{spinId});$("resultText").textContent="Ты отказался от подарка. Он удалён из ожидания и не будет отправлен.";actions.replaceChildren();await refresh();}
+        catch(error){decline.disabled=false;errorBox.textContent=error.message;errorBox.classList.add("show");}
+      });
+      actions.append(view,decline);
+    }
   }
   const kyivDateFormatter=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit"});
   function kyivDateAt(ms){return kyivDateFormatter.format(new Date(ms));}
@@ -207,7 +225,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       spinButton.disabled=!data.canSpin;spinButton.textContent=data.canSpin?"🎁 КРУТИТЬ КОЛЕСО":"ВОЗВРАЩАЙСЯ ЗАВТРА";
       balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–500 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
       if(data.lastResult?.day===new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())){
-        showResult({label:data.lastResult.label},data.lastResult.status==="pending"?"Подарок ожидает проверки. Напиши /paysupport.":"Твой результат за сегодня.",data.lastResult.status!=="pending");
+        showResult({label:data.lastResult.label,type:data.lastResult.giftId||data.lastResult.cost?"gift":"none"},data.lastResult.status==="pending"?"Подарок сохранён в ожидании.":"Твой результат за сегодня.",data.lastResult.status!=="pending",data.lastResult.spinId);
       }
       errorBox.classList.remove("show");
     }catch(error){
@@ -226,7 +244,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const target=((360-((index+.5)*step))%360+360)%360;
       wheel.style.transition="none";wheel.style.transform="rotate(0deg)";void wheel.offsetWidth;wheel.style.transition="transform 5s cubic-bezier(.12,.72,.12,1)";wheel.style.transform="rotate("+(360*7+target)+"deg)";
       await new Promise(resolve=>setTimeout(resolve,5200));
-      showResult(data.prize,data.message,data.delivered);
+      showResult(data.prize,data.message,data.delivered,data.spinId);
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
     }catch(error){
