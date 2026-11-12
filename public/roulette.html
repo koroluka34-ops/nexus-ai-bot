@@ -128,7 +128,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <p class="hint" id="streakInfo">3 дня подряд — +1 прокрутка · 7 дней — +2 · 30 дней — +5. Серия повышает шанс подарочных секторов.</p>
   </section>
   <section class="panel">
-    <div class="section-head"><strong>🏆 Последние победители</strong><span>Лента NEXUS</span></div>
+    <div class="section-head"><strong>🏆 Лидеры по звёздам</strong><span>Топ игроков по ценности выигрышей</span></div>
     <div id="leaderboardList" class="prizes"><div class="prize"><b>Победители появятся здесь</b></div></div>
   </section>
   <section class="panel">
@@ -174,7 +174,6 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   const firstPanel=allPanels[0];
   firstPanel.before(pageHost);
   const pages=pageGroups.map((indices,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);pageHost.append(page);indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});return page;});
-  $("pageNav").remove();
   pageHost.after($("pageNav"));
   let activePage=0;
   function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="СТРАНИЦА "+(activePage+1)+" / "+pages.length;}
@@ -296,7 +295,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function renderLeaderboard(items){
     const box=$("leaderboardList");box.replaceChildren();
     if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🏆 Победителей пока нет";card.append(b);box.append(card);return;}
-    items.slice(0,10).forEach((item,index)=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=(index+1)+". "+(item.name||"Игрок");const meta=document.createElement("span");meta.textContent="Побед: "+(item.wins||0)+" · прокруток: "+(item.spins||0)+" · ценность призов: "+(item.cost||0)+" ⭐";card.append(b,meta);box.append(card);});
+    items.slice(0,10).forEach((item,index)=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=(index+1)+". "+(item.name||"Игрок");const meta=document.createElement("span");meta.textContent="Выиграно: "+(item.cost||0)+" ⭐ · побед: "+(item.wins||0)+" · прокруток: "+(item.spins||0);card.append(b,meta);box.append(card);});
   }
   function renderCollection(items){
     const box=$("collectionList");box.replaceChildren();
