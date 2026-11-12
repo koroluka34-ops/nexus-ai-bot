@@ -279,7 +279,7 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 
  .exchange-panel .inventory-actions{margin-top:14px;padding-top:14px;border-top:1px solid #ffffff18}.exchange-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:14px 0}.exchange-steps>div{display:grid;gap:6px;padding:10px 8px;border:1px solid #3c4e72;border-radius:12px;background:#101a30}.exchange-steps b{color:#f4d47e;font-size:11px}.exchange-steps span{font-size:9px;line-height:1.35;color:#b9c6dc}.exchange-slot{padding:11px;border:1px dashed #8b6b38;border-radius:12px;text-align:center;color:#ffe3a0;background:#382b1c66;font-size:11px;font-weight:850}
-</style>
+.trade-modal{display:none;position:fixed;inset:0;z-index:10010;background:#050914ed;backdrop-filter:blur(12px);align-items:center;justify-content:center;padding:14px}.trade-modal.open{display:flex}.trade-dialog{width:min(100%,560px);max-height:88vh;overflow:auto;padding:18px;border:1px solid #8b6b38;border-radius:20px;background:linear-gradient(155deg,#253858,#101827);box-shadow:0 25px 90px #000c}.trade-head{display:flex;justify-content:space-between;align-items:center}.trade-head h2{color:#ffe5a3;font-size:19px}.trade-close,.trade-back{padding:9px 12px;border:1px solid #526486;border-radius:10px;background:#17243c;color:#fff}.trade-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}.trade-option{min-height:115px;padding:14px;border:1px solid #53658b;border-radius:15px;background:#152744;color:#fff;text-align:left}.trade-option b{display:block;color:#ffe4a0}.trade-option span{display:block;margin-top:8px;font-size:10px;line-height:1.5;color:#bdcbe2}.trade-subview{display:none}.trade-subview.active{display:block}.trade-select-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}.trade-select-item{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid #3c4e72;border-radius:12px;background:#0d172b;font-size:10px}.trade-select-item img{width:42px;height:42px;object-fit:contain}.trade-primary{width:100%;padding:12px;border:1px solid #e2bb6a;border-radius:12px;background:linear-gradient(100deg,#d99a32,#f4d47e);color:#1b1720;font-weight:950}.trade-status{min-height:18px;margin-top:9px;color:#b9c8e0;font-size:11px}@media(max-width:380px){.trade-options,.trade-select-list{grid-template-columns:1fr}}</style>
 </head>
 <body>
 <main>
@@ -372,11 +372,10 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
   <p class="disclaimer">В рулетке прокручивается кейс NEXUS. После открытия показывается выбранный приз: настоящий Telegram-подарок или Premium-награда. Выдача выполняется ботом через Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
   <section class="panel" id="vaultPanel">
     <div class="section-head"><strong>🎒 Инвентарь NEXUS</strong><span id="inventoryCount">0 подарков</span></div>
-    <p class="hint">Отмечай 5 подарков для контракта обмена или улучши один подарок. Используются только уже доставленные Telegram-подарки.</p>
+    <p class="hint">Открой меню обмена: можно улучшать ожидающие подарки или искать обмен с другими игроками.</p>
     <div id="inventoryList" class="prizes"><div class="prize"><b>Инвентарь загружается…</b></div></div>
     <div class="inventory-actions">
-      <button class="spin" id="contractButton" disabled>🔄 КОНТРАКТ · 5 ПОДАРКОВ</button>
-      <p class="hint" id="contractStatus">5 подарков → один новый подарок стоимостью от 1,5× средней стоимости выбранных.</p>
+      <button class="spin" id="contractButton">🔄 ОТКРЫТЬ МЕНЮ ОБМЕНА</button><p class="hint" id="contractStatus">Выбери обмен с игроками или улучшение подарков.</p>
     </div>
     <div class="section-head" style="margin-top:18px"><strong>📜 История открытий</strong><span id="historyCount">0 записей</span></div>
     <div id="historyList" class="history-list"><p class="hint">История появится после первых прокруток.</p></div>
@@ -385,7 +384,7 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
 
 
 </main>
-<div class="profile-modal" id="profileModal" aria-hidden="true">
+<div class="trade-modal" id="tradeModal"><div class="trade-dialog"><div class="trade-head"><h2>🔄 Обмен подарков</h2><button class="trade-close" id="tradeClose">✕</button></div><div id="tradeHome"><p class="hint">Выбери действие. Меню доступно даже без подарков.</p><div class="trade-options"><button class="trade-option" id="tradePlayers"><b>🤝 Обмен с игроками</b><span>Поиск партнёра, предложения, чат и подтверждение сделки.</span></button><button class="trade-option" id="tradeUpgrade"><b>⬆️ Улучшить подарки</b><span>Выбери любое количество ожидающих подарков. Шанс 50/50.</span></button></div></div><div class="trade-subview" id="tradeUpgradeView"><button class="trade-back" id="tradeBackUpgrade">← Назад</button><b>Выбери подарки для улучшения</b><div class="trade-select-list" id="tradeUpgradeList"></div><button class="trade-primary" id="tradeUpgradeSubmit">⬆️ ПОПРОБОВАТЬ УЛУЧШИТЬ</button><div class="trade-status" id="tradeUpgradeStatus"></div></div><div class="trade-subview" id="tradePlayersView"><button class="trade-back" id="tradeBackPlayers">← Назад</button><b>🤝 Обмен с игроками</b><p class="hint">Серверный поиск игроков, комнаты и чат пока не подключены. Следующий этап — реальные сделки, без фиктивных заявок.</p></div></div></div><div class="profile-modal" id="profileModal" aria-hidden="true">
   <div class="profile-dialog" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
     <div class="profile-modal-head"><div><span class="profile-modal-kicker">NEXUS ACCOUNT</span><h2 id="profileModalTitle">👤 Мой профиль</h2></div><button type="button" class="profile-modal-close" id="profileClose" aria-label="Закрыть профиль">✕</button></div>
     <div class="section-head"><strong>Карточка игрока</strong><span id="vipBadge">BRONZE</span></div>
@@ -427,13 +426,13 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
   try{tg?.setHeaderColor?.("#080b18");tg?.setBackgroundColor?.("#080b18");}catch{}
   const initData=tg?.initData||"";
   const $=id=>document.getElementById(id);
-  const pageGroups=[{title:"Главная рулетка",subtitle:"Крути колесо, следи за шансами и забирай ежедневные награды.",indices:[0,10,6,7]},{title:"Кейсы и задания",subtitle:"Открывай CS2-кейсы, выполняй миссии, активируй промокоды и приглашай друзей.",indices:[4,3,2,5]},{title:"Мой инвентарь",subtitle:"Все выигранные и ожидающие подарки, коллекция и история открытий.",indices:[14,1]},{title:"Обмен подарков",subtitle:"Выбери пять доставленных Telegram-подарков в инвентаре и собери из них один новый.",indices:[]},{title:"Сообщество NEXUS",subtitle:"Рейтинг игроков, свежие выигрыши, достижения и календарь событий.",indices:[8,11,12,13,9]}];
+  const pageGroups=[{title:"Главная рулетка",subtitle:"Крути колесо, следи за шансами и забирай ежедневные награды.",indices:[0,10,6,7]},{title:"Кейсы и задания",subtitle:"Открывай CS2-кейсы, выполняй миссии, активируй промокоды и приглашай друзей.",indices:[4,3,2,5]},{title:"Мой инвентарь",subtitle:"Все выигранные и ожидающие подарки, коллекция и история открытий.",indices:[14,1]},{title:"Обмен подарков",subtitle:"Выбирай обмен с игроками или улучшение подарков с шансом 50/50.",indices:[]},{title:"Сообщество NEXUS",subtitle:"Рейтинг игроков, свежие выигрыши, достижения и календарь событий.",indices:[8,11,12,13,9]}];
   const allPanels=[...document.querySelectorAll("main > section.panel")];
   const pageHost=document.createElement("div");pageHost.id="pageHost";
   const firstPanel=allPanels[0];
   firstPanel.before(pageHost);
   const pages=pageGroups.map((group,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);const intro=document.createElement("div");intro.className="page-intro";intro.innerHTML='<div class="page-intro-kicker">NEXUS EXPERIENCE · 0'+(index+1)+'</div><div class="page-intro-title">'+group.title+'</div><p>'+group.subtitle+'</p>';page.append(intro);pageHost.append(page);group.indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});return page;});
-  const exchangePanel=document.createElement("section");exchangePanel.className="panel exchange-panel";exchangePanel.innerHTML='<div class="section-head"><strong>🔄 Контракт обмена</strong><span>5 → 1</span></div><p class="hint">Выбери ровно 5 доставленных Telegram-подарков на странице «Склад». NEXUS подберёт доступный подарок стоимостью не менее 1,5× средней стоимости выбранных.</p><div class="exchange-steps"><div><b>01</b><span>Отметь 5 подарков</span></div><div><b>02</b><span>Проверь условия</span></div><div><b>03</b><span>Получи новый подарок</span></div></div><div class="exchange-slot" id="exchangeSelectionHint">🎁 Выбрано: 0 / 5</div>';exchangePanel.append(document.querySelector(".inventory-actions"));pages[3].append(exchangePanel);
+  const exchangePanel=document.createElement("section");exchangePanel.className="panel exchange-panel";exchangePanel.innerHTML='<div class="section-head"><strong>🔄 Обмен подарков</strong><span>2 режима</span></div><p class="hint">Меню обмена открывается в любой момент. Выбирай игрока для сделки или улучшай ожидающие подарки.</p><div class="exchange-slot">Открой меню и выбери режим</div>';exchangePanel.append(document.querySelector(".inventory-actions"));pages[3].append(exchangePanel);
   pageHost.before($("pageNav"));
   let activePage=0;
   const pageTabs=[...document.querySelectorAll("[data-page-jump]")];
@@ -586,7 +585,7 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
       card.append(b,meta);box.append(card);
     });
   }
-  let inventoryItems=[],selectedInventory=new Set();
+  let inventoryItems=[],selectedInventory=new Set(),pendingExchangeItems=[];
   function updateExchangeSelectionHint(){const hint=$("exchangeSelectionHint");if(hint)hint.textContent="🎁 Выбрано: "+selectedInventory.size+" / 5";}
   function renderInventory(items){
     inventoryItems=Array.isArray(items)?items:[];
@@ -620,12 +619,12 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
       await refresh();
     }catch(error){
       if(status)status.textContent=error.message;
-      button.disabled=false;button.textContent="⬆️ УЛУЧШИТЬ · 35%";
+      button.disabled=false;button.textContent="⬆️ УЛУЧШИТЬ · 50%";
       await refresh().catch(()=>{});
     }
   }
   function renderPendingGifts(items){
-    const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();
+    const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();pendingExchangeItems=Array.isArray(items)?items:[];
     if(!Array.isArray(items)||!items.length){panel.style.display="none";return;}
     panel.style.display="block";
     items.forEach(item=>{
@@ -647,7 +646,7 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
         });
         card.append(title,meta,rule,claim);
         if(item.canUpgrade){
-          const upgradeRule=document.createElement("span");upgradeRule.className="pending-upgrade-rule";upgradeRule.textContent="Улучшение: шанс 35% · новый подарок минимум в 2 раза дороже";
+          const upgradeRule=document.createElement("span");upgradeRule.className="pending-upgrade-rule";upgradeRule.textContent="Улучшение: шанс 50% · при неудаче подарок сгорит";
           const upgrade=document.createElement("button");upgrade.className="spin";upgrade.style.cssText="margin-top:8px;padding:10px 8px;font-size:11px;background:linear-gradient(100deg,#39445c,#222d45);color:#e8edf8;border-color:#64748b";upgrade.textContent="⬆️ УЛУЧИТЬ · 35%";upgrade.addEventListener("click",()=>upgradePendingGift(item.spinId,upgrade,status));
           card.append(upgradeRule,upgrade);
         }
@@ -1148,13 +1147,8 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
     }
   }
-  $("contractButton").addEventListener("click",async()=>{
-    if(selectedInventory.size!==5)return;
-    const button=$("contractButton");button.disabled=true;button.textContent="🔄 СОБИРАЕМ КОНТРАКТ…";
-    try{const result=await api("/roulette/api/contract","POST",{spinIds:[...selectedInventory]});$("contractStatus").textContent="🎉 "+result.message+" "+result.label;selectedInventory.clear();await refresh();}
-    catch(error){$("contractStatus").textContent=error.message;}
-    finally{button.textContent="🔄 КОНТРАКТ · 5 ПОДАРКОВ";button.disabled=selectedInventory.size!==5;}
-  });
+  function drawTradeUpgrade(){const box=$("tradeUpgradeList");box.replaceChildren();const available=pendingExchangeItems.filter(x=>x.canUpgrade&&!x.claimedAt&&!x.listingId&&!x.tradeLock);if(!available.length){const p=document.createElement("p");p.className="hint";p.textContent="Пока нет ожидающих подарков для улучшения.";box.append(p);return;}available.forEach(item=>{const label=document.createElement("label");label.className="trade-select-item";const cb=document.createElement("input");cb.type="checkbox";cb.value=item.spinId;const img=document.createElement("img");img.src=item.imageUrl||"";const name=document.createElement("span");name.textContent=item.label+" · "+item.cost+" ⭐";label.append(cb,img,name);box.append(label);});}
+  $("contractButton").addEventListener("click",()=>{$("tradeModal").classList.add("open");$("tradeHome").style.display="block";$("tradeUpgradeView").classList.remove("active");$("tradePlayersView").classList.remove("active");});$("tradeClose").addEventListener("click",()=>$("tradeModal").classList.remove("open"));$("tradeModal").addEventListener("click",e=>{if(e.target===$("tradeModal"))$("tradeModal").classList.remove("open");});$("tradePlayers").addEventListener("click",()=>{$("tradeHome").style.display="none";$("tradePlayersView").classList.add("active");});$("tradeUpgrade").addEventListener("click",()=>{$("tradeHome").style.display="none";$("tradeUpgradeView").classList.add("active");drawTradeUpgrade();});$("tradeBackUpgrade").addEventListener("click",()=>{$("tradeUpgradeView").classList.remove("active");$("tradeHome").style.display="block";});$("tradeBackPlayers").addEventListener("click",()=>{$("tradePlayersView").classList.remove("active");$("tradeHome").style.display="block";});$("tradeUpgradeSubmit").addEventListener("click",async()=>{const spinIds=[...$("tradeUpgradeList").querySelectorAll("input:checked")].map(x=>x.value);if(!spinIds.length){$("tradeUpgradeStatus").textContent="Сначала выбери подарок.";return;}const b=$("tradeUpgradeSubmit");b.disabled=true;try{const r=await api("/roulette/api/pending-upgrade","POST",{spinIds});$("tradeUpgradeStatus").textContent=r.message+" "+(r.label||"");await refresh();drawTradeUpgrade();}catch(e){$("tradeUpgradeStatus").textContent=e.message;}finally{b.disabled=false;}});
   $("caseRepeat").addEventListener("click",()=>{if(caseOpening)return;unlockCaseAudio();$("caseRepeat").classList.remove("show");$("caseReveal").classList.remove("show");$("caseSelectStage").style.display="flex";$("caseStage").style.display="none";$("caseModalPrize").textContent="🎁 ГОТОВИМ СЛЕДУЮЩИЙ КЕЙС";startCaseOpening();});
   $("caseButton").addEventListener("click",()=>{if(caseOpening)return;unlockCaseAudio();openCaseModal();startCaseOpening();});
   $("caseClose").addEventListener("click",closeCaseModal);
