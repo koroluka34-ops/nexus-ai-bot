@@ -134,7 +134,9 @@ function ensureDailyQuests(state, userId) {
   if (!state.dailyQuests || state.dailyQuests.day !== today || !Array.isArray(state.dailyQuests.tasks)) {
     // Four rotating daily missions: a mix of roulette, cases and real gift delivery.
     const pool = [
+      {id:"spin3",title:"Сделай 3 прокрутки рулетки",kind:"spins",target:3,reward:9},
       {id:"spin4",title:"Сделай 4 прокрутки рулетки",kind:"spins",target:4,reward:12},
+      {id:"spin5",title:"Сделай 5 прокруток рулетки",kind:"spins",target:5,reward:15},
       {id:"spin8",title:"Сделай 8 прокруток рулетки",kind:"spins",target:8,reward:24},
       {id:"spin12",title:"Сделай 12 прокруток рулетки",kind:"spins",target:12,reward:42},
       {id:"win2",title:"Выиграй 2 приза в рулетке",kind:"wins",target:2,reward:18},
@@ -782,7 +784,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           if (String(spin.prize || "") === "no_prize" || String(spin.prize || "").includes("no_prize")) break;
           currentWinStreak++;
         }
-        const vipTiers = [{ key: "bronze", label: "BRONZE", min: 0 }, { key: "silver", label: "SILVER", min: 25 }, { key: "gold", label: "GOLD", min: 100 }, { key: "diamond", label: "DIAMOND", min: 300 }];
+        const vipTiers = [{ key: "bronze", label: "BRONZE", min: 0 }, { key: "silver", label: "SILVER", min: 10 }, { key: "gold", label: "GOLD", min: 25 }, { key: "platinum", label: "PLATINUM", min: 60 }, { key: "diamond", label: "DIAMOND", min: 120 }, { key: "master", label: "MASTER", min: 250 }, { key: "legend", label: "LEGEND", min: 500 }];
         const mySpinCount = Math.max(0, Number(myStats.spins) || 0);
         const vipIndex = vipTiers.reduce((best, tier, index) => mySpinCount >= tier.min ? index : best, 0);
         const vipTier = vipTiers[vipIndex], nextVipTier = vipTiers[vipIndex + 1] || null;
@@ -794,7 +796,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           cost: Number(item.cost || 0), createdAt: item.createdAt || 0
         }));
         json(res, 200, {
-          ok: true, profile: { userId: String(user.id), name: myStats.name || user.firstName || "Игрок", photoUrl: user.photoUrl || "", spins: mySpinCount, wins: Math.max(0, Number(myStats.wins) || 0), losses: Math.max(0, Number(myStats.losses) || 0), prizeValue: Math.max(0, Number(myStats.cost) || 0), winStreak: currentWinStreak, vip: vipTier.key, vipLabel: vipTier.label, vipNext: nextVipTier ? { label: nextVipTier.label, min: nextVipTier.min } : null }, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
+          ok: true, profile: { userId: String(user.id), name: myStats.name || user.firstName || "Игрок", photoUrl: user.photoUrl || "", spins: mySpinCount, wins: Math.max(0, Number(myStats.wins) || 0), losses: Math.max(0, Number(myStats.losses) || 0), prizeValue: Math.max(0, Number(myStats.cost) || 0), winStreak: currentWinStreak, vip: vipTier.key, vipLabel: vipTier.label, vipCurrentMin: vipTier.min, vipNext: nextVipTier ? { label: nextVipTier.label, min: nextVipTier.min } : null }, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
           lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, coins: state.coins || 0, dailyQuests, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.cost) - Number(a.cost)) || (Number(b.wins) - Number(a.wins))).slice(0, 10),
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
           luckBoost: catalog.luckBoost,
@@ -832,7 +834,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           })(),
           prizes: catalog.prizes.map(publicPrize),
           unavailableReason: catalog.gifts.length ? "" : "Нет доступных подарков стоимостью 15–1000 ⭐ или не хватает Stars на балансе бота.",
-          inventory: state.history.filter(item => item.status === "delivered" && item.giftId && Number(item.cost) > 0).slice(-50).reverse().map(item => ({ spinId: item.spinId, label: item.label || "Telegram Gift", cost: Number(item.cost || 0), imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.giftId), at: item.deliveredAt || item.at || 0 })),
+          inventory: state.history.filter(item => item.status === "delivered" && (item.giftId || Number(item.cost) > 0 || /подарок|gift|premium|ultra/i.test(item.label || ""))).slice(-50).reverse().map(item => ({ spinId: item.spinId, giftId: item.giftId || "", tradeable: Boolean(item.giftId), label: item.label || "Выигранный приз", cost: Number(item.cost || 0), imageUrl: item.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(item.giftId) : (/Telegram Premium/i.test(item.label || "") ? "/assets/telegram-premium.svg" : /NEXUS Ultra/i.test(item.label || "") ? "/assets/nexus-ultra.svg" : /NEXUS Premium/i.test(item.label || "") ? "/assets/nexus-premium.svg" : ""), at: item.deliveredAt || item.at || 0 })),
           history: state.history.slice(-40).reverse().map(item => ({ spinId: item.spinId, label: item.label || item.prize || "Прокрутка", cost: Number(item.cost || 0), status: item.status || "unknown", source: item.source || "roulette", at: item.at || 0 })),
           bestWin: state.history.filter(item => item.status === "delivered").sort((a,b) => Number(b.cost||0)-Number(a.cost||0))[0] || null,
           lastResult: state.history.at(-1) || null
