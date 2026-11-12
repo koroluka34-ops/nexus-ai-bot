@@ -506,8 +506,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("dailyQuestList").addEventListener("click",event=>{const button=event.target.closest("button[data-quest]");if(button)claimQuest(button.dataset.quest);});
   async function animateCaseOpening(reward){
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
-    const pool=["🎁 Сюрприз","🪙 Биткоины","💰 Большой выигрыш","🎰 Прокрутка","💎 Редкий приз","✨ Бонус"];
-    const entries=Array.from({length:18},(_,i)=>({icon:["🎁","🪙","💰","🎰","💎","✨"][i%6],label:pool[i%pool.length]}));
+    const pool=["🎁 Сюрприз","₿ Биткоины","💰 Большой выигрыш","🎰 Прокрутка","💎 Редкий приз","✨ Бонус"];
+    const entries=Array.from({length:18},(_,i)=>({icon:["🎁","₿","💰","🎰","💎","✨"][i%6],label:pool[i%pool.length]}));
     entries.push({icon:reward.spins>=10?"👑":reward.spins?"🎰":reward.coins>=35?"💎":"₿",label:reward.title+" · "+reward.detail,winner:true});
     track.replaceChildren();
     entries.forEach(entry=>{const tile=document.createElement("div");tile.className="case-tile"+(entry.winner?" winner":"");const icon=document.createElement("span");icon.textContent=entry.icon;const small=document.createElement("small");small.textContent=entry.label;tile.append(icon,small);track.append(tile);});
