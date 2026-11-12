@@ -781,20 +781,78 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         if (locks.has("case:" + user.id)) { json(res, 409, { ok: false, error: "Кейс уже открывается." }); return true; }
         locks.add("case:" + user.id);
         try {
-          const state = await readState(user.id), cost = 20;
-          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Нужно 20 ₿ для открытия кейса." }); return true; }
+          const [state, giftResponse, botBalance] = await Promise.all([
+            readState(user.id), telegramApi("getAvailableGifts"), getStarBalance()
+          ]);
+          const cost = 20;
+          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Для открытия кейса нужно 20 ₿." }); return true; }
+          const available = (Array.isArray(giftResponse?.gifts) ? giftResponse.gifts : [])
+            .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
+            .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
+            .filter(g => Number(g.star_count) <= botBalance);
+          if (!available.length) {
+            json(res, 503, { ok: false, error: "Сейчас нет Telegram-подарков, которые бот может отправить. Попробуй позже — твои 20 ₿ не списаны." });
+            return true;
+          }
+          const pickFrom = (min, max) => available.filter(g => Number(g.star_count) >= min && Number(g.star_count) <= max);
+          const roll = crypto.randomInt(10000);
+          const tiers = [
+            { limit: 5500, min: 15, max: 50 },
+            { limit: 8200, min: 51, max: 100 },
+            { limit: 9600, min: 101, max: 250 },
+            { limit: 9900, min: 251, max: 500 },
+            { limit: 10000, min: 501, max: 1000 }
+          ];
+          const tier = tiers.find(t => roll < t.limit) || tiers[0];
+          let candidates = pickFrom(tier.min, tier.max);
+          if (!candidates.length) candidates = available;
+          const gift = candidates[crypto.randomInt(0, candidates.length)];
+          const spinId = crypto.randomUUID();
+          const giftEmoji = gift.sticker?.emoji || "🎁";
+          const giftTitle = giftEmoji + " Telegram-подарок";
+          const reward = {
+            title: giftTitle, detail: Number(gift.star_count) + " ⭐ · настоящий подарок Telegram",
+            type: "gift", giftId: gift.id, giftStars: Number(gift.star_count),
+            imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(gift.id),
+            coins: 0, spins: 0, status: "processing"
+          };
+          const row = {
+            spinId, day: kyivDay(), prize: "case_gift", label: giftTitle + " · " + Number(gift.star_count) + " ⭐",
+            giftId: gift.id, cost: Number(gift.star_count), status: "processing", at: Date.now(), source: "case"
+          };
+          const queueItem = {
+            spinId, userId: String(user.id), type: "case_gift", giftId: gift.id,
+            cost: Number(gift.star_count), label: row.label, createdAt: Date.now(), source: "case"
+          };
+          const reelPool = Array.from({ length: 19 }, () => {
+            const item = available[crypto.randomInt(0, available.length)];
+            return {
+              title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
+              detail: Number(item.star_count) + " ⭐",
+              imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
+            };
+          });
+          const reel = [...reelPool, { title: giftTitle, detail: Number(gift.star_count) + " ⭐", imageUrl: reward.imageUrl }];
           state.coins -= cost;
-          const roll = crypto.randomInt(100);
-          let reward;
-          if (roll < 40) { state.coins += 22; reward = { title: "🪙 Маленький выигрыш", detail: "+22 ₿ · чистая прибыль 2 ₿", coins: 22, spins: 0 }; }
-          else if (roll < 70) { state.coins += 25; reward = { title: "💰 Хороший выигрыш", detail: "+25 ₿ · чистая прибыль 5 ₿", coins: 25, spins: 0 }; }
-          else if (roll < 90) { state.coins += 35; reward = { title: "💎 Крупный выигрыш", detail: "+35 ₿ · чистая прибыль 15 ₿", coins: 35, spins: 0 }; }
-          else if (roll < 98) { state.bonusSpins = Math.min(100000, state.bonusSpins + 2); reward = { title: "🎁 Две бонусные прокрутки", detail: "+2 прокрутки рулетки", coins: 0, spins: 2 }; }
-          else { state.bonusSpins = Math.min(100000, state.bonusSpins + 10); reward = { title: "👑 МЕГА-ДРОП", detail: "+10 прокруток рулетки", coins: 0, spins: 10 }; }
-          state.caseHistory = Array.isArray(state.caseHistory) ? state.caseHistory.slice(-19) : [];
-          state.caseHistory.push({ at: Date.now(), reward: reward.title, detail: reward.detail });
-          await writeState(user.id, state);
-          json(res, 200, { ok: true, coins: state.coins, bonusSpins: state.bonusSpins, reward });
+          state.history.push(row);
+          state.history = state.history.slice(-100);
+          try {
+            await writeState(user.id, state);
+            const queue = await readPendingQueue();
+            queue.push(queueItem);
+            await writePendingQueue(queue);
+          } catch (error) {
+            state.coins += cost;
+            state.history = state.history.filter(item => item.spinId !== spinId);
+            await writeState(user.id, state).catch(() => {});
+            throw error;
+          }
+          processPendingGiftQueue().catch(() => {});
+          json(res, 200, {
+            ok: true, coins: state.coins, bonusSpins: state.bonusSpins,
+            reward, reel, spinId,
+            message: "Кейс открыт! Настоящий Telegram-подарок поставлен на отправку."
+          });
           return true;
         } finally { locks.delete("case:" + user.id); }
       }
