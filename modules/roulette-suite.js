@@ -922,7 +922,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const queue = await readPendingQueue();
         const own = queue.filter(q => String(q.userId) === String(user.id) && !q.claimedAt && !q.listingId && !q.tradeLock && q.giftId);
         const safe = item => ({ spinId:item.spinId, label:item.label || "🎁 Telegram-подарок", cost:Number(item.cost||0), imageUrl:item.giftId ? "/roulette/api/gift-image/"+encodeURIComponent(item.giftId) : "" });
-        json(res,200,{ok:true, profileId:String(user.id), gifts:own.map(safe), listings:(market.listings||[]).filter(x=>x.status==="open"&&String(x.ownerId)!==String(user.id)).map(x=>({...x})), deals:(market.deals||[]).filter(x=>String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)).map(x=>({...x}))}); return true;
+        json(res,200,{ok:true, profileId:String(user.id), gifts:own.map(safe), listings:(market.listings||[]).filter(x=>x.status==="open").map(x=>({...x})), deals:(market.deals||[]).filter(x=>String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)).map(x=>({...x}))}); return true;
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/market/list") {
         const body=await readBody(req), ids=Array.isArray(body.spinIds)?[...new Set(body.spinIds.map(String))]:[];
@@ -938,6 +938,14 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           await writePendingQueue(queue);await writeGlobal("nexusMarket",market);
           json(res,200,{ok:true,message:"Объявление опубликовано.",listingId});return true;
         }finally{locks.delete("market-global");}
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/market/cancel") {
+        const body=await readBody(req),listingId=String(body.listingId||"");
+        const [market,queue]=await Promise.all([readGlobal("nexusMarket",{listings:[],deals:[]}),readPendingQueue()]);
+        const listing=(market.listings||[]).find(x=>x.listingId===listingId&&String(x.ownerId)===String(user.id)&&x.status==="open");
+        if(!listing){json(res,404,{ok:false,error:"Объявление уже закрыто."});return true;}
+        listing.status="cancelled";listing.updatedAt=Date.now();queue.forEach(q=>{if(q.listingId===listingId)delete q.listingId;});
+        await writePendingQueue(queue);await writeGlobal("nexusMarket",market);json(res,200,{ok:true,message:"Объявление снято, подарки снова доступны."});return true;
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/market/offer") {
         const body=await readBody(req),listingId=String(body.listingId||""),ids=Array.isArray(body.spinIds)?[...new Set(body.spinIds.map(String))]:[];
