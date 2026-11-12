@@ -79,7 +79,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div id="leaderboardList" class="prizes"><div class="prize"><b>Победители появятся здесь</b></div></div>
   </section>
   <section class="panel">
-    <div class="section-head"><strong>🗃️ Моя коллекция</strong><span>Подарки Telegram и коллекционные NFT</span></div>
+    <div class="section-head"><strong>🗃️ Моя коллекция</strong><span>Выигранные подарки Telegram</span></div>
     <div id="collectionList" class="prizes"><div class="prize"><b>Коллекция пока пуста</b></div></div>
   </section>
   <section class="panel">
@@ -88,7 +88,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize"><b>🎁 Подарки Telegram</b><span>Список загрузится автоматически</span></div>
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
-    <p class="hint">Здесь показаны настоящие подарки Telegram. Коллекционные подарки можно получить уже улучшенными до уникальных — стоимость улучшения оплачивает бот. Подарок за 1000 ⭐ — отдельный джекпот.</p>
+    <p class="hint">Здесь показаны настоящие подарки Telegram. Подарок за 1000 ⭐ — отдельный джекпот.</p>
   </section>
   <p class="disclaimer">В секторах показаны призы NEXUS. Настоящие Telegram-подарки отправляются ботом после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
 </main>
@@ -117,7 +117,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function makePrizeEmoji(prize){
     const art=document.createElement("span");art.className="slice-emoji";
-    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="telegram_collectible"?"💠":prize.type==="nexus_plus"?"💎":prize.type==="jackpot"?"💎":prize.type==="secret"?"❔":prize.type==="none"?"🍀":prize.type==="gift_random"?"🧸":"🎁";
+    art.textContent=prize.type==="nexus_ultra"?"🚀":prize.type==="nexus_plus"?"💎":prize.type==="jackpot"?"💎":prize.type==="secret"?"❔":prize.type==="none"?"🍀":prize.type==="gift_random"?"🧸":"🎁";
     return art;
   }
   function drawWheel(prizes){
@@ -133,7 +133,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
       }else label.append(makePrizeEmoji(prize));
       const text=document.createElement("span");text.className="slice-text";
-      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="telegram_collectible"?"TELEGRAM NFT":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"???":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
+      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"???":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
     });
   }
@@ -145,7 +145,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function renderCollection(items){
     const box=$("collectionList");box.replaceChildren();
     if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎁 Здесь будут твои выигранные подарки";const meta=document.createElement("span");meta.textContent="Все доставленные призы сохраняются в коллекции.";card.append(b,meta);box.append(card);return;}
-    items.forEach(item=>{const card=document.createElement("div");card.className="prize";if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt=item.label||"Telegram Gift";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}const b=document.createElement("b");b.textContent=item.collectible?"💠 "+(item.label||"Коллекционный подарок Telegram"):item.label||"🎁 Выигранный приз";const meta=document.createElement("span");meta.textContent=item.collectible?"Коллекционный подарок Telegram · улучшение оплачено NEXUS"+(item.collectible.upgradeCost?" · улучшение "+item.collectible.upgradeCost+" ⭐":""):item.day||"NEXUS Gift Roulette";card.append(b,meta);box.append(card);});
+    items.forEach(item=>{const card=document.createElement("div");card.className="prize";if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt=item.label||"Telegram Gift";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}const b=document.createElement("b");b.textContent=item.label||"🎁 Выигранный приз";const meta=document.createElement("span");meta.textContent=item.day||"NEXUS Gift Roulette";card.append(b,meta);box.append(card);});
   }
   function renderPendingGifts(items){
     const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();
@@ -167,7 +167,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function renderCatalog(prizes,giftOptions=[]){
     drawWheel(prizes);
-    const rewards=(prizes||[]).filter(p=>["jackpot","secret","nexus_plus","nexus_ultra","telegram_premium","telegram_collectible"].includes(p.type));
+    const rewards=(prizes||[]).filter(p=>["jackpot","secret","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
     $("giftCount").textContent=giftOptions.length+" реальных подарков · "+rewards.length+" особых призов";
     prizesBox.replaceChildren();
     giftOptions.forEach(gift=>{
@@ -179,7 +179,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent="🎁";item.append(art);
       }
       const b=document.createElement("b");b.textContent=gift.label;
-      const s=document.createElement("span");s.textContent="Цена: "+gift.cost+" ⭐"+(gift.collectible?" · 💠 NFT-апгрейд: +"+gift.upgradeStarCount+" ⭐":"")+" · шанс: "+gift.probability;
+      const s=document.createElement("span");s.textContent="Цена: "+gift.cost+" ⭐ · шанс: "+gift.probability;
       item.append(b,s);prizesBox.append(item);
     });
     rewards.forEach(prize=>{
@@ -190,7 +190,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       }else if(prize.imageUrl){
         const img=document.createElement("img");img.className="gift-art";img.src=prize.imageUrl;img.alt=prize.label;item.append(img);
       }else{
-        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="telegram_premium"?"⭐":prize.type==="nexus_ultra"?"🚀":prize.type==="telegram_collectible"?"💠":prize.type==="jackpot"?"💎":prize.type==="secret"?"🎁":prize.type==="gift_random"?"🧸":"💎";item.append(art);
+        const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=prize.type==="telegram_premium"?"⭐":prize.type==="nexus_ultra"?"🚀":prize.type==="jackpot"?"💎":prize.type==="secret"?"🎁":prize.type==="gift_random"?"🧸":"💎";item.append(art);
       }
       const b=document.createElement("b");b.textContent=prize.label;
       const s=document.createElement("span");s.textContent=prize.available===false?"Сейчас недоступен · нужно 2500 ⭐ на балансе бота":"Шанс: "+prize.probability;
