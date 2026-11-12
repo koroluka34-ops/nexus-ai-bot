@@ -557,14 +557,25 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const giftId = decodeURIComponent(url.pathname.slice("/roulette/api/gift-image/".length));
         const result = await telegramApi("getAvailableGifts");
         const gift = (result?.gifts || []).find(item => item.id === giftId);
-        const fileId = gift?.sticker?.thumbnail?.file_id || gift?.sticker?.file_id;
+        // Prefer Telegram's static thumbnail: animated/video/TGS sticker files
+        // cannot be displayed reliably by a normal HTML <img> element.
+        const sticker = gift?.sticker;
+        const thumbnail = sticker?.thumbnail;
+        const fileId = thumbnail?.file_id || (sticker?.format === "static" ? sticker?.file_id : "");
         if (!fileId) { res.writeHead(404); res.end(); return true; }
         const file = await bot.api.getFile(fileId);
         if (!file?.file_path) { res.writeHead(404); res.end(); return true; }
         const remote = await fetch("https://api.telegram.org/file/bot" + BOT_TOKEN + "/" + file.file_path);
         if (!remote.ok) { res.writeHead(502); res.end(); return true; }
+        // Telegram's file server can return application/octet-stream for image
+        // stickers. Infer a safe image MIME type from the actual file extension;
+        // nosniff would otherwise make browsers refuse to render the image.
+        const extension = require("node:path").extname(file.file_path).toLowerCase();
+        const imageTypes = { ".webp": "image/webp", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" };
+        const contentType = imageTypes[extension] || (String(remote.headers.get("content-type") || "").toLowerCase().startsWith("image/") ? remote.headers.get("content-type") : "");
+        if (!contentType) { res.writeHead(415); res.end(); return true; }
         res.writeHead(200, {
-          "Content-Type": remote.headers.get("content-type") || "application/octet-stream",
+          "Content-Type": contentType,
           "Cache-Control": "public, max-age=3600",
           "X-Content-Type-Options": "nosniff"
         });
