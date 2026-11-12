@@ -102,18 +102,24 @@ function dailyQuestProgress(state, quest, today) {
 function ensureDailyQuests(state, userId) {
   const today = kyivDay();
   if (!state.dailyQuests || state.dailyQuests.day !== today || !Array.isArray(state.dailyQuests.tasks)) {
+    // Daily tasks are separate from the permanent referral mission below.
+    // Rotate every unfinished daily task at Kyiv midnight and avoid repeating
+    // yesterday's pair whenever the pool allows it.
     const pool = [
+      { id: "spin2", title: "Сделай 2 прокрутки", kind: "spins", target: 2, reward: 5 },
       { id: "spin3", title: "Сделай 3 прокрутки", kind: "spins", target: 3, reward: 8 },
       { id: "spin5", title: "Сделай 5 прокруток", kind: "spins", target: 5, reward: 12 },
       { id: "win1", title: "Получи любой приз", kind: "wins", target: 1, reward: 10 },
-      { id: "invite1", title: "Пригласи нового игрока", kind: "referrals", target: Number(state.referralCount || 0) + 1, reward: 15 }
+      { id: "win2", title: "Получи 2 любых приза", kind: "wins", target: 2, reward: 18 },
+      { id: "spin7", title: "Сделай 7 прокруток", kind: "spins", target: 7, reward: 16 }
     ];
-    const seed = crypto.createHash("sha256").update(String(userId) + ":" + today).digest();
-    const chosen = [];
-    while (chosen.length < 2 && pool.length) {
-      const index = seed[chosen.length] % pool.length;
-      chosen.push(pool.splice(index, 1)[0]);
-    }
+    const previousIds = new Set((state.dailyQuests?.tasks || []).map(q => q.id));
+    const seed = crypto.createHash("sha256").update(String(userId) + ":" + today + ":daily-quests-v2").digest();
+    const order = pool.map((q, index) => ({ q, key: seed.readUInt32BE((index * 4) % 28) }))
+      .sort((a, b) => a.key - b.key);
+    const fresh = order.filter(item => !previousIds.has(item.q.id));
+    const chosen = [...fresh, ...order.filter(item => previousIds.has(item.q.id))]
+      .slice(0, 2).map(item => item.q);
     state.dailyQuests = { day: today, tasks: chosen.map(q => ({ ...q, claimed: false })) };
   }
   return state.dailyQuests.tasks.map(q => ({
