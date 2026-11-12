@@ -561,11 +561,43 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       const keyboard = new InlineKeyboard();
       const lines = pending.map((item, index) => {
         const label = item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram");
-        keyboard.text("❌ Отказаться от подарка №" + (index + 1), "rdecline_" + item.spinId).row();
-        return (index + 1) + ". " + label + " — ожидает отправки" + (item.cost ? " (" + item.cost + " ⭐)" : "");
+        if (item.claimedAt) keyboard.text("⏳ Отправка запрошена №" + (index + 1), "rstatus_" + item.spinId).row();
+        else {
+          keyboard.text("🎁 Забрать №" + (index + 1), "rclaim_" + item.spinId).row();
+          keyboard.text("🗑 Удалить №" + (index + 1), "rdecline_" + item.spinId).row();
+        }
+        return (index + 1) + ". " + label + (item.claimedAt ? " — отправка запрошена" : " — хранится в NEXUS") + (item.cost ? " (" + item.cost + " ⭐)" : "");
       });
-      return ctx.reply("🎁 <b>ТВОИ ОЖИДАЮЩИЕ ПОДАРКИ</b>\n\n" + lines.join("\n") + "\n\nПодарки отправятся автоматически, когда у бота появятся нужные Stars. Чтобы отказаться, нажми кнопку под списком.", { parse_mode: "HTML", reply_markup: keyboard });
+      return ctx.reply("🎁 <b>ТВОИ ОЖИДАЮЩИЕ ПОДАРКИ</b>\n\n" + lines.join("\n") + "\n\nПодарки не отправляются автоматически. Нажми «Забрать», когда будешь готов получить награду в Telegram.", { parse_mode: "HTML", reply_markup: keyboard });
     } catch (error) { return ctx.reply("❌ Не удалось загрузить подарки: " + String(error.message || error).slice(0, 200)); }
+  });
+
+  bot.callbackQuery(/^rclaim_([a-f0-9-]{36})$/i, async ctx => {
+    const spinId = ctx.match[1];
+    if (locks.has("pending-claim")) { await ctx.answerCallbackQuery({ text: "Сейчас обрабатывается другая выдача.", show_alert: true }); return; }
+    const waitUntil = Date.now() + 7000;
+    while (queueWorkerRunning && Date.now() < waitUntil) await new Promise(resolve => setTimeout(resolve, 150));
+    if (queueWorkerRunning) { await ctx.answerCallbackQuery({ text: "Очередь занята. Попробуй ещё раз через несколько секунд.", show_alert: true }); return; }
+    locks.add("pending-claim");
+    try {
+      const [queue, state] = await Promise.all([readPendingQueue(), readState(ctx.from.id)]);
+      const item = queue.find(entry => entry.spinId === spinId && String(entry.userId) === String(ctx.from.id));
+      const row = state.history.find(entry => entry.spinId === spinId);
+      if (!item || !row || !["processing", "pending"].includes(row.status) || item.claimedAt) {
+        await ctx.answerCallbackQuery({ text: "Подарок уже забран или недоступен.", show_alert: true }); return;
+      }
+      if (item.listingId || item.tradeLock) { await ctx.answerCallbackQuery({ text: "Подарок участвует в обмене.", show_alert: true }); return; }
+      const oldQueue = JSON.parse(JSON.stringify(queue)), oldState = JSON.parse(JSON.stringify(state));
+      item.claimedAt = Date.now(); item.claimedBy = String(ctx.from.id);
+      row.status = "processing"; row.claimedAt = item.claimedAt; row.deliveryMessage = "Пользователь запросил отправку подарка.";
+      try { await writeState(ctx.from.id, state); await writePendingQueue(queue); }
+      catch (error) { await writeState(ctx.from.id, oldState).catch(() => {}); await writePendingQueue(oldQueue).catch(() => {}); throw error; }
+      await ctx.answerCallbackQuery({ text: "Запрос принят! Отправляем награду." });
+      await ctx.editMessageText("🎁 Запрос на получение принят. Бот отправит подарок в Telegram, когда сможет.");
+    } catch (error) {
+      await ctx.answerCallbackQuery({ text: "Ошибка: " + String(error.message || error).slice(0, 120), show_alert: true });
+    } finally { locks.delete("pending-claim"); }
+    processPendingGiftQueue().catch(() => {});
   });
 
   bot.callbackQuery(/^rdecline_([a-f0-9-]{36})$/i, async ctx => {
@@ -574,6 +606,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       const queue = await readPendingQueue();
       const item = queue.find(entry => entry.spinId === spinId && String(entry.userId) === String(ctx.from.id));
       if (!item) { await ctx.answerCallbackQuery({ text: "Подарок уже отправлен или удалён.", show_alert: true }); return; }
+      if (item.claimedAt || item.listingId || item.tradeLock) { await ctx.answerCallbackQuery({ text: "Этот подарок уже забирается или участвует в обмене.", show_alert: true }); return; }
       await writePendingQueue(queue.filter(entry => entry.spinId !== spinId));
       const state = await readState(ctx.from.id);
       const row = state.history.find(entry => entry.spinId === spinId);
@@ -696,7 +729,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         "🎁 Доступно подарков для рулетки: <b>" + catalog.gifts.length + "</b>\n" +
         (cheapest ? "Самый дешёвый доступный подарок: <b>" + cheapest.cost + " ⭐</b>" : "Пока нет подарков, которые можно оплатить с текущего баланса.") +
         "\n⏳ Ожидают отправки: <b>" + queue.length + "</b>" +
-        "\n\nПодарки отправляются автоматически после пополнения баланса бота. Получатель может показать их в профиле, но подарок от бота нельзя обменять на Stars.",
+        "\n\nПодарки отправляются только после нажатия игроком «Забрать». Получатель может показать их в профиле, но подарок от бота нельзя обменять на Stars.",
         { parse_mode: "HTML" }
       );
     } catch (error) {
@@ -1116,7 +1149,8 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const [state, queue] = await Promise.all([readState(user.id), readPendingQueue()]);
           const item = queue.find(entry => entry.spinId === spinId && String(entry.userId) === String(user.id));
           const row = state.history.find(entry => entry.spinId === spinId);
-          if (!item || !row || row.status !== "processing") { json(res, 404, { ok: false, error: "Подарок уже забран, удалён или недоступен." }); return true; }
+          if (!item || !row || !["processing", "pending"].includes(row.status)) { json(res, 404, { ok: false, error: "Подарок уже забран, удалён или недоступен." }); return true; }
+          row.status = "processing";
           if (item.listingId || item.tradeLock) { json(res, 409, { ok: false, error: "Подарок участвует в обмене. Сначала отмени объявление или сделку." }); return true; }
           if (item.claimedAt) { json(res, 409, { ok: false, error: "Отправка этого подарка уже запрошена. Проверь статус ниже." }); return true; }
           const oldState = JSON.parse(JSON.stringify(state)), oldQueue = JSON.parse(JSON.stringify(queue));
