@@ -108,7 +108,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .case-reveal .case-reveal-value{font-size:14px;font-weight:950;color:#ffe3a0;margin-top:7px}
 .case-open-lock{opacity:.7;pointer-events:none}
 @media(max-width:420px){.case-dialog{padding:15px}.case-stage{height:154px}.case-tile{height:128px}.case-tile img{width:56px;height:56px}}
-</style>
+\n/* Opaque, CS-style case roulette */\n.case-modal{background:rgba(3,7,17,.97)!important;backdrop-filter:blur(12px)}\n.case-dialog{background:linear-gradient(155deg,#263a60 0%,#17233d 48%,#100f1b 100%)!important;opacity:1!important;isolation:isolate;border:1px solid #d1a85c!important;box-shadow:0 28px 100px #000!important}\n.case-stage{background:linear-gradient(180deg,#080e1c 0%,#182844 48%,#080e1c 100%)!important;opacity:1!important;min-height:174px;border:2px solid #b58a48!important;box-shadow:inset 0 0 34px #000d,0 10px 30px #0009!important}\n.case-stage:before{background:linear-gradient(90deg,#080e1c 8%,#080e1cdd 48%,transparent)!important}\n.case-stage:after{background:linear-gradient(270deg,#080e1c 8%,#080e1cdd 48%,transparent)!important}\n.case-tile.case-reel-crate{height:140px;flex-basis:116px;gap:5px;background:linear-gradient(155deg,#263b5d,#101a2e)!important;border:1px solid #7387a9;box-shadow:inset 0 0 18px #0009,0 4px 12px #0008}\n.reel-case-art{width:74px;height:72px;position:relative;filter:drop-shadow(0 7px 5px #000b)}\n.reel-case-body{position:absolute;left:8px;right:8px;bottom:7px;height:43px;border:2px solid #e5c27c;border-radius:5px;background:linear-gradient(135deg,#bd8538,#70431e 65%,#d7a34e);clip-path:polygon(0 13%,50% 0,100% 13%,100% 100%,0 100%)}\n.reel-case-lid{position:absolute;left:5px;right:5px;top:8px;height:19px;border:2px solid #f6dda0;border-radius:4px;background:linear-gradient(100deg,#ffe6a0,#bb8135 50%,#f5d17d);transform:skewY(-9deg)}\n.reel-case-mark{position:absolute;left:0;right:0;top:38px;text-align:center;color:#fff0bd;font-size:19px;text-shadow:0 2px 4px #3b210d}\n.case-reel-crate .case-name{font-size:10px;font-weight:1000;letter-spacing:.12em;color:#fff0c2}\n.case-reel-crate .case-rarity{font-size:9px}\n.case-tile.winner{border:2px solid #ffe18b!important;box-shadow:0 0 30px #f5cf68aa,inset 0 0 18px #f5cf6833!important}\n.case-modal-prize{background:#111d34;border:1px solid #8c7041;border-radius:12px;padding:12px;text-align:center;color:#ffe5a4}\n</style>
 </head>
 <body>
 <main>
@@ -593,15 +593,15 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const source=Array.isArray(reel)?reel:[];
     const previews=source.slice(0,-1),winningEntry=source.length?source[source.length-1]:null;const entries=Array.from({length:3},()=>previews).flat().map(item=>({...item,winner:false}));if(winningEntry)entries.push({...winningEntry,winner:true});
     track.replaceChildren();
-    entries.forEach(entry=>{
+    entries.forEach((entry,index)=>{
       const stars=Number((entry.detail||"").match(/\d+/)?.[0]||0),rarity=caseRarity(stars);
-      const tile=document.createElement("div");tile.className="case-tile rarity-"+rarity.key+(entry.winner?" winner":"");
-      if(entry.imageUrl){
-        const img=document.createElement("img");img.src=entry.imageUrl;img.alt="Telegram-подарок";
-        img.onerror=()=>{img.remove();const icon=document.createElement("span");icon.textContent="🎁";icon.style.fontSize="42px";tile.prepend(icon);};tile.append(img);
-      }else{const icon=document.createElement("span");icon.textContent="🎁";icon.style.fontSize="42px";tile.append(icon);}
-      const name=document.createElement("div");name.className="case-name";name.textContent="Подарок Telegram";tile.append(name);
-      const small=document.createElement("small");small.textContent=stars+" ⭐";tile.append(small);
+      const tile=document.createElement("div");tile.className="case-tile case-reel-crate rarity-"+rarity.key+(entry.winner?" winner":"");
+      const shell=document.createElement("div");shell.className="reel-case-art";
+      const lid=document.createElement("span");lid.className="reel-case-lid";shell.append(lid);
+      const body=document.createElement("span");body.className="reel-case-body";shell.append(body);
+      const mark=document.createElement("b");mark.className="reel-case-mark";mark.textContent="N";shell.append(mark);
+      tile.append(shell);
+      const name=document.createElement("div");name.className="case-name";name.textContent="NEXUS CASE";tile.append(name);
       const tier=document.createElement("div");tier.className="case-rarity";tier.textContent=rarity.label;tile.append(tier);
       track.append(tile);
     });
@@ -651,7 +651,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
     }
   }
-  $("caseButton").addEventListener("click",()=>{openCaseModal();startCaseOpening();});
+  $("caseButton").addEventListener("click",openCaseModal);
   $("caseClose").addEventListener("click",closeCaseModal);
   $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
   $("caseOpenConfirm").addEventListener("click",startCaseOpening);
