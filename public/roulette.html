@@ -223,7 +223,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   const pages=pageGroups.map((indices,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);pageHost.append(page);indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});return page;});
   pageHost.after($("pageNav"));
   let activePage=0;
-  function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="СТРАНИЦА "+(activePage+1)+" / "+pages.length;}
+  function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="СТРАНИЦА "+(activePage+1)+" / "+pages.length;window.scrollTo({top:0,left:0,behavior:"instant"});}
   $("prevPage").addEventListener("click",()=>showPage(activePage-1));$("nextPage").addEventListener("click",()=>showPage(activePage+1));
   const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),pointer=document.querySelector(".pointer"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
