@@ -256,7 +256,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
   const webAppUrl = makeWebAppUrl();
   const referralLocks = new Set();
   async function registerReferral(userId, payload) {
-    const match = /^ref_(\\d{1,20})$/.exec(String(payload || ""));
+    const match = /^ref_(\d{1,20})$/.exec(String(payload || ""));
     if (!kvReady()) return { ok: false };
     const inviteeId = String(userId);
     if (referralLocks.has(inviteeId)) return { ok: false };
