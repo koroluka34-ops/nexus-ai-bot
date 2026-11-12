@@ -93,11 +93,33 @@ async function writeState(userId, state) {
 function kyivDay() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
 }
+function isRouletteSpinEntry(item) {
+  if (!item || !item.spinId || !item.prize) return false;
+  if (item.source) return item.source === "roulette_spin";
+  return !["case_gift", "contract_gift", "upgrade_gift", "upgrade_failed"].includes(String(item.prize));
+}
+function rouletteSpinsBetween(state, start, end) {
+  return state.history.filter(item => isRouletteSpinEntry(item) && Number(item.at) >= start && Number(item.at) < end);
+}
 function dailyQuestProgress(state, quest, today) {
-  if (quest.kind === "spins") return state.history.filter(item => item.day === today).length;
-  if (quest.kind === "wins") return state.history.filter(item => item.day === today && item.prize !== "no_prize" && item.status !== "declined").length;
+  const spins = state.history.filter(item => isRouletteSpinEntry(item) && item.day === today);
+  if (quest.kind === "spins") return spins.length;
+  if (quest.kind === "wins") return spins.filter(item => item.prize !== "no_prize" && item.status !== "declined").length;
   if (quest.kind === "referrals") return Number(state.referralCount || 0);
   return 0;
+}
+function kyivNextResetAt() {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  const p = Object.fromEntries(fmt.formatToParts(now).map(x => [x.type, Number(x.value)]));
+  const d = new Date(Date.UTC(p.year, p.month - 1, p.day + 1));
+  const target = { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+  let guess = Date.UTC(target.year, target.month - 1, target.day);
+  for (let i = 0; i < 2; i++) {
+    const q = Object.fromEntries(fmt.formatToParts(new Date(guess)).map(x => [x.type, Number(x.value)]));
+    guess += Date.UTC(target.year, target.month - 1, target.day) - Date.UTC(q.year, q.month - 1, q.day, q.hour, q.minute, q.second);
+  }
+  return guess;
 }
 function ensureDailyQuests(state, userId) {
   const today = kyivDay();
@@ -759,10 +781,11 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           referralCount: state.referralCount || 0,
           inviteQuestAvailable: !state.questClaims.inviteFriend,
           dailyQuestClaimed: state.questClaims.dailySpin === kyivDay(),
+          dailyResetAt: kyivNextResetAt(),
           timedQuest: (() => {
             const cycle = Math.floor(Date.now() / 3600000), start = cycle * 3600000;
             return { cycle, startsAt: start, endsAt: start + 3600000, target: 3,
-              progress: state.history.filter(item => Number(item.at) >= start && Number(item.at) < start + 3600000).length,
+              progress: rouletteSpinsBetween(state, start, start + 3600000).length,
               claimed: state.questClaims.timedSpinCycle === cycle };
           })(),
           giftsAvailable: catalog.gifts.length, pendingGifts,
@@ -859,7 +882,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       if (req.method === "POST" && url.pathname === "/roulette/api/quest/claim") {
         const body = await readBody(req), quest = String(body.quest || ""), today = kyivDay(), state = await readState(user.id);
         if (quest === "daily_spin") {
-          if (!state.history.some(item => item.day === today)) { json(res, 409, { ok: false, error: "Сначала используй сегодняшнюю прокрутку." }); return true; }
+          if (!state.history.some(item => isRouletteSpinEntry(item) && item.day === today)) { json(res, 409, { ok: false, error: "Сначала используй сегодняшнюю прокрутку колеса. Открытие кейса не засчитывается." }); return true; }
           if (state.questClaims.dailySpin === today) { json(res, 409, { ok: false, error: "Награда за это задание уже получена сегодня." }); return true; }
           state.questClaims.dailySpin = today; state.bonusSpins = Math.min(100000, state.bonusSpins + 1);
         } else if (quest === "invite_friend") {
@@ -868,7 +891,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           state.questClaims.inviteFriend = true; state.bonusSpins = Math.min(100000, state.bonusSpins + 3);
         } else if (quest === "timed_spin") {
           const cycle = Math.floor(Date.now() / 3600000), start = cycle * 3600000, end = start + 3600000;
-          const progress = state.history.filter(item => Number(item.at) >= start && Number(item.at) < end).length;
+          const progress = rouletteSpinsBetween(state, start, end).length;
           if (state.questClaims.timedSpinCycle === cycle) { json(res, 409, { ok: false, error: "Награда за это часовое задание уже получена." }); return true; }
           if (progress < 3) { json(res, 409, { ok: false, error: "Нужно сделать 3 прокрутки за это часовое задание. Сейчас: " + progress + "/3." }); return true; }
           state.questClaims.timedSpinCycle = cycle; state.bonusSpins = Math.min(100000, state.bonusSpins + 2);
@@ -1073,7 +1096,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const row = {
             spinId, day: today, prize: prize.id, label: prize.label,
             giftId: prize.giftId || "", cost: prize.cost || 0,
-            status: "processing", at: Date.now()
+            status: "processing", at: Date.now(), source: "roulette_spin"
           };
           fresh.lastSpinDay = today;
           fresh.coins = Math.min(100000000, (fresh.coins || 0) + (x2Mode ? 2 : 1));
