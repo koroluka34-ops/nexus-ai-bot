@@ -1285,9 +1285,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           } else {
             delivered = true;
           }
-          if (delivered && prize.type !== "none") {
+          if (prize.type !== "none") {
             const winners = await readGlobal("winners", []);
-            winners.push({ userId: user.id, name: user.firstName || "Игрок", label: prize.label, cost: prize.cost || 0, at: Date.now() });
+            winners.push({ userId: user.id, name: user.firstName || "Игрок", label: prize.label, cost: prize.cost || 0, at: Date.now(), delivery: "pending_claim" });
             await writeGlobal("winners", winners.slice(-200));
           }
           const latestState = await readState(user.id);
