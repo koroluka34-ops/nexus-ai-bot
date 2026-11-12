@@ -723,23 +723,34 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
     let art=$("resultArtwork");if(!art){art=document.createElement("img");art.id="resultArtwork";art.style.cssText="display:block;max-width:180px;max-height:180px;object-fit:contain;margin:12px auto;border-radius:18px";$("resultTitle").after(art);}
     if(prize?.imageUrl){art.src=prize.imageUrl;art.alt=prize.label||"Приз";art.style.display="block";}else{art.removeAttribute("src");art.style.display="none";}
     const actions=$("resultActions");actions.replaceChildren();
-    const isGift=["gift","telegram_premium"].includes(prize?.type);
-    const waiting=isGift&&delivered===false;
+    const waiting=prize?.type!=="none"&&delivered===false;
     $("resultText").textContent=waiting
-      ? "🎉 Ты выиграл(а): "+(prize?.label||"подарок")+". Подарок пока не отправлен: у бота недостаточно Stars или Telegram временно не позволяет его отправить. Он сохранён в ожидании — повторно крутить колесо не нужно."
+      ? "🎉 ПОЗДРАВЛЯЕМ! Подарок уже добавлен в твой инвентарь NEXUS. Он пока хранится у бота и не отправлен в Telegram. Решай сам: забрать его себе, попробовать улучшить или отказаться. Пока не выберешь действие, подарок останется в ожидании."
       : message;
     if(waiting){
-      const view=document.createElement("button");view.className="spin";view.style.cssText="padding:12px;font-size:12px";view.textContent="🎁 ПОСМОТРЕТЬ ПОДАРОК В ОЖИДАНИИ";
-      view.addEventListener("click",()=>{$("pendingPanel").scrollIntoView({behavior:"smooth",block:"center"});});
-      const decline=document.createElement("button");decline.className="spin";decline.style.cssText="padding:12px;font-size:12px;background:linear-gradient(100deg,#8f3547,#d75c69);border-color:#f5a0a8;color:white";decline.textContent="❌ ОТКАЗАТЬСЯ ОТ ЭТОГО ПОДАРКА";
-      decline.addEventListener("click",async()=>{
-        if(!spinId){$("resultText").textContent="Не удалось определить этот подарок. Открой список ожидающих подарков ниже и откажись от него там.";return;}
-        if(!confirm("Отказаться именно от этого подарка? Другие ожидающие подарки останутся."))return;
-        decline.disabled=true;
-        try{await api("/roulette/api/decline","POST",{spinId});$("resultText").textContent="Ты отказался от подарка. Он удалён из ожидания и не будет отправлен.";actions.replaceChildren();await refresh();}
-        catch(error){decline.disabled=false;errorBox.textContent=error.message;errorBox.classList.add("show");}
+      const makeAction=(caption,style,handler)=>{const b=document.createElement("button");b.className="spin";b.style.cssText=style;b.textContent=caption;b.addEventListener("click",handler);actions.append(b);return b;};
+      makeAction("🎁 ЗАБРАТЬ ПОДАРОК СЕБЕ","padding:12px;font-size:12px",async function(){
+        if(!spinId){$("resultText").textContent="Не удалось определить подарок. Найди его в разделе «Склад» и забери оттуда.";return;}
+        this.disabled=true;this.textContent="ОТПРАВЛЯЕМ ЗАПРОС…";
+        try{const response=await api("/roulette/api/claim","POST",{spinId});$("resultText").textContent="🎁 Отлично! Запрос на получение принят. Бот отправит награду в Telegram, как только сможет.";actions.replaceChildren();await refresh();}
+        catch(error){this.disabled=false;this.textContent="🎁 ЗАБРАТЬ ПОДАРОК СЕБЕ";$("resultText").textContent=error.message;}
       });
-      actions.append(view,decline);
+      if(prize?.giftId&&!["telegram_premium","nexus_plus","nexus_ultra"].includes(prize.type)){
+        makeAction("⬆️ ПОПРОБОВАТЬ УЛУЧШИТЬ · 50%","padding:12px;font-size:12px;background:linear-gradient(100deg,#8054c9,#bd8df5);border-color:#d2b4ff;color:white",async function(){
+          if(!spinId)return; if(!confirm("Шанс успеха — 50%. При неудаче этот подарок будет потерян. Попробовать?"))return;
+          this.disabled=true;this.textContent="ПРОВЕРЯЕМ УДАЧУ…";
+          try{const response=await api("/roulette/api/pending-upgrade","POST",{spinIds:[spinId]});$("resultText").textContent=response.message+" "+(response.label||"");actions.replaceChildren();await refresh();}
+          catch(error){this.disabled=false;this.textContent="⬆️ ПОПРОБОВАТЬ УЛУЧШИТЬ · 50%";$("resultText").textContent=error.message;}
+        });
+      }
+      makeAction("❌ ОТКАЗАТЬСЯ ОТ ПОДАРКА","padding:12px;font-size:12px;background:linear-gradient(100deg,#8f3547,#d75c69);border-color:#f5a0a8;color:white",async function(){
+        if(!spinId){$("resultText").textContent="Не удалось определить подарок. Открой раздел «Склад» и откажись от него там.";return;}
+        if(!confirm("Точно отказаться от этого подарка? Отменить это действие будет нельзя."))return;
+        this.disabled=true;
+        try{await api("/roulette/api/decline","POST",{spinId});$("resultText").textContent="Подарок удалён из ожидания. Ты отказался от этой награды.";actions.replaceChildren();await refresh();}
+        catch(error){this.disabled=false;$("resultText").textContent=error.message;}
+      });
+      const hint=document.createElement("p");hint.className="hint";hint.textContent="Ничего не нажимай, если хочешь оставить подарок на потом — он останется в инвентаре.";actions.append(hint);
     }
   }
   function playJackpotFanfare(){
