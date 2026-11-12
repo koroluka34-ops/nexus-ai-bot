@@ -20,17 +20,31 @@ const MAX_GIFTS_IN_WHEEL = 20;
 // These are the 11 real Telegram gifts previously confirmed in the bot's /realgifts
 // catalogue. Match them against Telegram's live Bot API response; never invent IDs.
 const FEATURED_TELEGRAM_GIFTS = [
-  { emoji: "💝", stars: 15 }, { emoji: "🧸", stars: 15 },
-  { emoji: "🎁", stars: 25 }, { emoji: "🌹", stars: 25 },
-  { emoji: "🎂", stars: 50 }, { emoji: "💐", stars: 50 },
-  { emoji: "🚀", stars: 50 }, { emoji: "🍾", stars: 50 },
-  { emoji: "🏆", stars: 100 }, { emoji: "💍", stars: 100 },
-  { emoji: "💎", stars: 100 }
+  { emoji: "🍦", name: "Мороженое" },
+  { emoji: "🥅", name: "Хоккейная маска" },
+  { emoji: "🗽", name: "Статуя Свободы" },
+  { emoji: "🐊", name: "Крокодил с короной" },
+  { emoji: "🍜", name: "Золотая лапша" },
+  { emoji: "🏮", name: "Фонарь" },
+  { emoji: "🍭", name: "Леденец" },
+  { emoji: "🍫", name: "Шоколадное эскимо" },
+  { emoji: "🦩", name: "Розовый фламинго" },
+  { emoji: "🎒", name: "Рюкзак" },
+  { emoji: "💩", name: "Забавный сюрприз" },
+  { emoji: "🐝", name: "Пчелиный сюрприз" },
+  { emoji: "🌸", name: "Цветочный подарок" },
+  { emoji: "☃️", name: "Снеговик" },
+  { emoji: "🍬", name: "Новогодняя конфета" },
+  { emoji: "🍀", name: "Четырёхлистный клевер" },
+  { emoji: "🛷", name: "Новогодние сани" },
+  { emoji: "🧦", name: "Носки" },
+  { emoji: "🎁", name: "Подарочная коробка" },
+  { emoji: "🎂", name: "Happy Birthday" },
+  { emoji: "🗡️", name: "Световой меч" }
 ];
-function isFeaturedTelegramGift(gift) {
-  const emoji = String(gift?.sticker?.emoji || "");
-  const stars = Number(gift?.star_count);
-  return FEATURED_TELEGRAM_GIFTS.some(item => item.emoji === emoji && item.stars === stars);
+function getFeaturedTelegramGift(gift) {
+  const emoji = String(gift?.sticker?.emoji || "").replace(/\uFE0F/g, "");
+  return FEATURED_TELEGRAM_GIFTS.find(item => item.emoji.replace(/\uFE0F/g, "") === emoji) || null;
 }
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
@@ -268,18 +282,24 @@ async function getGiftCatalog(bot) {
   const available = gifts
     .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
     .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
-    .map(g => ({
-      id: "gift:" + g.id,
-      giftId: g.id,
-      label: (g.sticker?.emoji ? g.sticker.emoji + " " : "🎁 ") + "Подарок Telegram · " + Number(g.star_count) + " ⭐",
-      short: (g.sticker?.emoji || "🎁") + " " + Number(g.star_count) + " ⭐",
-      stickerFileId: g.sticker?.thumbnail?.file_id || g.sticker?.file_id || "",
-      stickerFormat: g.sticker?.format || "",
-      probability: "",
-      type: "gift",
-      cost: Number(g.star_count),
-      featured: isFeaturedTelegramGift(g)
-    }))
+    .map(g => {
+      const featuredGift = getFeaturedTelegramGift(g);
+      const emoji = g.sticker?.emoji || "🎁";
+      const stars = Number(g.star_count);
+      return {
+        id: "gift:" + g.id,
+        giftId: g.id,
+        label: emoji + " " + (featuredGift?.name || "Подарок Telegram") + " · " + stars + " ⭐",
+        short: emoji + " " + stars + " ⭐",
+        stickerFileId: g.sticker?.thumbnail?.file_id || g.sticker?.file_id || "",
+        stickerFormat: g.sticker?.format || "",
+        probability: "",
+        type: "gift",
+        cost: stars,
+        featured: Boolean(featuredGift),
+        featuredName: featuredGift?.name || ""
+      };
+    })
     // Keep the 11 requested Telegram gifts at the top, while retaining the
     // rest of Telegram's live sendable catalogue below them.
     .sort((a, b) => Number(b.featured) - Number(a.featured) || a.cost - b.cost);
