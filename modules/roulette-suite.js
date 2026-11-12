@@ -78,7 +78,7 @@ async function readState(userId) {
     lastStreakDay: String(value.lastStreakDay || ""),
     claimedCodes: Array.isArray(value.claimedCodes) ? value.claimedCodes.slice(-200) : [],
     questClaims: value.questClaims && typeof value.questClaims === "object" ? value.questClaims : {},
-    referralCount: Math.max(0, Math.min(100000, Math.floor(Number(value.referralCount) || 0)))
+    referralCount: Math.max(0, Math.min(100000, Math.floor(Number(value.referralCount) || 0))), referralHistory: Array.isArray(value.referralHistory) ? value.referralHistory.slice(-500) : []
   };
 }
 async function writeState(userId, state) {
@@ -110,7 +110,10 @@ function dailyQuestProgress(state, quest, today) {
   if (quest.kind === "gifts") return todayRows.filter(item => item.status === "delivered" && item.giftId).length;
   if (quest.kind === "contracts") return todayRows.filter(item => item.source === "contract" && item.prize === "contract_gift").length;
   if (quest.kind === "upgrades") return todayRows.filter(item => item.source === "upgrade" && item.prize === "upgrade_gift").length;
-  if (quest.kind === "referrals") return Number(state.referralCount || 0);
+  if (quest.kind === "referrals") return (state.referralHistory || []).filter(at => new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date(Number(at))) === today).length;
+  if (quest.kind === "mixed") return Math.min(quest.target, spins.length + todayRows.filter(item => item.source === "case").length);
+  if (quest.kind === "mixedwin") return Math.min(quest.target, spins.length + spins.filter(item => item.prize !== "no_prize" && item.status !== "declined").length);
+  if (quest.kind === "casegift") return todayRows.filter(item => item.source === "case" && item.status === "delivered" && item.giftId).length;
   return 0;
 }
 function kyivNextResetAt() {
@@ -131,18 +134,26 @@ function ensureDailyQuests(state, userId) {
   if (!state.dailyQuests || state.dailyQuests.day !== today || !Array.isArray(state.dailyQuests.tasks)) {
     // Four rotating daily missions: a mix of roulette, cases and real gift delivery.
     const pool = [
-      { id: "spin4", title: "Сделай 4 прокрутки рулетки", kind: "spins", target: 4, reward: 12 },
-      { id: "spin8", title: "Сделай 8 прокруток рулетки", kind: "spins", target: 8, reward: 24 },
-      { id: "win2", title: "Выиграй 2 приза в рулетке", kind: "wins", target: 2, reward: 18 },
-      { id: "win4", title: "Получи 4 выигрыша в рулетке", kind: "wins", target: 4, reward: 38 },
-      { id: "case1", title: "Открой 1 CS2-кейс", kind: "cases", target: 1, reward: 22 },
-      { id: "case2", title: "Открой 2 CS2-кейса", kind: "cases", target: 2, reward: 48 },
-      { id: "gift1", title: "Получи доставленный Telegram-подарок", kind: "gifts", target: 1, reward: 28 },
-      { id: "gift2", title: "Получи 2 доставленных Telegram-подарка", kind: "gifts", target: 2, reward: 55 },
-      { id: "contract1", title: "Собери 1 контракт из 5 подарков", kind: "contracts", target: 1, reward: 35 },
-      { id: "upgrade1", title: "Успешно улучши 1 подарок", kind: "upgrades", target: 1, reward: 32 },
-      { id: "spin6", title: "Сделай 6 прокруток за день", kind: "spins", target: 6, reward: 19 },
-      { id: "win3", title: "Выиграй 3 приза в рулетке", kind: "wins", target: 3, reward: 27 }
+      {id:"spin4",title:"Сделай 4 прокрутки рулетки",kind:"spins",target:4,reward:12},
+      {id:"spin8",title:"Сделай 8 прокруток рулетки",kind:"spins",target:8,reward:24},
+      {id:"spin12",title:"Сделай 12 прокруток рулетки",kind:"spins",target:12,reward:42},
+      {id:"win2",title:"Выиграй 2 приза в рулетке",kind:"wins",target:2,reward:18},
+      {id:"win4",title:"Выиграй 4 приза в рулетке",kind:"wins",target:4,reward:38},
+      {id:"case1",title:"Открой 1 CS2-кейс",kind:"cases",target:1,reward:22},
+      {id:"case2",title:"Открой 2 CS2-кейса",kind:"cases",target:2,reward:48},
+      {id:"case3",title:"Открой 3 CS2-кейса",kind:"cases",target:3,reward:78},
+      {id:"gift1",title:"Получи доставленный Telegram-подарок",kind:"gifts",target:1,reward:28},
+      {id:"gift2",title:"Получи 2 доставленных Telegram-подарка",kind:"gifts",target:2,reward:55},
+      {id:"contract1",title:"Собери контракт из 5 подарков",kind:"contracts",target:1,reward:35},
+      {id:"upgrade1",title:"Успешно улучши подарок",kind:"upgrades",target:1,reward:32},
+      {id:"spin6",title:"Сделай 6 прокруток за день",kind:"spins",target:6,reward:19},
+      {id:"win3",title:"Выиграй 3 приза в рулетке",kind:"wins",target:3,reward:27},
+      {id:"invite1",title:"Пригласи 1 нового игрока по своей ссылке",kind:"referrals",target:1,reward:30},
+      {id:"invite2",title:"Пригласи 2 новых игроков по своей ссылке",kind:"referrals",target:2,reward:75},
+      {id:"invite3",title:"Пригласи 3 новых игроков по своей ссылке",kind:"referrals",target:3,reward:120},
+      {id:"mixed1",title:"Сделай 3 прокрутки и открой 1 кейс",kind:"mixed",target:4,reward:35},
+      {id:"mixed2",title:"Сделай 5 прокруток и выиграй 1 приз",kind:"mixedwin",target:6,reward:45},
+      {id:"casegift",title:"Открой кейс и получи доставленный подарок",kind:"casegift",target:1,reward:50}
     ];
     const previousIds = new Set((state.dailyQuests?.tasks || []).map(q => q.id));
     const seed = crypto.createHash("sha256").update(String(userId) + ":" + today + ":daily-quests-v3").digest();
@@ -176,7 +187,7 @@ function verifyInitData(initData) {
   try {
     const user = JSON.parse(userRaw);
     if (!Number.isSafeInteger(Number(user.id)) || Number(user.id) <= 0) return null;
-    return { id: Number(user.id), firstName: String(user.first_name || "").slice(0, 80) };
+    return { id: Number(user.id), firstName: String(user.first_name || "").slice(0, 80), photoUrl: typeof user.photo_url === "string" && /^https:\/\//i.test(user.photo_url) ? user.photo_url.slice(0, 1000) : "" };
   } catch { return null; }
 }
 function json(res, status, data) {
@@ -311,7 +322,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       const inviterId = String(match[1]);
       const inviter = await readState(inviterId);
       referrals[inviteeId] = { inviterId, at: Date.now() };
-      inviter.referralCount = Math.min(100000, (inviter.referralCount || 0) + 1);
+      inviter.referralCount = Math.min(100000, (inviter.referralCount || 0) + 1); inviter.referralHistory = [...(inviter.referralHistory || []), Date.now()].slice(-500);
       inviter.bonusSpins = Math.min(100000, inviter.bonusSpins + 2);
       invitee.bonusSpins = Math.min(100000, invitee.bonusSpins + 1);
       await writeState(inviterId, inviter);
@@ -327,7 +338,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
   }
   let queueWorkerRunning = false;
   async function processPendingGiftQueue() {
-    if (queueWorkerRunning || !kvReady()) return;
+    if (queueWorkerRunning || locks.has("pending-upgrade") || !kvReady()) return;
     queueWorkerRunning = true;
     try {
       let queue = await readPendingQueue();
@@ -783,7 +794,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           cost: Number(item.cost || 0), createdAt: item.createdAt || 0
         }));
         json(res, 200, {
-          ok: true, profile: { userId: String(user.id), name: myStats.name || user.firstName || "Игрок", spins: mySpinCount, wins: Math.max(0, Number(myStats.wins) || 0), losses: Math.max(0, Number(myStats.losses) || 0), prizeValue: Math.max(0, Number(myStats.cost) || 0), winStreak: currentWinStreak, vip: vipTier.key, vipLabel: vipTier.label, vipNext: nextVipTier ? { label: nextVipTier.label, min: nextVipTier.min } : null }, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
+          ok: true, profile: { userId: String(user.id), name: myStats.name || user.firstName || "Игрок", photoUrl: user.photoUrl || "", spins: mySpinCount, wins: Math.max(0, Number(myStats.wins) || 0), losses: Math.max(0, Number(myStats.losses) || 0), prizeValue: Math.max(0, Number(myStats.cost) || 0), winStreak: currentWinStreak, vip: vipTier.key, vipLabel: vipTier.label, vipNext: nextVipTier ? { label: nextVipTier.label, min: nextVipTier.min } : null }, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
           lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, coins: state.coins || 0, dailyQuests, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.cost) - Number(a.cost)) || (Number(b.wins) - Number(a.wins))).slice(0, 10),
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
           luckBoost: catalog.luckBoost,
@@ -852,6 +863,33 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           processPendingGiftQueue().catch(()=>{});
           json(res, 200, { ok: true, label, stars, message: "Контракт собран. Награда добавлена в очередь отправки." }); return true;
         } finally { locks.delete("inventory:" + user.id); }
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/pending-upgrade") {
+        if(queueWorkerRunning||locks.has("pending-upgrade")){json(res,409,{ok:false,error:"Очередь подарков сейчас обрабатывается. Попробуй через несколько секунд."});return true;}
+        locks.add("pending-upgrade");
+        try{
+          const body=await readBody(req),spinId=String(body.spinId||"");
+          const [state,catalog,queue]=await Promise.all([readState(user.id),telegramApi("getAvailableGifts"),readPendingQueue()]);
+          const oldState=JSON.parse(JSON.stringify(state)),oldQueue=JSON.parse(JSON.stringify(queue));
+          const item=queue.find(q=>q.spinId===spinId&&String(q.userId)===String(user.id)&&q.giftId&&!["telegram_premium","nexus_plus","nexus_ultra"].includes(q.type));
+          const row=state.history.find(h=>h.spinId===spinId);
+          if(!item||!row||row.status!=="processing"){json(res,409,{ok:false,error:"Подарок уже отправлен или недоступен для улучшения."});return true;}
+          const price=Number(item.cost||row.cost||0);
+          const candidates=(catalog?.gifts||[]).filter(g=>g&&typeof g.id==="string"&&g.id!==item.giftId&&Number(g.star_count)>=price*2&&Number(g.star_count)<=1000&&(g.remaining_count===undefined||Number(g.remaining_count)>0));
+          if(!candidates.length){json(res,503,{ok:false,error:"Нет доступного подарка минимум в 2 раза дороже. Твой подарок остался в очереди."});return true;}
+          const success=crypto.randomInt(100)<35;
+          if(success){
+            const gift=candidates[crypto.randomInt(0,candidates.length)],stars=Number(gift.star_count);
+            item.giftId=gift.id;item.cost=stars;item.label=(gift.sticker?.emoji||"🎁")+" Улучшенный подарок · "+stars+" ⭐";
+            row.giftId=gift.id;row.cost=stars;row.label=item.label;row.prize="pending_upgrade_gift";row.source="upgrade";row.at=Date.now();
+          }else{
+            queue.splice(queue.indexOf(item),1);row.status="upgrade_failed";row.prize="pending_upgrade_failed";row.deliveryMessage="Подарок сгорел при неудачном улучшении до отправки.";
+          }
+          try{await writeState(user.id,state);await writePendingQueue(queue);}
+          catch(error){await writeState(user.id,oldState).catch(()=>{});await writePendingQueue(oldQueue).catch(()=>{});throw error;}
+          if(success)processPendingGiftQueue().catch(()=>{});
+          json(res,200,{ok:true,success,chance:"35%",label:success?row.label:"Подарок сгорел",message:success?"Улучшение прошло! Новый подарок сохранён в очереди.":"Неудача. Ожидающий подарок сгорел и удалён из очереди."});return true;
+        }finally{locks.delete("pending-upgrade");}
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/upgrade") {
         if (locks.has("inventory:" + user.id)) { json(res, 409, { ok: false, error: "Инвентарь уже обрабатывается." }); return true; }
