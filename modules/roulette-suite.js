@@ -596,7 +596,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const canSpin = freeSpinAvailable || state.bonusSpins > 0;
         const winners = await readGlobal("winners", []);
         const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
-        const collection = state.history.filter(item => item.status === "delivered" && !item.collectible && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse().map(item => ({ ...item, imageUrl: item.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(item.giftId) : "" }));
+        const collection = state.history.filter(item => item.status === "delivered" && !/NFT|коллекцион/i.test(item.label || "") && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse().map(item => ({ ...item, imageUrl: item.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(item.giftId) : "" }));
         const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
           spinId: item.spinId,
           label: item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram"),
