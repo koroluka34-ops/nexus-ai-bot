@@ -65,7 +65,7 @@ async function readState(userId) {
     headers: { Authorization: "Bearer " + TOKEN },
     signal: AbortSignal.timeout(9000)
   });
-  if (r.status === 404) return { lastSpinDay: "", bonusSpins: 0, history: [], streak: 0, lastStreakDay: "" };
+  if (r.status === 404) return { lastSpinDay: "", bonusSpins: 0, history: [], streak: 0, lastStreakDay: "", claimedCodes: [], questClaims: {}, referralCount: 0 };
   if (!r.ok) throw new Error("Cloudflare KV HTTP " + r.status);
   const value = JSON.parse(await r.text());
   return {
@@ -73,7 +73,10 @@ async function readState(userId) {
     bonusSpins: Math.max(0, Math.min(100000, Math.floor(Number(value.bonusSpins) || 0))),
     history: Array.isArray(value.history) ? value.history.slice(-100) : [],
     streak: Math.max(0, Math.min(3650, Math.floor(Number(value.streak) || 0))),
-    lastStreakDay: String(value.lastStreakDay || "")
+    lastStreakDay: String(value.lastStreakDay || ""),
+    claimedCodes: Array.isArray(value.claimedCodes) ? value.claimedCodes.slice(-200) : [],
+    questClaims: value.questClaims && typeof value.questClaims === "object" ? value.questClaims : {},
+    referralCount: Math.max(0, Math.min(100000, Math.floor(Number(value.referralCount) || 0)))
   };
 }
 async function writeState(userId, state) {
@@ -215,6 +218,27 @@ function makeWebAppUrl() {
 }
 function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
   const webAppUrl = makeWebAppUrl();
+  const referralLocks = new Set();
+  async function registerReferral(userId, payload) {
+    const match = /^ref_(\d{1,20})$/.exec(String(payload || ""));
+    if (!match || String(match[1]) === String(userId) || !kvReady()) return { ok: false };
+    const inviterId = String(match[1]), inviteeId = String(userId);
+    if (referralLocks.has(inviteeId)) return { ok: false };
+    referralLocks.add(inviteeId);
+    try {
+      const referrals = await readGlobal("referrals", {});
+      if (referrals[inviteeId]) return { ok: false, duplicate: true };
+      const inviter = await readState(inviterId), invitee = await readState(inviteeId);
+      referrals[inviteeId] = { inviterId, at: Date.now() };
+      inviter.referralCount = Math.min(100000, (inviter.referralCount || 0) + 1);
+      inviter.bonusSpins = Math.min(100000, inviter.bonusSpins + 2);
+      invitee.bonusSpins = Math.min(100000, invitee.bonusSpins + 1);
+      await writeState(inviterId, inviter); await writeState(inviteeId, invitee); await writeGlobal("referrals", referrals);
+      await bot.api.sendMessage(Number(inviterId), "🎉 По твоей ссылке пришёл новый игрок! Тебе начислено +2 бонусные прокрутки.").catch(() => {});
+      return { ok: true };
+    } catch (error) { console.error("NEXUS referral:", String(error.message || error).slice(0, 180)); return { ok: false }; }
+    finally { referralLocks.delete(inviteeId); }
+  }
   let queueWorkerRunning = false;
   async function processPendingGiftQueue() {
     if (queueWorkerRunning || !kvReady()) return;
@@ -345,6 +369,19 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     } catch (error) {
       return ctx.reply("❌ Не удалось выдать прокрутки: " + String(error.message || error).slice(0, 220));
     }
+  });
+
+  bot.command("roulettecode", async ctx => {
+    const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
+    if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Только администратор может создавать промокоды.");
+    const [rawCode, rawSpins, rawUses] = String(ctx.match || "").trim().split(/\s+/);
+    const code = String(rawCode || "").toUpperCase(), spins = Number(rawSpins), maxUses = Number(rawUses || 100);
+    if (!/^[A-Z0-9_-]{3,24}$/.test(code) || !Number.isInteger(spins) || spins < 1 || spins > 100 || !Number.isInteger(maxUses) || maxUses < 1 || maxUses > 10000)
+      return ctx.reply("Формат: /roulettecode CODE ПРОКРУТКИ [ЛИМИТ]\nПример: /roulettecode NEXUS2026 3 100");
+    const promos = await readGlobal("promos", {});
+    promos[code] = { spins, maxUses, uses: 0, createdAt: Date.now(), expiresAt: Date.now() + 30 * 86400000 };
+    await writeGlobal("promos", promos);
+    return ctx.reply("✅ Промокод " + code + " создан: +" + spins + " прокрутки, лимит " + maxUses + " активаций, срок 30 дней.");
   });
 
   bot.command("roulettehistory", async ctx => {
@@ -596,6 +633,8 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const canSpin = freeSpinAvailable || state.bonusSpins > 0;
         const winners = await readGlobal("winners", []);
         const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
+        const playerStats = await readGlobal("playerStats", {});
+        const me = await bot.api.getMe().catch(() => ({}));
         const collection = state.history.filter(item => item.status === "delivered" && !/NFT|коллекцион/i.test(item.label || "") && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse().map(item => ({ ...item, imageUrl: item.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(item.giftId) : "" }));
         const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
           spinId: item.spinId,
@@ -604,7 +643,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         }));
         json(res, 200, {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
-          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Array.isArray(winners) ? winners.slice(-10).reverse() : [],
+          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.wins) - Number(a.wins)) || (Number(b.cost) - Number(a.cost))).slice(0, 10),
+          referralLink: me.username ? "https://t.me/" + me.username + "?start=ref_" + user.id : "",
+          referralCount: state.referralCount || 0,
           giftsAvailable: catalog.gifts.length, pendingGifts,
           giftOptions: (() => {
             const randomCount = catalog.gifts.filter(g => g.cost >= 15 && g.cost <= 999).length;
@@ -623,6 +664,34 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         });
         return true;
       }
+      if (req.method === "POST" && url.pathname === "/roulette/api/redeem-code") {
+        const body = await readBody(req), code = String(body.code || "").trim().toUpperCase();
+        if (!/^[A-Z0-9_-]{3,24}$/.test(code)) { json(res, 400, { ok: false, error: "Промокод должен содержать 3–24 символа." }); return true; }
+        if (locks.has("promo:" + user.id)) { json(res, 409, { ok: false, error: "Подожди завершения предыдущей операции." }); return true; }
+        locks.add("promo:" + user.id);
+        try {
+          const state = await readState(user.id), promos = await readGlobal("promos", {}), promo = promos[code];
+          if (!promo || Number(promo.expiresAt) < Date.now() || Number(promo.uses) >= Number(promo.maxUses)) { json(res, 404, { ok: false, error: "Промокод не найден, истёк или уже исчерпан." }); return true; }
+          if (state.claimedCodes.includes(code)) { json(res, 409, { ok: false, error: "Ты уже активировал этот промокод." }); return true; }
+          promo.uses = Number(promo.uses || 0) + 1; state.claimedCodes.push(code); state.claimedCodes = state.claimedCodes.slice(-200);
+          state.bonusSpins = Math.min(100000, state.bonusSpins + Number(promo.spins || 0));
+          await writeGlobal("promos", promos); await writeState(user.id, state);
+          json(res, 200, { ok: true, spins: Number(promo.spins || 0), bonusSpins: state.bonusSpins }); return true;
+        } finally { locks.delete("promo:" + user.id); }
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/quest/claim") {
+        const body = await readBody(req), quest = String(body.quest || ""), today = kyivDay(), state = await readState(user.id);
+        if (quest === "daily_spin") {
+          if (!state.history.some(item => item.day === today)) { json(res, 409, { ok: false, error: "Сначала используй сегодняшнюю прокрутку." }); return true; }
+          if (state.questClaims.dailySpin === today) { json(res, 409, { ok: false, error: "Награда за это задание уже получена сегодня." }); return true; }
+          state.questClaims.dailySpin = today; state.bonusSpins = Math.min(100000, state.bonusSpins + 1);
+        } else if (quest === "invite_friend") {
+          if ((state.referralCount || 0) < 1) { json(res, 409, { ok: false, error: "Сначала пригласи хотя бы одного нового игрока." }); return true; }
+          if (state.questClaims.inviteFriend) { json(res, 409, { ok: false, error: "Награда за приглашение уже получена." }); return true; }
+          state.questClaims.inviteFriend = true; state.bonusSpins = Math.min(100000, state.bonusSpins + 2);
+        } else { json(res, 400, { ok: false, error: "Неизвестное задание." }); return true; }
+        await writeState(user.id, state); json(res, 200, { ok: true, bonusSpins: state.bonusSpins }); return true;
+      }
       if (req.method === "POST" && url.pathname === "/roulette/api/decline") {
         const body = await readBody(req);
         const spinId = String(body.spinId || "");
@@ -638,18 +707,18 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         return true;
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/spin") {
-        await readBody(req);
+        const spinBody = await readBody(req), x2Mode = spinBody.mode === "x2";
         if (locks.has(String(user.id))) { json(res, 409, { ok: false, error: "Рулетка уже обрабатывает твою попытку." }); return true; }
         locks.add(String(user.id));
         try {
           const [fresh, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
           const today = kyivDay();
-          if (fresh.lastSpinDay === today && fresh.bonusSpins <= 0) {
-            json(res, 409, { ok: false, error: "Сегодня ты уже использовал бесплатную попытку.", canSpin: false, bonusSpins: 0 });
-            return true;
-          }
-          const usedBonusSpin = fresh.lastSpinDay === today;
-          if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
+          const freeAvailable = fresh.lastSpinDay !== today, totalAvailable = fresh.bonusSpins + (freeAvailable ? 1 : 0);
+          const spinCost = x2Mode ? 2 : 1;
+          if (totalAvailable < spinCost) { json(res, 409, { ok: false, error: x2Mode ? "Для режима x2 нужны две доступные прокрутки." : "Сегодня ты уже использовал бесплатную попытку.", canSpin: false, bonusSpins: fresh.bonusSpins }); return true; }
+          const usedBonusSpin = !freeAvailable;
+          if (x2Mode) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - (freeAvailable ? 1 : 2));
+          else if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
           else if (fresh.lastStreakDay !== today) {
             const yesterday = new Date(Date.parse(today + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
             fresh.streak = fresh.lastStreakDay === yesterday ? fresh.streak + 1 : 1;
@@ -661,7 +730,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           let prizeList = catalog.prizes.map(item => ({ ...item }));
           const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
           const streakMultiplier = fresh.streak >= 30 ? 5 : fresh.streak >= 7 ? 3 : fresh.streak >= 3 ? 2 : 1;
-          const luckMultiplier = streakMultiplier * (event.active ? 2 : 1);
+          const luckMultiplier = streakMultiplier * (event.active ? 2 : 1) * (x2Mode ? 2 : 1);
           if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot"].includes(item.type) ? luckMultiplier : 1) }));
           let prize = choosePrize(prizeList);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
@@ -687,6 +756,12 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           fresh.history = fresh.history.slice(-100);
           await writeState(user.id, fresh);
           try {
+            const playerStats = await readGlobal("playerStats", {});
+            const player = playerStats[String(user.id)] || { userId: user.id, name: user.firstName || "Игрок", wins: 0, losses: 0, spins: 0, cost: 0 };
+            player.name = user.firstName || player.name || "Игрок"; player.spins = (Number(player.spins) || 0) + 1;
+            if (prize.type === "none") player.losses = (Number(player.losses) || 0) + 1;
+            else { player.wins = (Number(player.wins) || 0) + 1; player.cost = (Number(player.cost) || 0) + Number(prize.cost || 0); }
+            playerStats[String(user.id)] = player; await writeGlobal("playerStats", playerStats);
             const stats = await readGlobal("stats", { totalSpins: 0, wins: 0, losses: 0 });
             stats.totalSpins = (Number(stats.totalSpins) || 0) + 1;
             if (prize.type === "none") stats.losses = (Number(stats.losses) || 0) + 1;
@@ -744,7 +819,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             await writeState(user.id, latestState);
           }
           json(res, 200, {
-            ok: true, canSpin: fresh.bonusSpins > 0, bonusSpins: fresh.bonusSpins, totalSpinsAvailable: fresh.bonusSpins, spinId,
+            ok: true, canSpin: fresh.bonusSpins > 0, bonusSpins: fresh.bonusSpins, totalSpinsAvailable: fresh.bonusSpins, spinId, x2Mode, jackpot: Boolean(prize.jackpot),
             prize: publicPrize(prize),
             prizeIndex: prize.wheelIndex,
             delivered,
@@ -770,6 +845,6 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
   const queuePoller = setInterval(() => { processPendingGiftQueue().catch(() => {}); }, 60 * 1000);
   if (typeof queuePoller.unref === "function") queuePoller.unref();
   processPendingGiftQueue().catch(() => {});
-  return { handleHttp, webAppUrl };
+  return { handleHttp, webAppUrl, registerReferral };
 }
 module.exports = { installRoulette };
