@@ -53,27 +53,6 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .prize span{font-size:10px;color:#a8b7d1}
 .prize.no-prize{border-color:#4b5267}.prize.unavailable{opacity:.72;border-style:dashed}
 .disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}.jackpot-flash{animation:jackpotPulse 1s ease-in-out 4}@keyframes jackpotPulse{0%,100%{box-shadow:0 0 0 1px #f7d78a55,0 0 12px #f7d78a33}50%{box-shadow:0 0 0 5px #f7d78a99,0 0 55px #f7d78a}}.field{display:flex;gap:7px;margin-top:10px}.field input{min-width:0;flex:1;background:#0a1225;border:1px solid #34415e;border-radius:12px;padding:11px;color:white}.field button{border:1px solid #f5d78b;border-radius:12px;padding:10px;background:#d99a32;color:#171528;font-weight:900}.quest{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #2d3d5e;font-size:11px}.quest button{background:#243b66;color:white;border:1px solid #516b9c;border-radius:10px;padding:8px;font-weight:800}.mode{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#f7d78a;margin:10px 0}
-/* Main roulette: CS-style case reel instead of the blank wheel */
-.main-case-wrap{display:flex;flex-direction:column;align-items:center;padding:12px 0 8px;gap:12px}
-.main-case-stage{position:relative;width:100%;height:148px;overflow:hidden;display:flex;align-items:center;border:1px solid #a77c3d;border-radius:18px;background:linear-gradient(180deg,#080f20,#1d2b49 50%,#080f20);box-shadow:inset 0 0 35px #000b,0 10px 28px #0006}
-.main-case-stage:before,.main-case-stage:after{content:"";position:absolute;z-index:3;top:0;bottom:0;width:42px;pointer-events:none}
-.main-case-stage:before{left:0;background:linear-gradient(90deg,#080f20,transparent)}
-.main-case-stage:after{right:0;background:linear-gradient(270deg,#080f20,transparent)}
-.main-case-pointer{position:absolute;z-index:5;top:0;left:50%;transform:translateX(-50%);color:#ffe3a0;font-size:25px;line-height:1;text-shadow:0 2px 8px #000;filter:drop-shadow(0 0 7px #f5c66a)}
-.main-case-track{display:flex;align-items:center;gap:12px;will-change:transform;padding:0 8px;transform:translateX(0)}
-.main-case-tile{flex:0 0 116px;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px solid #63769a;border-radius:13px;background:linear-gradient(145deg,#293d63,#111b31);font-size:42px;box-shadow:inset 0 1px #ffffff18}
-.main-case-tile small{font-size:9px;font-weight:950;letter-spacing:.1em;color:#f7d78a}
-.main-case-chest{display:none;flex-direction:column;align-items:center;justify-content:center;width:118px;height:105px;border:1px solid #c99b50;border-radius:18px;background:radial-gradient(circle,#654b24,#17213b 75%);box-shadow:0 0 28px #e9bc5a55}
-.main-case-chest span{font-size:54px;transform-origin:50% 85%}
-.main-case-chest small{font-size:9px;font-weight:950;color:#ffe3a0;letter-spacing:.1em}
-.main-case-chest.opening{display:flex;animation:mainChestPop .45s ease-out}
-.main-case-chest.opening span{animation:mainChestOpen .9s ease-in-out forwards}
-.main-case-wrap.revealing .main-case-stage{display:none}
-.main-case-wrap.revealing .main-case-chest{display:flex}
-.main-case-caption{margin:0;text-align:center;font-size:11px;line-height:1.45;color:#b8c7e2;min-height:17px}
-.main-case-stage.rolling{border-color:#ffe09a;box-shadow:inset 0 0 35px #000b,0 0 26px #e9bc5a66}
-@keyframes mainChestPop{0%{opacity:0;transform:scale(.65)}75%{transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
-@keyframes mainChestOpen{0%,100%{transform:rotate(0) scale(1)}25%{transform:rotate(-13deg) scale(1.08)}50%{transform:rotate(13deg) scale(1.12)}75%{transform:rotate(-5deg) scale(1.08)}}
 @media(min-width:420px){body{padding-top:22px}.panel{padding:19px}.outer{width:310px}}
 
 
@@ -95,7 +74,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .page-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 0}.page-nav button{flex:1;border:1px solid #3a4c78;background:#17213c;color:#eaf0ff;border-radius:12px;padding:11px 8px;font-weight:850}.page-nav button:disabled{opacity:.35}.page-indicator{color:#f4d47e;font-size:11px;font-weight:900;white-space:nowrap}.app-page{display:none}.app-page.active{display:block}.coin-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid #80622d;background:#342817;border-radius:13px;margin:10px 0}.coin-value{font-size:20px;font-weight:950;color:#ffe39b}.case-stage{height:112px;margin:12px 0;overflow:hidden;position:relative;border:1px solid #8a6b35;border-radius:14px;background:linear-gradient(135deg,#111a30,#302319);display:flex;align-items:center}.case-stage:before,.case-stage:after{content:"";position:absolute;z-index:2;top:0;bottom:0;width:28px;pointer-events:none}.case-stage:before{left:0;background:linear-gradient(90deg,#111a30,transparent)}.case-stage:after{right:0;background:linear-gradient(270deg,#111a30,transparent)}.case-track{display:flex;align-items:center;gap:8px;will-change:transform;padding:0 4px}.case-tile{flex:0 0 116px;height:82px;border:1px solid #53658e;border-radius:12px;background:linear-gradient(150deg,#26395d,#141d33);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:25px;color:#fff;box-sizing:border-box}.case-tile small{font-size:9px;text-align:center;color:#d7e1fa;padding:0 4px}.case-tile.winner{border:2px solid #f5d47d;background:linear-gradient(145deg,#59421d,#26203a);box-shadow:0 0 24px #e9bc5a88}.case-stage.rolling{border-color:#f5d47d;box-shadow:0 0 18px #e9bc5a33}.daily-task{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #34446b;border-radius:12px;background:#111a30}.daily-task button{flex-shrink:0;padding:9px 12px;border-radius:10px;border:0;font-weight:900;background:linear-gradient(120deg,#f3cf7d,#b77b2b);color:#24180a}.daily-task button:disabled{opacity:.45}
 .case-modal{display:none;position:fixed;inset:0;z-index:9999;background:#050914ef;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.case-modal.open{display:flex}.case-dialog{width:min(100%,520px);max-height:90vh;overflow:auto;padding:18px;border:1px solid #8b6b38;border-radius:20px;background:linear-gradient(155deg,#1b2741,#17131e 70%);box-shadow:0 24px 90px #000b;color:#fff}.case-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.case-modal-head strong{display:block;font-size:18px}.case-modal-head small{display:block;color:#e6c77e;margin-top:5px}.case-close{width:36px;height:36px;border:1px solid #65718a;border-radius:10px;background:#26334d;color:white;font-size:18px}.case-modal-hint{text-align:center;color:#c5cee0;font-size:13px}.case-stage{height:126px;margin:16px 0;overflow:hidden;position:relative;border:1px solid #8a6b35;border-radius:14px;background:linear-gradient(135deg,#111a30,#302319);display:flex;align-items:center}.case-stage:before,.case-stage:after{content:"";position:absolute;z-index:2;top:0;bottom:0;width:28px;pointer-events:none}.case-stage:before{left:0;background:linear-gradient(90deg,#111a30,transparent)}.case-stage:after{right:0;background:linear-gradient(270deg,#111a30,transparent)}.case-track{display:flex;align-items:center;gap:8px;will-change:transform;padding:0 4px}.case-tile{flex:0 0 116px;height:96px;border:1px solid #53658e;border-radius:12px;background:linear-gradient(150deg,#26395d,#141d33);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:25px;color:#fff;box-sizing:border-box;padding:5px}.case-tile img{width:48px;height:48px;object-fit:contain}.case-tile small{font-size:10px;text-align:center;color:#d7e1fa;padding:0 4px}.case-tile.winner{border:2px solid #f5d47d;background:linear-gradient(145deg,#59421d,#26203a);box-shadow:0 0 24px #e9bc5a88}.case-stage.rolling{border-color:#f5d47d;box-shadow:0 0 18px #e9bc5a33}.case-modal-prize{text-align:center;min-height:24px;color:#ffe39b;font-weight:900;margin:10px 0}.case-modal .spin{width:100%}
 /* Dedicated CS2-style gift case — separate from the roulette wheel */
-.case-panel-intro{color:#b8c5dd;font-size:12px;line-height:1.55;margin:0 0 12px}
+.case-cover{margin:12px 0;padding:12px;border:1px solid #b58a48;border-radius:17px;background:radial-gradient(ellipse at 50% 65%,#75501d88,#1a2540 60%,#0b1222);box-shadow:inset 0 0 28px #0009,0 0 24px #d99a3222}.case-cover svg{display:block;width:100%;height:142px;filter:drop-shadow(0 8px 12px #000b)}.case-cover-caption{text-align:center;font-size:9px;font-weight:950;letter-spacing:.24em;color:#f5d78b}.case-panel-intro{color:#b8c5dd;font-size:12px;line-height:1.55;margin:0 0 12px}
 .case-modal{backdrop-filter:blur(9px)}
 .case-dialog{width:min(100%,620px);padding:22px;background:radial-gradient(ellipse at 50% 0,#34466e 0,#1a2540 43%,#100f1b 100%);border-color:#b58a48}
 .case-modal-head strong{font-size:20px;letter-spacing:.06em}
@@ -138,20 +117,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   <div class="page-nav" id="pageNav"><button id="prevPage" disabled>← НАЗАД</button><span class="page-indicator" id="pageIndicator">СТРАНИЦА 1 / 3</span><button id="nextPage">СЛЕДУЮЩАЯ →</button></div>
   <section class="panel">
     <div class="stats"><span>Твои прокрутки</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
-    <div class="main-case-wrap">
-      <div class="main-case-stage" id="mainCaseStage">
-        <div class="main-case-pointer" id="mainCasePointer">▼</div>
-        <div class="main-case-track" id="mainCaseTrack">
-          <div class="main-case-tile">🧰<small>КЕЙС NEXUS</small></div>
-          <div class="main-case-tile">🧰<small>КЕЙС NEXUS</small></div>
-          <div class="main-case-tile">🧰<small>КЕЙС NEXUS</small></div>
-          <div class="main-case-tile">🧰<small>КЕЙС NEXUS</small></div>
-          <div class="main-case-tile">🧰<small>КЕЙС NEXUS</small></div>
-        </div>
-      </div>
-      <div class="main-case-chest" id="mainCaseChest"><span>🧰</span><small>КЕЙС NEXUS</small></div>
-      <p class="main-case-caption" id="mainCaseCaption">Стрелка выберет кейс — затем он откроется и покажет твой приз</p>
-    </div>
+    <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
     <label class="mode"><input type="checkbox" id="x2Mode"> ⚡ Режим x2 — 2 попытки, шанс подарка x2</label>
     <button class="spin" id="spinButton" disabled>ПОДКЛЮЧАЕМ РУЛЕТКУ…</button>
     <p class="hint" id="balanceNote">Получаем список реальных подарков Telegram…</p>
@@ -179,7 +145,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="section-head"><strong>🎲 Твои случайные задания</strong><span>Все задания обновляются в 00:00 по Киеву</span></div><div id="dailyQuestList"></div>
   </section>
   <section class="panel">
-    <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>100 ₿ за открытие</span></div>
+    <div class="section-head"><strong>🎁 CS2 GIFT CASE · NEXUS</strong><span>100 ₿ за открытие</span></div>
+<div class="case-cover"><svg viewBox="0 0 340 150" role="img" aria-label="Золотой кейс NEXUS"><defs><linearGradient id="caseGold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a6"/><stop offset=".3" stop-color="#d99a32"/><stop offset=".7" stop-color="#8b531e"/><stop offset="1" stop-color="#f6d47b"/></linearGradient></defs><ellipse cx="170" cy="127" rx="115" ry="13" fill="#e8ad45" opacity=".3"/><path d="M111 39h118l13 14v66H98V53z" fill="#9a6229" stroke="#ffe6a0" stroke-width="3"/><path d="M111 39l12-19h94l12 19-12 12h-94z" fill="url(#caseGold)" stroke="#ffe6a0" stroke-width="3"/><path d="M126 61h88v44h-88z" fill="#17213b" stroke="#f8d77f" stroke-width="3"/><path d="M151 75l19-11 19 11v18l-19 11-19-11z" fill="url(#caseGold)" stroke="#fff0b5" stroke-width="2"/><path d="M142 20v-9q0-7 8-7h40q8 0 8 7v9" fill="none" stroke="#f5d98b" stroke-width="7" stroke-linecap="round"/><text x="170" y="89" fill="#fff2bd" text-anchor="middle" font-size="10" font-weight="900" letter-spacing="2">NEXUS</text></svg><div class="case-cover-caption">NEXUS · TELEGRAM GIFT CASE</div></div>
     <div class="coin-panel"><div><div>Твой баланс биткоинов</div><div class="coin-value" id="coinsValue">₿ 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Биткоины<br>и прокрутки</div></div>
     <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 100 ₿</button>
     <p class="case-panel-intro">Это отдельный магазинный кейс, а не режим рулетки: колесо и его призы не меняются. Покупай открытие за накопленные ₿ и получай настоящий Telegram-подарок.</p><p class="hint" id="caseStatus">Открытие кейса стоит 100 ₿. За каждую обычную прокрутку рулетки начисляется +1 ₿.</p>
@@ -235,7 +202,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
     <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
-    <p class="case-modal-hint">Внутри настоящие подарки Telegram. Лента прокрутится и остановится на твоём выигрыше.</p>
+    <p class="case-modal-hint">Внутри настоящие подарки Telegram. Длинная лента подарков прокрутится как в CS2, замедлится и остановится на твоём выигрыше.</p>
     <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
     <div class="case-reveal" id="caseReveal"><img id="caseRevealImage" alt="Выигранный Telegram-подарок"><div class="case-reveal-rarity" id="caseRevealRarity"></div><h3 id="caseRevealTitle"></h3><div class="case-reveal-value" id="caseRevealValue"></div></div>
@@ -259,7 +226,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   let activePage=0;
   function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="СТРАНИЦА "+(activePage+1)+" / "+pages.length;window.scrollTo({top:0,left:0,behavior:"instant"});}
   $("prevPage").addEventListener("click",()=>showPage(activePage-1));$("nextPage").addEventListener("click",()=>showPage(activePage+1));
-  const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=null,pointer=$("mainCasePointer"),result=$("result"),errorBox=$("errorBox");
+  const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),pointer=document.querySelector(".pointer"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
   let busy=false,currentPrizes=[],wheelRotation=0;
   let hourlyQuestEndsAt=0,hourlyQuestProgress=0;
@@ -283,21 +250,41 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     return art;
   }
   function drawWheel(prizes){
-    currentPrizes=Array.isArray(prizes)&&prizes.length?prizes:[];
-    const track=$("mainCaseTrack");
-    if(track&&!busy){
-      const wrap=document.querySelector(".main-case-wrap"),stage=$("mainCaseStage"),chest=$("mainCaseChest");
-      wrap?.classList.remove("revealing");
-      if(stage){stage.style.display="flex";stage.classList.remove("rolling");}
-      chest?.classList.remove("opening");
-      $("mainCaseCaption").textContent="Стрелка выберет кейс — затем он откроется и покажет твой приз";
-      track.replaceChildren();
-      for(let i=0;i<9;i++){
-        const tile=document.createElement("div");tile.className="main-case-tile";
-        tile.innerHTML="🧰<small>КЕЙС NEXUS</small>";track.append(tile);
-      }
-      track.style.transition="none";track.style.transform="translateX(0px)";
-    }
+    currentPrizes=Array.isArray(prizes)&&prizes.length?prizes:[{id:"gift_preview",short:"Подарок",label:"Подарок Telegram",type:"gift"},{id:"no_prize",short:"Попробуй завтра",label:"Без приза",type:"none"}];
+    const count=currentPrizes.length,step=360/count,diameter=wheel.clientWidth||280;
+    const radius=diameter*.285;
+    wheel.style.background="conic-gradient(from 0deg,"+currentPrizes.map((_,i)=>colors[i%colors.length]+" "+(i*step)+"deg "+((i+1)*step)+"deg").join(",")+")";
+    wheel.querySelectorAll(".slice-label,.wheel-peg").forEach(node=>node.remove());
+    currentPrizes.forEach((prize,index)=>{
+      const angle=(index+.5)*step;
+      const sectorChord=2*radius*Math.sin(step*Math.PI/360);
+      const width=Math.max(28,Math.min(72,sectorChord*.72));
+      const artSize=Math.max(16,Math.min(34,width*.56));
+      const fontSize=Math.max(5.5,Math.min(7.5,width*.105));
+      const label=document.createElement("span");label.className="slice-label";
+      const radians=angle*Math.PI/180;
+      const x=Math.sin(radians)*radius;
+      const y=-Math.cos(radians)*radius;
+      label.style.left="calc(50% + "+x+"px)";
+      label.style.top="calc(50% + "+y+"px)";
+      label.style.width=width+"px";
+      label.style.transform="translate(-50%,-50%) rotate(0deg)";
+      label.dataset.angle=String(angle);
+      label.style.setProperty("--art-size",artSize+"px");
+      label.style.setProperty("--label-font",fontSize+"px");
+      if(prize.imageUrl){
+        const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.draggable=false;
+        img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
+      }else label.append(makePrizeEmoji(prize));
+      const text=document.createElement("span");text.className="slice-text";
+      text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"???":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
+      label.append(text);wheel.append(label);
+      const peg=document.createElement("i");peg.className="wheel-peg";
+      peg.style.transform="rotate("+(index*step)+"deg) translateY(-"+(diameter*.47)+"px)";
+      wheel.append(peg);
+    });
+    // Keep rebuilt labels upright if the wheel is already stopped at a rotated angle.
+    keepWheelLabelsUpright(wheelRotation);
   }
   function keepWheelLabelsUpright(rotation){
     wheel.querySelectorAll(".slice-label").forEach(label=>{
@@ -587,7 +574,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   async function animateCaseOpening(reel){
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
     const source=Array.isArray(reel)?reel:[];
-    const entries=source.map((item,index)=>({...item,winner:index===(source.length-1)}));
+    const previews=source.slice(0,-1),winningEntry=source.length?source[source.length-1]:null;const entries=Array.from({length:3},()=>previews).flat().map(item=>({...item,winner:false}));if(winningEntry)entries.push({...winningEntry,winner:true});
     track.replaceChildren();
     entries.forEach(entry=>{
       const stars=Number((entry.detail||"").match(/\d+/)?.[0]||0),rarity=caseRarity(stars);
@@ -647,35 +634,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     catch{$("referralLink").select();document.execCommand("copy");$("questStatus").textContent="Ссылка скопирована.";}
   });
   $("x2Mode").addEventListener("change",()=>{const total=Number(($("spinsRemaining").textContent.match(/\d+/)||[0])[0]);spinButton.disabled=busy||total<($("x2Mode").checked?2:1);spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";});
-  async function animateMainCase(){
-    const wrap=document.querySelector(".main-case-wrap"),stage=$("mainCaseStage"),track=$("mainCaseTrack"),chest=$("mainCaseChest");
-    if(!wrap||!stage||!track)return;
-    wrap.classList.remove("revealing");stage.style.display="flex";stage.classList.add("rolling");
-    chest.classList.remove("opening");track.replaceChildren();
-    const count=42;
-    for(let i=0;i<count;i++){
-      const tile=document.createElement("div");tile.className="main-case-tile";
-      tile.innerHTML="🧰<small>КЕЙС NEXUS</small>";track.append(tile);
-    }
-    track.style.transition="none";track.style.transform="translateX(0px)";
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const tile=track.children[0],tileWidth=tile.getBoundingClientRect().width+12;
-    const target=Math.max(0,(count-1)*tileWidth+tileWidth/2-stage.clientWidth/2);
-    track.style.transition="transform 6.2s cubic-bezier(.08,.72,.12,1)";
-    track.style.transform="translateX(-"+target+"px)";
-    await new Promise(resolve=>setTimeout(resolve,6350));
-    stage.classList.remove("rolling");stage.style.display="none";
-    wrap.classList.add("revealing");chest.classList.add("opening");
-    $("mainCaseCaption").textContent="🔓 Кейс открывается…";
-    await new Promise(resolve=>setTimeout(resolve,1050));
-    $("mainCaseCaption").textContent="🎉 Твой приз найден!";
-  }
   spinButton.addEventListener("click",async()=>{
     if(busy||spinButton.disabled)return;
-    busy=true;spinButton.disabled=true;spinButton.textContent="КЕЙС ПРОКРУЧИВАЕТСЯ…";result.classList.remove("show");errorBox.classList.remove("show");
+    busy=true;spinButton.disabled=true;spinButton.textContent="КОЛЕСО ВРАЩАЕТСЯ…";pointer?.classList.add("spinning");result.classList.remove("show");errorBox.classList.remove("show");
     try{
       const data=await api("/roulette/api/spin","POST",{mode:$("x2Mode").checked?"x2":"normal"});
-      await animateMainCase();
+      const count=currentPrizes.length||2,index=Number.isInteger(data.prizeIndex)?data.prizeIndex:count-1,step=360/count;
+      const target=((360-((index+.5)*step))%360+360)%360;
+      await animateWheelTo(360*7+target,step,7600);
       showResult(data.prize,data.message,data.delivered,data.spinId);celebrateWin(data.prize,data.message,data.jackpot);if(data.jackpot){$("result").classList.add("jackpot-flash");playJackpotFanfare();setTimeout(()=>$("result").classList.remove("jackpot-flash"),4500);}
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
