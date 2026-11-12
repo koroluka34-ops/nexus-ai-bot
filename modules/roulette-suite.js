@@ -193,6 +193,10 @@ async function getGiftCatalog(bot) {
   ];
   return { balance, gifts: available, prizes };
 }
+function chooseNftRarity() {
+  const roll = crypto.randomInt(0, 100);
+  return roll < 50 ? "COMMON" : roll < 75 ? "RARE" : roll < 90 ? "EPIC" : roll < 98 ? "LEGENDARY" : "MYTHIC";
+}
 function choosePrize(prizes) {
   const total = prizes.reduce((sum, prize) => sum + (Number(prize.weight) || 0), 0);
   let ticket = crypto.randomInt(0, total);
@@ -670,7 +674,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const row = {
             spinId, day: today, prize: prize.id, label: prize.label,
             giftId: prize.giftId || "", cost: prize.cost || 0,
-            nft: prize.type === "nft_collectible" ? { collection: "NEXUS Genesis", tokenId: "NX-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(3).toString("hex").toUpperCase(), rarity: "MYTHIC", edition: "1/1", chain: "NEXUS in-app · not minted on TON", minted: false } : null,
+            nft: prize.type === "nft_collectible" ? (() => { const tokenId = "NX-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(3).toString("hex").toUpperCase(); return { collection: "NEXUS Genesis", name: "NEXUS Genesis " + tokenId, tokenId, rarity: chooseNftRarity(), edition: "1/1", chain: "NEXUS in-app · not minted on TON", minted: false }; })() : null,
             status: "processing", at: Date.now()
           };
           fresh.lastSpinDay = today;
