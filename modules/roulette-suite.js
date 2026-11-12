@@ -922,7 +922,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const queue = await readPendingQueue();
         const own = queue.filter(q => String(q.userId) === String(user.id) && !q.claimedAt && !q.listingId && !q.tradeLock && q.giftId);
         const safe = item => ({ spinId:item.spinId, label:item.label || "🎁 Telegram-подарок", cost:Number(item.cost||0), imageUrl:item.giftId ? "/roulette/api/gift-image/"+encodeURIComponent(item.giftId) : "" });
-        json(res,200,{ok:true, gifts:own.map(safe), listings:(market.listings||[]).filter(x=>x.status==="open"&&String(x.ownerId)!==String(user.id)).map(x=>({...x})), deals:(market.deals||[]).filter(x=>String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)).map(x=>({...x}))}); return true;
+        json(res,200,{ok:true, profileId:String(user.id), gifts:own.map(safe), listings:(market.listings||[]).filter(x=>x.status==="open"&&String(x.ownerId)!==String(user.id)).map(x=>({...x})), deals:(market.deals||[]).filter(x=>String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)).map(x=>({...x}))}); return true;
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/market/list") {
         const body=await readBody(req), ids=Array.isArray(body.spinIds)?[...new Set(body.spinIds.map(String))]:[];
