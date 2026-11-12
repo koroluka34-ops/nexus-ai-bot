@@ -662,6 +662,14 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           luckySector: event.active ? (event.label || "Счастливый сектор активен") : "Счастливый сектор появится во время события",
           referralLink: me.username ? "https://t.me/" + me.username + "?start=ref_" + user.id : "",
           referralCount: state.referralCount || 0,
+          inviteQuestAvailable: !state.questClaims.inviteFriend,
+          dailyQuestClaimed: state.questClaims.dailySpin === kyivDay(),
+          timedQuest: (() => {
+            const cycle = Math.floor(Date.now() / 300000), start = cycle * 300000;
+            return { cycle, startsAt: start, endsAt: start + 300000, target: 3,
+              progress: state.history.filter(item => Number(item.at) >= start && Number(item.at) < start + 300000).length,
+              claimed: state.questClaims.timedSpinCycle === cycle };
+          })(),
           giftsAvailable: catalog.gifts.length, pendingGifts,
           giftOptions: (() => {
             const randomCount = catalog.gifts.filter(g => g.cost >= 15 && g.cost <= 999).length;
@@ -702,9 +710,15 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           if (state.questClaims.dailySpin === today) { json(res, 409, { ok: false, error: "Награда за это задание уже получена сегодня." }); return true; }
           state.questClaims.dailySpin = today; state.bonusSpins = Math.min(100000, state.bonusSpins + 1);
         } else if (quest === "invite_friend") {
-          if ((state.referralCount || 0) < 1) { json(res, 409, { ok: false, error: "Сначала пригласи хотя бы одного нового игрока." }); return true; }
+          if ((state.referralCount || 0) < 3) { json(res, 409, { ok: false, error: "Нужно пригласить 3 новых игроков. Сейчас: " + (state.referralCount || 0) + "/3." }); return true; }
           if (state.questClaims.inviteFriend) { json(res, 409, { ok: false, error: "Награда за приглашение уже получена." }); return true; }
-          state.questClaims.inviteFriend = true; state.bonusSpins = Math.min(100000, state.bonusSpins + 2);
+          state.questClaims.inviteFriend = true; state.bonusSpins = Math.min(100000, state.bonusSpins + 3);
+        } else if (quest === "timed_spin") {
+          const cycle = Math.floor(Date.now() / 300000), start = cycle * 300000, end = start + 300000;
+          const progress = state.history.filter(item => Number(item.at) >= start && Number(item.at) < end).length;
+          if (state.questClaims.timedSpinCycle === cycle) { json(res, 409, { ok: false, error: "Награда за это пятиминутное задание уже получена." }); return true; }
+          if (progress < 3) { json(res, 409, { ok: false, error: "Нужно сделать 3 прокрутки за это пятиминутное задание. Сейчас: " + progress + "/3." }); return true; }
+          state.questClaims.timedSpinCycle = cycle; state.bonusSpins = Math.min(100000, state.bonusSpins + 2);
         } else { json(res, 400, { ok: false, error: "Неизвестное задание." }); return true; }
         await writeState(user.id, state); json(res, 200, { ok: true, bonusSpins: state.bonusSpins }); return true;
       }
