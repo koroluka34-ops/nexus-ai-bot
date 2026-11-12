@@ -161,7 +161,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function renderLeaderboard(items){
     const box=$("leaderboardList");box.replaceChildren();
     if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🏆 Победителей пока нет";card.append(b);box.append(card);return;}
-    items.slice(0,10).forEach((item,index)=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=(index+1)+". "+(item.name||"Игрок");const meta=document.createElement("span");meta.textContent=(item.label||"Приз")+(item.cost?" · "+item.cost+" ⭐":"");card.append(b,meta);box.append(card);});
+    items.slice(0,10).forEach((item,index)=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=(index+1)+". "+(item.name||"Игрок");const meta=document.createElement("span");meta.textContent="Побед: "+(item.wins||0)+" · прокруток: "+(item.spins||0)+" · ценность призов: "+(item.cost||0)+" ⭐";card.append(b,meta);box.append(card);});
   }
   function renderCollection(items){
     const box=$("collectionList");box.replaceChildren();
