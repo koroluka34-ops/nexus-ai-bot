@@ -1062,14 +1062,15 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             // Every available gift can now appear in the CS2-style case reel.
             for (const item of available) previewPool.push({
               title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
+              emoji: item.sticker?.emoji || "🎁",
               detail: Number(item.star_count) + " ⭐", stars: Number(item.star_count), type: "gift",
               imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
             });
           }
           previewPool.push(
-            { title: "NEXUS Premium · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
-            { title: "NEXUS Ultra · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
-            { title: "Telegram Premium · 12 месяцев", detail: "Официальная подписка", stars: 0, type: "telegram_premium", imageUrl: "/assets/telegram-premium.svg" }
+            { title: "NEXUS Premium · 30 дней", emoji: "💎", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
+            { title: "NEXUS Ultra · 30 дней", emoji: "🚀", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
+            { title: "Telegram Premium · 12 месяцев", emoji: "⭐", detail: "Официальная подписка", stars: 0, type: "telegram_premium", imageUrl: "/assets/telegram-premium.svg" }
           );
           const reelPool = Array.from({ length: 59 }, () => previewPool[crypto.randomInt(0, previewPool.length)]);
           const winningEntry = {
