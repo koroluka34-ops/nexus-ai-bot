@@ -212,6 +212,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 @media(prefers-reduced-motion:reduce){.case-stage.rolling,.case-stage.rolling .case-tile,.case-center-pointer,.case-reveal.show img{animation:none!important}}
 
 .rarity-badge{display:inline-flex;align-items:center;justify-content:center;width:max-content;max-width:100%;margin:0 auto 7px;padding:4px 8px;border:1px solid #64748b;border-radius:99px;background:#263449;color:#dbeafe;font-size:8px!important;font-weight:1000;letter-spacing:.12em;text-align:center}.rarity-badge.rarity-rare{border-color:#3b82f6;background:#15365c;color:#bfdbfe}.rarity-badge.rarity-epic{border-color:#a855f7;background:#3b1d55;color:#e9d5ff}.rarity-badge.rarity-legendary{border-color:#e5a33b;background:#543717;color:#ffe3a0}.rarity-badge.rarity-mythic{border-color:#f06a9b;background:#54213f;color:#ffd2e4}
+
+.profile-card{display:flex;align-items:center;gap:13px;padding:13px;border:1px solid #34466d;border-radius:15px;background:linear-gradient(120deg,#17243e,#10182b)}
+.profile-avatar{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#e6bd65,#80532c);color:#20150a;font-size:23px;font-weight:1000;box-shadow:0 0 20px #e6bd6533}
+.profile-main{display:flex;flex-direction:column;gap:4px;min-width:0}.profile-main b{font-size:17px}.profile-main span,.profile-main small{font-size:11px;color:#9eafd0}
+.profile-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.profile-stats>div{padding:11px;border-radius:12px;background:#111b30;border:1px solid #2a3b5f;display:flex;flex-direction:column;gap:4px}.profile-stats b{font-size:19px;color:#ffe09a}.profile-stats span{font-size:10px;color:#a9b8d5}
+.profile-progress{margin-top:12px;padding:12px;border-radius:12px;background:#101a2d}.profile-progress-head{display:flex;justify-content:space-between;gap:8px;font-size:11px}.profile-progress-head span{color:#f5d58b}.profile-progress-track{height:9px;background:#263552;border-radius:99px;overflow:hidden;margin-top:9px}.profile-progress-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b8893c,#ffe39a);border-radius:99px;transition:width .3s}
+
 </style>
 </head>
 <body>
@@ -314,6 +321,21 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div id="historyList" class="history-list"><p class="hint">История появится после первых прокруток.</p></div>
     <div class="best-win" id="bestWin">🏆 Самый дорогой выигрыш появится здесь.</div>
   </section>
+
+  <section class="panel">
+    <div class="section-head"><strong>👤 Профиль игрока</strong><span id="vipBadge">BRONZE</span></div>
+    <div class="profile-card">
+      <div class="profile-avatar" id="profileAvatar">N</div>
+      <div class="profile-main"><b id="profileName">Игрок</b><span id="profileId">ID: —</span><small id="profileVipText">Уровень Bronze</small></div>
+    </div>
+    <div class="profile-stats">
+      <div><b id="profileSpins">0</b><span>Прокруток</span></div>
+      <div><b id="profileWins">0</b><span>Выигрышей</span></div>
+      <div><b id="profileLosses">0</b><span>Без приза</span></div>
+      <div><b id="profileValue">0 ⭐</b><span>Ценность призов</span></div>
+    </div>
+    <div class="profile-progress"><div class="profile-progress-head"><b id="profileWinStreak">🔥 Серия побед: 0</b><span id="vipProgressText">0 / 25</span></div><div class="profile-progress-track"><i id="vipProgressBar"></i></div><p class="hint" id="vipNextText">Продолжай играть, чтобы открыть следующий VIP-уровень.</p></div>
+  </section>
 </main>
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" id="caseDialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
@@ -339,7 +361,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   try{tg?.setHeaderColor?.("#080b18");tg?.setBackgroundColor?.("#080b18");}catch{}
   const initData=tg?.initData||"";
   const $=id=>document.getElementById(id);
-  const pageGroups=[[0,1,10],[2,3,4,5],[6,7,8,9,11,12,13,14]];
+  const pageGroups=[[0,1,10],[2,3,4,5],[6,7,8,9,11,12,13,14,15]];
   const allPanels=[...document.querySelectorAll("main > section.panel")];
   const pageHost=document.createElement("div");pageHost.id="pageHost";
   const firstPanel=allPanels[0];
@@ -647,6 +669,26 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     });
     if(!tasks.length){const empty=document.createElement("p");empty.className="hint";empty.textContent="Новые задания появятся после обновления в полночь по Киеву.";box.append(empty);}
   }
+
+  function renderProfile(profile){
+    const p=profile||{}, name=String(p.name||"Игрок").slice(0,48), spins=Number(p.spins)||0;
+    $("profileName").textContent=name;$("profileAvatar").textContent=(name.trim()[0]||"N").toUpperCase();
+    $("profileId").textContent="ID: "+String(p.userId||"—");
+    $("profileSpins").textContent=spins.toLocaleString("ru-RU");
+    $("profileWins").textContent=(Number(p.wins)||0).toLocaleString("ru-RU");
+    $("profileLosses").textContent=(Number(p.losses)||0).toLocaleString("ru-RU");
+    $("profileValue").textContent=(Number(p.prizeValue)||0).toLocaleString("ru-RU")+" ⭐";
+    $("profileWinStreak").textContent="🔥 Серия побед: "+(Number(p.winStreak)||0);
+    $("vipBadge").textContent=p.vipLabel||"BRONZE";
+    $("profileVipText").textContent="VIP-уровень "+(p.vipLabel||"BRONZE");
+    const next=p.vipNext, currentMin=p.vip==="diamond"?300:p.vip==="gold"?100:p.vip==="silver"?25:0;
+    const target=next?Number(next.min):currentMin;
+    const progress=next?Math.max(0,Math.min(100,(spins-currentMin)/(target-currentMin)*100)):100;
+    $("vipProgressBar").style.width=progress+"%";
+    $("vipProgressText").textContent=next?spins+" / "+target:"МАКСИМУМ";
+    $("vipNextText").textContent=next?"До VIP "+next.label+" осталось "+Math.max(0,target-spins)+" прокруток. VIP открывает оформление профиля и сезонные бонусы.":"Ты достиг максимального VIP-уровня. Спасибо за активность!";
+  }
+
   function renderExtraFeatures(data){
     const grid=$("achievementGrid");grid.replaceChildren();
     (data.achievements||[]).forEach(item=>{const card=document.createElement("div");card.className="achievement"+(item.done?" done":"");const b=document.createElement("b");b.textContent=(item.done?"✅ ":"🔒 ")+item.icon+" "+item.title;const span=document.createElement("span");span.textContent=item.done?"Получено":item.progress+"/"+item.target+" выполнено";card.append(b,span);grid.append(card);});
@@ -687,7 +729,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;$("coinsValue").textContent="₿ "+(data.coins||0);renderDailyQuests(data.dailyQuests||[]);
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"")+(data.luckBoost?.active?" · 🍀 ПРЕМИУМ-ШАНС УСИЛЕН!":"");
-      renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
+      renderLeaderboard(data.leaderboard||[]);renderProfile(data.profile);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       $("dailyQuest").disabled=!!data.dailyQuestClaimed;$("dailyQuest").textContent=data.dailyQuestClaimed?"ПОЛУЧЕНО":"ЗАБРАТЬ";
       const tq=data.timedQuest||{progress:0,target:3,endsAt:Date.now()+3600000,claimed:false};
       hourlyQuestEndsAt=tq.endsAt||Date.now()+3600000;hourlyQuestProgress=Math.min(tq.progress||0,3);dailyResetAt=Number(data.dailyResetAt)||0;
