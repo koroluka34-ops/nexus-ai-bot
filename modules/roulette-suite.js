@@ -211,7 +211,7 @@ function choosePrize(prizes) {
 }
 function publicPrize(prize) {
   const hiddenSecret = prize.type === "secret";
-  return { id: prize.id, label: hiddenSecret ? "❔ Неизвестный приз" : prize.label, short: hiddenSecret ? "???" : prize.short, probability: hiddenSecret ? "Сюрприз" : prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
+  return { id: prize.id, label: hiddenSecret ? "❔ Неизвестный приз" : prize.label, short: hiddenSecret ? "???" : prize.short, probability: hiddenSecret ? "Сюрприз" : prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, upgradeStarCount: Number(prize.upgradeStarCount || 0), collectible: Boolean(prize.collectible), imageUrl: prize.type === "gift" && prize.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
@@ -668,7 +668,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           if (prize.type === "telegram_collectible") {
             const wheelIndex = prize.wheelIndex;
             const eligible = catalog.gifts.filter(g => g.collectible && g.upgradeStarCount > 0 && g.cost >= 15 && g.cost <= 1000);
-            const selectedGift = eligible.length ? eligible[crypto.randomInt(0, eligible.length)] : null;
+            const fiveHundredStarGifts = eligible.filter(g => g.cost === 500);
+            const collectiblePool = fiveHundredStarGifts.length ? fiveHundredStarGifts : eligible;
+            const selectedGift = collectiblePool.length ? collectiblePool[crypto.randomInt(0, collectiblePool.length)] : null;
             prize = selectedGift ? { ...selectedGift, label: "💠 КОЛЛЕКЦИОННЫЙ ПОДАРОК TELEGRAM · " + selectedGift.cost + " ⭐ + улучшение " + selectedGift.upgradeStarCount + " ⭐", short: "NFT · " + selectedGift.cost + " ⭐", wheelIndex, type: "gift", collectible: true, payForUpgrade: true, sectorId: "telegram_collectible" } : { ...prize, type: "none", id: "no_prize", label: "Нет доступных коллекционных подарков", short: "Нет NFT", wheelIndex };
           }
           if (["gift_random", "secret", "jackpot"].includes(prize.type)) {
