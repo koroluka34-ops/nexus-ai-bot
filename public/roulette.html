@@ -936,10 +936,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       await new Promise(resolve=>setTimeout(resolve,700));
       return {name:"NEXUS GIFT CASE",image:""};
     }
-    const base=Array.from({length:48},()=>({...catalog[Math.floor(Math.random()*catalog.length)]}));
+    const base=Array.from({length:32},()=>({...catalog[Math.floor(Math.random()*catalog.length)]}));
     const winner=base[Math.floor(Math.random()*base.length)];
-    const targetIndex=base.length*3+Math.floor(Math.random()*base.length);
-    const entries=Array.from({length:5},()=>base.map(item=>({...item}))).flat();
+    const targetIndex=base.length+10+Math.floor(Math.random()*8);
+    const entries=Array.from({length:3},()=>base.map(item=>({...item}))).flat();
     entries[targetIndex]={...winner,winner:true};
     track.replaceChildren();
     entries.forEach(item=>{
@@ -952,7 +952,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     await new Promise(resolve=>requestAnimationFrame(resolve));
     const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9,step=w+gap,cycleWidth=base.length*step;
     const fast=$("fastOpen").checked;
-    const cruiseDuration=fast?3800:4800,brakeDuration=fast?4200:5200;
+    const cruiseDuration=fast?4200:4800,brakeDuration=fast?4400:5000;
     const targetTile=track.children[targetIndex];
     const finalX=targetIndex*step-(stage.clientWidth-w)/2+4;
     playCaseSound("spin");scheduleCaseTicks(cruiseDuration+brakeDuration);
@@ -995,9 +995,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
     const source=Array.isArray(reelPool)?reelPool:[];
     if(!source.length)throw new Error("Не удалось загрузить призы для прокрутки кейса.");
-    const base=Array.from({length:48},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
-    const targetIndex=base.length*3+Math.floor(Math.random()*base.length);
-    const entries=Array.from({length:5},()=>base.map(item=>({...item}))).flat();
+    const base=Array.from({length:32},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
+    const targetIndex=base.length+10+Math.floor(Math.random()*8);
+    const entries=Array.from({length:3},()=>base.map(item=>({...item}))).flat();
     entries[targetIndex]={...(winningEntry||base[0]),winner:true};
     track.replaceChildren();
     entries.forEach(entry=>{
@@ -1016,7 +1016,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(resolve));
     const firstTile=track.firstElementChild,cardWidth=firstTile?.getBoundingClientRect().width||140,tileWidth=cardWidth+8,cycleWidth=base.length*tileWidth;
     const fast=$("fastOpen").checked;
-    const cruiseDuration=fast?4200:5200,brakeDuration=fast?4800:6200;
+    const cruiseDuration=fast?4400:5000,brakeDuration=fast?4600:5200;
     const targetTile=track.children[targetIndex];
     const finalX=targetIndex*tileWidth-(stage.clientWidth-cardWidth)/2+4;
     playCaseSound("spin");scheduleCaseTicks(cruiseDuration+brakeDuration);
