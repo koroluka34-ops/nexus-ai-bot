@@ -102,9 +102,14 @@ function rouletteSpinsBetween(state, start, end) {
   return state.history.filter(item => isRouletteSpinEntry(item) && Number(item.at) >= start && Number(item.at) < end);
 }
 function dailyQuestProgress(state, quest, today) {
-  const spins = state.history.filter(item => isRouletteSpinEntry(item) && item.day === today);
+  const todayRows = state.history.filter(item => item.day === today);
+  const spins = todayRows.filter(isRouletteSpinEntry);
   if (quest.kind === "spins") return spins.length;
   if (quest.kind === "wins") return spins.filter(item => item.prize !== "no_prize" && item.status !== "declined").length;
+  if (quest.kind === "cases") return todayRows.filter(item => item.source === "case").length;
+  if (quest.kind === "gifts") return todayRows.filter(item => item.status === "delivered" && item.giftId).length;
+  if (quest.kind === "contracts") return todayRows.filter(item => item.source === "contract" && item.prize === "contract_gift").length;
+  if (quest.kind === "upgrades") return todayRows.filter(item => item.source === "upgrade" && item.prize === "upgrade_gift").length;
   if (quest.kind === "referrals") return Number(state.referralCount || 0);
   return 0;
 }
@@ -124,31 +129,34 @@ function kyivNextResetAt() {
 function ensureDailyQuests(state, userId) {
   const today = kyivDay();
   if (!state.dailyQuests || state.dailyQuests.day !== today || !Array.isArray(state.dailyQuests.tasks)) {
-    // Daily tasks are separate from the permanent referral mission below.
-    // Rotate every unfinished daily task at Kyiv midnight and avoid repeating
-    // yesterday's pair whenever the pool allows it.
+    // Four rotating daily missions: a mix of roulette, cases and real gift delivery.
     const pool = [
-      { id: "spin2", title: "Сделай 2 прокрутки", kind: "spins", target: 2, reward: 5 },
-      { id: "spin3", title: "Сделай 3 прокрутки", kind: "spins", target: 3, reward: 8 },
-      { id: "spin5", title: "Сделай 5 прокруток", kind: "spins", target: 5, reward: 12 },
-      { id: "win1", title: "Получи любой приз", kind: "wins", target: 1, reward: 10 },
-      { id: "win2", title: "Получи 2 любых приза", kind: "wins", target: 2, reward: 18 },
-      { id: "spin7", title: "Сделай 7 прокруток", kind: "spins", target: 7, reward: 16 }
+      { id: "spin4", title: "Сделай 4 прокрутки рулетки", kind: "spins", target: 4, reward: 12 },
+      { id: "spin8", title: "Сделай 8 прокруток рулетки", kind: "spins", target: 8, reward: 24 },
+      { id: "win2", title: "Выиграй 2 приза в рулетке", kind: "wins", target: 2, reward: 18 },
+      { id: "win4", title: "Получи 4 выигрыша в рулетке", kind: "wins", target: 4, reward: 38 },
+      { id: "case1", title: "Открой 1 CS2-кейс", kind: "cases", target: 1, reward: 22 },
+      { id: "case2", title: "Открой 2 CS2-кейса", kind: "cases", target: 2, reward: 48 },
+      { id: "gift1", title: "Получи доставленный Telegram-подарок", kind: "gifts", target: 1, reward: 28 },
+      { id: "gift2", title: "Получи 2 доставленных Telegram-подарка", kind: "gifts", target: 2, reward: 55 },
+      { id: "contract1", title: "Собери 1 контракт из 5 подарков", kind: "contracts", target: 1, reward: 35 },
+      { id: "upgrade1", title: "Успешно улучши 1 подарок", kind: "upgrades", target: 1, reward: 32 },
+      { id: "spin6", title: "Сделай 6 прокруток за день", kind: "spins", target: 6, reward: 19 },
+      { id: "win3", title: "Выиграй 3 приза в рулетке", kind: "wins", target: 3, reward: 27 }
     ];
     const previousIds = new Set((state.dailyQuests?.tasks || []).map(q => q.id));
-    const seed = crypto.createHash("sha256").update(String(userId) + ":" + today + ":daily-quests-v2").digest();
+    const seed = crypto.createHash("sha256").update(String(userId) + ":" + today + ":daily-quests-v3").digest();
     const order = pool.map((q, index) => ({ q, key: seed.readUInt32BE((index * 4) % 28) }))
       .sort((a, b) => a.key - b.key);
     const fresh = order.filter(item => !previousIds.has(item.q.id));
     const chosen = [...fresh, ...order.filter(item => previousIds.has(item.q.id))]
-      .slice(0, 2).map(item => item.q);
-    state.dailyQuests = { day: today, tasks: chosen.map(q => ({ ...q, claimed: false })) };
+      .slice(0, 4).map(item => ({ ...item.q, claimed: false }));
+    state.dailyQuests = { day: today, tasks: chosen };
   }
-  return state.dailyQuests.tasks.map(q => ({
-    ...q,
-    progress: Math.min(q.target, dailyQuestProgress(state, q, today)),
-    done: dailyQuestProgress(state, q, today) >= q.target
-  }));
+  return state.dailyQuests.tasks.map(q => {
+    const progress = dailyQuestProgress(state, q, today);
+    return { ...q, progress: Math.min(q.target, progress), done: progress >= q.target };
+  });
 }
 function verifyInitData(initData) {
   if (!BOT_TOKEN || !initData || initData.length > 10000) return null;
