@@ -632,18 +632,35 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
       const card=document.createElement("div");card.className="prize pending-gift-card";
       if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt="Подарок";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}
       const title=document.createElement("b");title.textContent=item.label||"🎁 Подарок Telegram";
-      const meta=document.createElement("span");meta.textContent="Ожидает отправки · "+(item.cost||"цена уточняется")+" ⭐";
-      const rule=document.createElement("span");rule.className="pending-upgrade-rule";rule.textContent="Улучшение: шанс 35% · новый подарок минимум в 2 раза дороже";
+      const meta=document.createElement("span");meta.textContent="Сохранён в NEXUS · "+(item.cost?Number(item.cost).toLocaleString("ru-RU")+" ⭐":"особая награда");
       const status=document.createElement("span");status.className="pending-upgrade-status";status.setAttribute("aria-live","polite");
-      const upgrade=document.createElement("button");upgrade.className="spin";upgrade.style.cssText="margin-top:10px;padding:11px 8px;font-size:11px";upgrade.textContent="⬆️ УЛУЧИТЬ · 35%";upgrade.addEventListener("click",()=>upgradePendingGift(item.spinId,upgrade,status));
-      const decline=document.createElement("button");decline.className="spin";decline.style.cssText="margin-top:8px;padding:9px 8px;font-size:10px;background:linear-gradient(100deg,#39445c,#222d45);color:#e8edf8;border-color:#64748b";decline.textContent="ОТКАЗАТЬСЯ ОТ ПОДАРКА";
-      decline.addEventListener("click",async()=>{
-        if(!confirm("Точно отказаться от этого подарка? Отменить действие будет нельзя."))return;
-        decline.disabled=true;status.textContent="Удаляем из очереди…";
-        try{await api("/roulette/api/decline","POST",{spinId:item.spinId});await refresh();}
-        catch(error){decline.disabled=false;status.textContent=error.message;}
-      });
-      card.append(title,meta,rule,upgrade,status,decline);box.append(card);
+      if(item.claimedAt){
+        const waiting=document.createElement("span");waiting.className="pending-upgrade-rule";waiting.textContent="⏳ Запрос на отправку принят. Бот отправит награду, когда сможет.";
+        card.append(title,meta,waiting,status);
+      }else{
+        const rule=document.createElement("span");rule.className="pending-upgrade-rule";rule.textContent="Награда хранится у NEXUS и не отправится без твоего нажатия.";
+        const claim=document.createElement("button");claim.className="spin";claim.style.cssText="margin-top:10px;padding:12px 8px;font-size:12px";claim.textContent="🎁 ЗАБРАТЬ ПОДАРОК";
+        claim.addEventListener("click",async()=>{
+          claim.disabled=true;claim.textContent="ОТПРАВЛЯЕМ…";status.textContent="Передаём запрос боту…";
+          try{const result=await api("/roulette/api/claim","POST",{spinId:item.spinId});status.textContent=result.message;await refresh();}
+          catch(error){claim.disabled=false;claim.textContent="🎁 ЗАБРАТЬ ПОДАРОК";status.textContent=error.message;}
+        });
+        card.append(title,meta,rule,claim);
+        if(item.canUpgrade){
+          const upgradeRule=document.createElement("span");upgradeRule.className="pending-upgrade-rule";upgradeRule.textContent="Улучшение: шанс 35% · новый подарок минимум в 2 раза дороже";
+          const upgrade=document.createElement("button");upgrade.className="spin";upgrade.style.cssText="margin-top:8px;padding:10px 8px;font-size:11px;background:linear-gradient(100deg,#39445c,#222d45);color:#e8edf8;border-color:#64748b";upgrade.textContent="⬆️ УЛУЧИТЬ · 35%";upgrade.addEventListener("click",()=>upgradePendingGift(item.spinId,upgrade,status));
+          card.append(upgradeRule,upgrade);
+        }
+        const decline=document.createElement("button");decline.className="spin";decline.style.cssText="margin-top:8px;padding:9px 8px;font-size:10px;background:linear-gradient(100deg,#252d40,#171d2b);color:#e8edf8;border-color:#475569";decline.textContent="🗑 УДАЛИТЬ ПОДАРОК";
+        decline.addEventListener("click",async()=>{
+          if(!confirm("Удалить награду из ожидания? Бот не отправит её, отменить действие нельзя."))return;
+          decline.disabled=true;status.textContent="Удаляем награду…";
+          try{await api("/roulette/api/decline","POST",{spinId:item.spinId});await refresh();}
+          catch(error){decline.disabled=false;status.textContent=error.message;}
+        });
+        card.append(status,decline);
+      }
+      box.append(card);
     });
   }
   let lastCatalogData=null;
