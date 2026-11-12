@@ -239,7 +239,12 @@ async function getStarBalance() {
   return Number(value?.amount || 0);
 }
 async function getGiftCatalog(bot) {
-  const balance = await getStarBalance();
+  // A balance lookup must never make the entire roulette unavailable.
+  // The gift catalog is independent from the current Stars balance.
+  const balance = await getStarBalance().catch(error => {
+    console.warn("NEXUS roulette: could not read Stars balance; loading gifts anyway:", String(error.message || error).slice(0, 180));
+    return 0;
+  });
   const result = await telegramApi("getAvailableGifts");
   const gifts = Array.isArray(result?.gifts) ? result.gifts : [];
   // Keep the complete eligible pool. The wheel has one teddy-bear sector;
