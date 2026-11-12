@@ -72,7 +72,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.achievement{padding:11px;border:1px solid #34446b;border-radius:14px;background:#0b1428}.achievement b{display:block;font-size:11px}.achievement span{display:block;margin-top:5px;color:#9fb0ce;font-size:10px}.achievement.done{border-color:#d9aa52;background:#392b1b88}
 .calendar-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}.calendar-day{padding:8px 2px;text-align:center;border:1px solid #34446b;border-radius:10px;color:#aab8d2;font-size:9px}.calendar-day.today{border-color:#f5d78b;color:#ffe4a0;background:#6b4b1d66}
 .page-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 0}.page-nav button{flex:1;border:1px solid #3a4c78;background:#17213c;color:#eaf0ff;border-radius:12px;padding:11px 8px;font-weight:850}.page-nav button:disabled{opacity:.35}.page-indicator{color:#f4d47e;font-size:11px;font-weight:900;white-space:nowrap}.app-page{display:none}.app-page.active{display:block}.coin-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid #80622d;background:#342817;border-radius:13px;margin:10px 0}.coin-value{font-size:20px;font-weight:950;color:#ffe39b}.case-stage{height:112px;margin:12px 0;overflow:hidden;position:relative;border:1px solid #8a6b35;border-radius:14px;background:linear-gradient(135deg,#111a30,#302319);display:flex;align-items:center}.case-stage:before,.case-stage:after{content:"";position:absolute;z-index:2;top:0;bottom:0;width:28px;pointer-events:none}.case-stage:before{left:0;background:linear-gradient(90deg,#111a30,transparent)}.case-stage:after{right:0;background:linear-gradient(270deg,#111a30,transparent)}.case-track{display:flex;align-items:center;gap:8px;will-change:transform;padding:0 4px}.case-tile{flex:0 0 116px;height:82px;border:1px solid #53658e;border-radius:12px;background:linear-gradient(150deg,#26395d,#141d33);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:25px;color:#fff;box-sizing:border-box}.case-tile small{font-size:9px;text-align:center;color:#d7e1fa;padding:0 4px}.case-tile.winner{border:2px solid #f5d47d;background:linear-gradient(145deg,#59421d,#26203a);box-shadow:0 0 24px #e9bc5a88}.case-stage.rolling{border-color:#f5d47d;box-shadow:0 0 18px #e9bc5a33}.daily-task{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #34446b;border-radius:12px;background:#111a30}.daily-task button{flex-shrink:0;padding:9px 12px;border-radius:10px;border:0;font-weight:900;background:linear-gradient(120deg,#f3cf7d,#b77b2b);color:#24180a}.daily-task button:disabled{opacity:.45}
-</style>
+.case-modal{display:none;position:fixed;inset:0;z-index:9999;background:#050914ef;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.case-modal.open{display:flex}.case-dialog{width:min(100%,520px);max-height:90vh;overflow:auto;padding:18px;border:1px solid #8b6b38;border-radius:20px;background:linear-gradient(155deg,#1b2741,#17131e 70%);box-shadow:0 24px 90px #000b;color:#fff}.case-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.case-modal-head strong{display:block;font-size:18px}.case-modal-head small{display:block;color:#e6c77e;margin-top:5px}.case-close{width:36px;height:36px;border:1px solid #65718a;border-radius:10px;background:#26334d;color:white;font-size:18px}.case-modal-hint{text-align:center;color:#c5cee0;font-size:13px}.case-stage{height:126px;margin:16px 0;overflow:hidden;position:relative;border:1px solid #8a6b35;border-radius:14px;background:linear-gradient(135deg,#111a30,#302319);display:flex;align-items:center}.case-stage:before,.case-stage:after{content:"";position:absolute;z-index:2;top:0;bottom:0;width:28px;pointer-events:none}.case-stage:before{left:0;background:linear-gradient(90deg,#111a30,transparent)}.case-stage:after{right:0;background:linear-gradient(270deg,#111a30,transparent)}.case-track{display:flex;align-items:center;gap:8px;will-change:transform;padding:0 4px}.case-tile{flex:0 0 116px;height:96px;border:1px solid #53658e;border-radius:12px;background:linear-gradient(150deg,#26395d,#141d33);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:25px;color:#fff;box-sizing:border-box;padding:5px}.case-tile img{width:48px;height:48px;object-fit:contain}.case-tile small{font-size:10px;text-align:center;color:#d7e1fa;padding:0 4px}.case-tile.winner{border:2px solid #f5d47d;background:linear-gradient(145deg,#59421d,#26203a);box-shadow:0 0 24px #e9bc5a88}.case-stage.rolling{border-color:#f5d47d;box-shadow:0 0 18px #e9bc5a33}.case-modal-prize{text-align:center;min-height:24px;color:#ffe39b;font-weight:900;margin:10px 0}.case-modal .spin{width:100%}</style>
 </head>
 <body>
 <main>
@@ -112,8 +112,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>20 ₿ за открытие</span></div>
     <div class="coin-panel"><div><div>Твой баланс биткоинов</div><div class="coin-value" id="coinsValue">₿ 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Биткоины<br>и прокрутки</div></div>
     <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 20 ₿</button>
-    <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-track" id="caseTrack"><div class="case-tile">🎁<small>Кейс NEXUS</small></div></div></div>
-    <p class="hint" id="caseStatus">В кейсе всегда выпадает награда не меньше стоимости открытия: от +22 ₿ или бонусные прокрутки. За каждую прокрутку рулетки начисляется +1 ₿.</p>
+    <p class="hint" id="caseStatus">Открой кейс за 20 ₿ и получи настоящий Telegram-подарок. Чем дороже подарок, тем реже он выпадает. За каждую прокрутку рулетки начисляется +1 ₿.</p>
   </section>
   <section class="panel">
     <div class="section-head"><strong>👥 Приглашения</strong><span id="referralCount">0 друзей</span></div>
@@ -163,6 +162,16 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   </div>
   <p class="disclaimer">В секторах показаны призы NEXUS. Настоящие Telegram-подарки отправляются ботом после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
 </main>
+<div class="case-modal" id="caseModal" aria-hidden="true">
+  <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
+    <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 20 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
+    <p class="case-modal-hint">Внутри настоящие подарки Telegram. Лента прокрутится и остановится на твоём выигрыше.</p>
+    <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-track" id="caseTrack"></div></div>
+    <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
+    <button class="spin" id="caseOpenConfirm">ОТКРЫТЬ ЗА 20 ₿</button>
+    <p class="hint" id="caseModalStatus">Нажми кнопку, чтобы открыть кейс.</p>
+  </div>
+</div>
 <script>
 (()=> {
   const tg=window.Telegram?.WebApp;tg?.ready?.();tg?.expand?.();
@@ -504,33 +513,54 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("timedQuest").addEventListener("click",()=>claimQuest("timed_spin"));
   $("inviteQuest").addEventListener("click",()=>claimQuest("invite_friend"));
   $("dailyQuestList").addEventListener("click",event=>{const button=event.target.closest("button[data-quest]");if(button)claimQuest(button.dataset.quest);});
-  async function animateCaseOpening(reward){
+  function openCaseModal(){
+    $("caseModal").classList.add("open");$("caseModal").setAttribute("aria-hidden","false");
+    $("caseModalPrize").textContent="🎁 В кейсе — настоящие подарки Telegram";
+    $("caseModalStatus").textContent="Нажми кнопку, чтобы открыть кейс за 20 ₿.";
+    $("caseOpenConfirm").disabled=false;$("caseOpenConfirm").textContent="ОТКРЫТЬ ЗА 20 ₿";
+  }
+  function closeCaseModal(){
+    $("caseModal").classList.remove("open");$("caseModal").setAttribute("aria-hidden","true");
+  }
+  async function animateCaseOpening(reel){
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
-    const pool=["🎁 Сюрприз","₿ Биткоины","💰 Большой выигрыш","🎰 Прокрутка","💎 Редкий приз","✨ Бонус"];
-    const entries=Array.from({length:18},(_,i)=>({icon:["🎁","₿","💰","🎰","💎","✨"][i%6],label:pool[i%pool.length]}));
-    entries.push({icon:reward.spins>=10?"👑":reward.spins?"🎰":reward.coins>=35?"💎":"₿",label:reward.title+" · "+reward.detail,winner:true});
+    const entries=(Array.isArray(reel)?reel:[]).map((item,index)=>({...item,winner:index===(reel.length-1)}));
     track.replaceChildren();
-    entries.forEach(entry=>{const tile=document.createElement("div");tile.className="case-tile"+(entry.winner?" winner":"");const icon=document.createElement("span");icon.textContent=entry.icon;const small=document.createElement("small");small.textContent=entry.label;tile.append(icon,small);track.append(tile);});
+    entries.forEach(entry=>{
+      const tile=document.createElement("div");tile.className="case-tile"+(entry.winner?" winner":"");
+      if(entry.imageUrl){const img=document.createElement("img");img.src=entry.imageUrl;img.alt="Telegram-подарок";tile.append(img);}
+      else{const icon=document.createElement("span");icon.textContent="🎁";tile.append(icon);}
+      const small=document.createElement("small");small.textContent=entry.detail||entry.title;tile.append(small);track.append(tile);
+    });
     track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
     void track.offsetWidth;
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const tileWidth=124,finalX=-(entries.length-1)*tileWidth+(stage.clientWidth-116)/2;
-    track.style.transition="transform 4.8s cubic-bezier(.08,.72,.08,1)";
+    track.style.transition="transform 5.2s cubic-bezier(.08,.72,.08,1)";
     track.style.transform="translateX("+finalX+"px)";
-    await new Promise(resolve=>setTimeout(resolve,4950));
+    await new Promise(resolve=>setTimeout(resolve,5350));
     stage.classList.remove("rolling");
+    const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
   }
-  $("caseButton").addEventListener("click",async()=>{
-    const button=$("caseButton");button.disabled=true;button.textContent="🎲 ОТКРЫВАЕМ КЕЙС…";
-    $("caseStatus").textContent="Кейс вращается — ждём, что выпадет!";
+  $("caseButton").addEventListener("click",openCaseModal);
+  $("caseClose").addEventListener("click",closeCaseModal);
+  $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
+  $("caseOpenConfirm").addEventListener("click",async()=>{
+    const button=$("caseOpenConfirm");button.disabled=true;button.textContent="🎁 ОТКРЫВАЕМ КЕЙС…";
+    $("caseModalStatus").textContent="Лента подарков запускается...";
     try{
       const data=await api("/roulette/api/case/open","POST",{});
-      await animateCaseOpening(data.reward);
-      $("caseStatus").textContent="🎉 ВЫПАЛО: "+data.reward.title+" — "+data.reward.detail;
+      await animateCaseOpening(data.reel);
+      $("caseModalPrize").textContent="🏆 "+data.reward.title+" · "+data.reward.detail;
+      $("caseModalStatus").textContent="Подарок добавлен в очередь отправки. Статус доставки появится в разделе «Ожидающие подарки».";
+      $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+data.reward.detail;
       $("coinsValue").textContent="₿ "+data.coins;
+      button.textContent="КЕЙС ОТКРЫТ";
       await refresh();
-    }catch(error){$("caseStatus").textContent="ℹ️ "+error.message;}
-    finally{button.disabled=false;button.textContent="ОТКРЫТЬ КЕЙС · 20 ₿";}
+    }catch(error){
+      $("caseModalStatus").textContent="ℹ️ "+error.message;
+      button.disabled=false;button.textContent="ПОВТОРИТЬ · 20 ₿";
+    }
   });
   $("copyReferral").addEventListener("click",async()=>{
     const link=$("referralLink").value;if(!link){$("questStatus").textContent="Ссылка ещё загружается.";return;}
