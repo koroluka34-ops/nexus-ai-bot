@@ -257,7 +257,8 @@ async function getGiftCatalog(bot) {
       probability: "",
       type: "gift",
       cost: Number(g.star_count)
-    }));
+    }))
+    .sort((a, b) => a.cost - b.cost);
   const premiumAvailable = balance >= 2500;
   const settings = await readGlobal("settings", { giftPercent: 38 });
   const giftPercent = Math.max(1, Math.min(90, Number(settings.giftPercent) || 38));
@@ -1048,8 +1049,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           };
           const previewPool = [];
           if (available.length) {
-            const samples = available.slice(0, Math.min(18, available.length));
-            for (const item of samples) previewPool.push({
+            // Include the full live Telegram gift catalog, not only the first 18 entries.
+            // Every available gift can now appear in the CS2-style case reel.
+            for (const item of available) previewPool.push({
               title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
               detail: Number(item.star_count) + " ⭐", stars: Number(item.star_count), type: "gift",
               imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
