@@ -937,7 +937,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       return {name:"NEXUS GIFT CASE",image:""};
     }
     const winner=catalog[Math.floor(Math.random()*catalog.length)];
-    const entries=Array.from({length:5},()=>catalog).flat().map(item=>({...item,winner:false}));
+    const entries=Array.from({length:90},()=>({...catalog[Math.floor(Math.random()*catalog.length)],winner:false}));
     entries.push({...winner,winner:true});
     track.replaceChildren();
     entries.forEach(item=>{
@@ -950,7 +950,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9;
     const finalX=(stage.clientWidth-w)/2-(entries.length-1)*(w+gap)-4;
-    const duration=$("fastOpen").checked?1450:6100;
+    const duration=$("fastOpen").checked?2600:8500;
     playCaseSound("spin");scheduleCaseTicks(duration);
     stage.classList.add("case-select-spinning");
     track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";
@@ -990,16 +990,16 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(!source.length)throw new Error("Не удалось загрузить призы для прокрутки кейса.");
     // Build a long, freshly randomized reel from the complete live gift catalogue.
     // The server-selected weighted prize is placed only at the final stopping position.
-    const entries=Array.from({length:119},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
+    const entries=Array.from({length:159},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
     if(winningEntry)entries.push({...winningEntry,winner:true});
     track.replaceChildren();
     entries.forEach(entry=>{
       const stars=Number(entry.stars||String(entry.detail||"").match(/\d+/)?.[0]||0),rarity=caseRarity(stars,entry.type);
       const tile=document.createElement("div");tile.className="case-tile case-reel-item rarity-"+rarity.key;
-      if(entry.emoji){
-        const art=document.createElement("div");art.className="case-showcase-emoji";art.textContent=entry.emoji;art.setAttribute("aria-label",entry.title||"Витринный предмет");tile.append(art);
-      }else{
-        const image=document.createElement("img");image.src=entry.imageUrl||"";image.alt=entry.title||"Подарок Telegram";image.loading="eager";tile.append(image);
+      const art=document.createElement("div");art.className="case-showcase-emoji";art.textContent=entry.emoji|| (entry.type==="telegram_premium"?"⭐":entry.type==="nexus_ultra"?"🚀":entry.type==="nexus_plus"?"💎":"🎁");art.setAttribute("aria-label",entry.title||"Подарок Telegram");tile.append(art);
+      if(entry.imageUrl){
+        const image=document.createElement("img");image.src=entry.imageUrl;image.alt=entry.title||"Подарок Telegram";image.loading="eager";
+        image.onerror=()=>{image.remove();};tile.insertBefore(image,art); 
       }
       const name=document.createElement("div");name.className="case-name";name.textContent=entry.title||"Подарок Telegram";tile.append(name);
       const tier=document.createElement("div");tier.className="case-rarity";tier.textContent=rarity.label;tile.append(tier);
@@ -1008,7 +1008,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
     void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const firstTile=track.firstElementChild,tileWidth=(firstTile?.getBoundingClientRect().width||140)+8,center=(stage.clientWidth-(firstTile?.getBoundingClientRect().width||140))/2,finalX=center-4-(entries.length-1)*tileWidth;
-    const duration=$("fastOpen").checked?1450:7200;
+    const duration=$("fastOpen").checked?3200:10500;
     playCaseSound("spin");scheduleCaseTicks(duration);
     track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";track.style.transform="translateX("+finalX+"px)";
     await new Promise(resolve=>setTimeout(resolve,duration+100));stage.classList.remove("rolling");
