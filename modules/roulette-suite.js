@@ -351,7 +351,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       const gifts = (Array.isArray(catalog?.gifts) ? catalog.gifts : [])
         .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
         .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
-      for (const item of [...queue].filter(entry => entry.type !== "telegram_premium")) {
+      for (const item of [...queue].filter(entry => !["telegram_premium", "nexus_plus", "nexus_ultra"].includes(entry.type))) {
         // If the catalog was empty at spin time, select a real gift only when
         // it becomes available and the bot can afford it.
         let gift = item.giftId ? gifts.find(g => g.id === item.giftId) : null;
@@ -837,6 +837,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const available = (Array.isArray(giftResponse?.gifts) ? giftResponse.gifts : [])
             .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
             .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
+          if (!available.length) { json(res, 503, { ok: false, error: "В каталоге Telegram сейчас нет доступных подарков для кейса. Попробуй позже — 100 ₿ не списаны." }); return true; }
           const rewardPool = [];
           if (available.length) rewardPool.push({ type: "gift", weight: 8500 });
           rewardPool.push(
