@@ -254,7 +254,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="quest" id="timedQuestRow"><span id="timedQuestText">⏱ Сделай 3 прокрутки за час — +2 попытки</span><button id="timedQuest">ЗАБРАТЬ</button></div>
     <div class="quest" id="inviteQuestRow"><span id="inviteQuestText">👥 Пригласи 3 новых друзей — +3 попытки</span><button id="inviteQuest">ЗАБРАТЬ</button></div>
     <p class="hint" id="questStatus">Выполняй более сложные, но реальные миссии: прокрутки, выигрыши, кейсы и подарки. Каждая награда начисляется в ₿.</p>
-    <div class="section-head"><strong>🎲 Твои случайные задания</strong><span>4 миссии · награды в ₿ · сброс <b id="dailyResetCountdown">—:—:—</b></span></div><div id="dailyQuestList"></div>
+    <div class="section-head"><strong>🎲 Твои случайные задания</strong><span>4 из 20 миссий · награды в ₿ · сброс <b id="dailyResetCountdown">—:—:—</b></span></div><div id="dailyQuestList"></div>
   </section>
   <section class="panel">
     <div class="section-head"><strong>🎁 CS2 GIFT CASE · NEXUS</strong><span>100 ₿ за открытие</span></div>
@@ -551,6 +551,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const box=$("bestWin");if(!item){box.textContent="🏆 Самый дорогой выигрыш появится здесь.";return;}
     box.textContent="🏆 ТВОЙ ЛУЧШИЙ ВЫИГРЫШ · "+(item.label||"Подарок")+" · "+Number(item.cost||0)+" ⭐";
   }
+  async function upgradePendingGift(spinId,button){
+    if(!confirm("Поставить ожидающий подарок на улучшение? Шанс — 35%. При неудаче он сгорит и уже не будет отправлен."))return;
+    button.disabled=true;button.textContent="УЛУЧАЕМ…";
+    try{const result=await api("/roulette/api/pending-upgrade","POST",{spinId});$("questStatus").textContent=result.message+" "+result.label;await refresh();}
+    catch(error){button.disabled=false;button.textContent="⬆️ УЛУЧИТЬ · 35%";$("questStatus").textContent=error.message;}
+  }
   function renderPendingGifts(items){
     const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();
     if(!Array.isArray(items)||!items.length){panel.style.display="none";return;}
@@ -566,7 +572,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         try{await api("/roulette/api/decline","POST",{spinId:item.spinId});await refresh();}
         catch(error){button.disabled=false;errorBox.textContent=error.message;errorBox.classList.add("show");}
       });
-      card.append(title,meta,button);box.append(card);
+      const upgrade=document.createElement("button");upgrade.className="spin";upgrade.style.cssText="margin-top:8px;padding:9px 8px;font-size:11px";upgrade.textContent="⬆️ УЛУЧИТЬ · 35%";upgrade.addEventListener("click",()=>upgradePendingGift(item.spinId,upgrade));
+      card.append(title,meta,upgrade,button);box.append(card);
     });
   }
   function renderCatalog(prizes,giftOptions=[]){
@@ -687,21 +694,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 
   function renderProfile(profile){
     const p=profile||{}, name=String(p.name||"Игрок").slice(0,48), spins=Number(p.spins)||0;
-    $("profileName").textContent=name;$("profileAvatar").textContent=(name.trim()[0]||"N").toUpperCase();$("profileTriggerAvatar").textContent=(name.trim()[0]||"N").toUpperCase();
-    $("profileId").textContent="ID: "+String(p.userId||"—");
-    $("profileSpins").textContent=spins.toLocaleString("ru-RU");
-    $("profileWins").textContent=(Number(p.wins)||0).toLocaleString("ru-RU");
-    $("profileLosses").textContent=(Number(p.losses)||0).toLocaleString("ru-RU");
-    $("profileValue").textContent=(Number(p.prizeValue)||0).toLocaleString("ru-RU")+" ⭐";
-    $("profileWinStreak").textContent="🔥 Серия побед: "+(Number(p.winStreak)||0);
-    $("vipBadge").textContent=p.vipLabel||"BRONZE";
-    $("profileVipText").textContent="VIP-уровень "+(p.vipLabel||"BRONZE");
-    const next=p.vipNext, currentMin=p.vip==="diamond"?300:p.vip==="gold"?100:p.vip==="silver"?25:0;
-    const target=next?Number(next.min):currentMin;
-    const progress=next?Math.max(0,Math.min(100,(spins-currentMin)/(target-currentMin)*100)):100;
-    $("vipProgressBar").style.width=progress+"%";
-    $("vipProgressText").textContent=next?spins+" / "+target:"МАКСИМУМ";
-    $("vipNextText").textContent=next?"До VIP "+next.label+" осталось "+Math.max(0,target-spins)+" прокруток. VIP открывает оформление профиля и сезонные бонусы.":"Ты достиг максимального VIP-уровня. Спасибо за активность!";
+    $("profileName").textContent=name;$("profileId").textContent="ID: "+String(p.userId||"—");
+    const photo=String(p.photoUrl||"");
+    [["profileAvatar","N"],["profileTriggerAvatar","N"]].forEach(([id,fallback])=>{const node=$(id);node.replaceChildren();if(photo){const img=document.createElement("img");img.src=photo;img.alt="Фото профиля Telegram";img.referrerPolicy="no-referrer";img.onerror=()=>{node.textContent=(name.trim()[0]||fallback).toUpperCase();};node.append(img);}else node.textContent=(name.trim()[0]||fallback).toUpperCase();});
+    $("profileSpins").textContent=spins.toLocaleString("ru-RU");$("profileWins").textContent=(Number(p.wins)||0).toLocaleString("ru-RU");$("profileLosses").textContent=(Number(p.losses)||0).toLocaleString("ru-RU");$("profileValue").textContent=(Number(p.prizeValue)||0).toLocaleString("ru-RU")+" ⭐";
+    $("profileWinStreak").textContent="🔥 Серия побед: "+(Number(p.winStreak)||0);$("vipBadge").textContent=p.vipLabel||"BRONZE";$("profileVipText").textContent="VIP-уровень "+(p.vipLabel||"BRONZE");
+    const next=p.vipNext,currentMin=p.vip==="diamond"?300:p.vip==="gold"?100:p.vip==="silver"?25:0,target=next?Number(next.min):currentMin,progress=next?Math.max(0,Math.min(100,(spins-currentMin)/(target-currentMin)*100)):100;
+    $("vipProgressBar").style.width=progress+"%";$("vipProgressText").textContent=next?spins+" / "+target:"МАКСИМУМ";$("vipNextText").textContent=next?"До VIP "+next.label+" осталось "+Math.max(0,target-spins)+" прокруток. VIP открывает оформление профиля и сезонные бонусы.":"Ты достиг максимального VIP-уровня. Спасибо за активность!";
   }
 
   function renderExtraFeatures(data){
