@@ -1062,7 +1062,229 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
               imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
             });
           }
-          // The case reel contains only real Telegram gifts returned by getAvailableGifts.
+          const showcaseItems = [
+            ["🍦","Мороженое",300],["🥅","Хоккейная маска",929],["🗽","Статуя Свободы",563],
+            ["🐊","Крокодил с короной",581],["🍜","Золотая лапша",430],["🏮","Фонарь",480],
+            ["🍭","Леденец",500],["🍫","Шоколадное эскимо",500],["🦩","Розовый фламинго",490],
+            ["🎒","Рюкзак",562],["💩","Забавный сюрприз",500],["🐝","Пчелиный сюрприз",581],
+            ["🌸","Цветочный подарок",484],["☃️","Снеговик",435],["🍬","Новогодняя конфета",420],
+            ["🍀","Четырёхлистный клевер",581],["🛷","Новогодние сани",425],["🧦","Носки",510],
+            ["🎁","Подарочная коробка",500],["🎂","Happy Birthday",500],["🗡️","Световой меч",500]
+          ];
+          for (const [emoji, name, value] of showcaseItems) previewPool.push({
+            title: emoji + " " + name, detail: "Витрина · около " + value + " ⭐",
+            stars: value, type: "showcase", emoji, showcaseOnly: true
+          });
+          previewPool.push(
+            { title: "NEXUS Premium · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
+            { title: "NEXUS Ultra · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
+            { title: "Telegram Premium · 12 месяцев", detail: "Официальная подписка", stars: 0, type: "telegram_premium", imageUrl: "/assets/telegram-premium.svg" }
+          );
+          const reelPool = Array.from({ length: 59 }, () => previewPool[crypto.randomInt(0, previewPool.length)]);
+          const reel = [...reelPool, {
+            title: reward.title, detail: reward.detail, stars: Number(reward.giftStars || 0),
+            type: reward.type, imageUrl: reward.imageUrl
+          }];
+          state.coins -= cost;
+          state.history.push(row);
+          state.history = state.history.slice(-100);
+          try {
+            await writeState(user.id, state);
+            const queue = await readPendingQueue();
+            queue.push(queueItem);
+            await writePendingQueue(queue);
+          } catch (error) {
+            state.coins += cost;
+            state.history = state.history.filter(item => item.spinId !== spinId);
+            await writeState(user.id, state).catch(() => {});
+            throw error;
+          }
+          processPendingGiftQueue().catch(() => {});
+          json(res, 200, {
+            ok: true, coins: state.coins, bonusSpins: state.bonusSpins,
+            reward, reel, spinId,
+            message: "Кейс открыт! Награда сохранена в очереди выдачи."
+          });
+          return true;
+        } finally { locks.delete("case:" + user.id); }
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/decline") {
+        const body = await readBody(req);
+        const spinId = String(body.spinId || "");
+        if (!/^[a-f0-9-]{36}$/i.test(spinId)) { json(res, 400, { ok: false, error: "Идентификатор подарка некорректен." }); return true; }
+        const queue = await readPendingQueue();
+        const item = queue.find(entry => entry.spinId === spinId && String(entry.userId) === String(user.id));
+        if (!item) { json(res, 404, { ok: false, error: "Подарок уже отправлен или больше не ожидает выдачи." }); return true; }
+        await writePendingQueue(queue.filter(entry => entry.spinId !== spinId));
+        const state = await readState(user.id);
+        const row = state.history.find(entry => entry.spinId === spinId);
+        if (row) { row.status = "declined"; row.deliveryMessage = "Пользователь отказался от подарка."; row.declinedAt = Date.now(); await writeState(user.id, state); }
+        json(res, 200, { ok: true, message: "Подарок удалён из ожидающих. Бот не будет его отправлять." });
+        return true;
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/spin") {
+        const spinBody = await readBody(req), x2Mode = spinBody.mode === "x2";
+        if (locks.has(String(user.id))) { json(res, 409, { ok: false, error: "Рулетка уже обрабатывает твою попытку." }); return true; }
+        locks.add(String(user.id));
+        try {
+          const [fresh, catalog] = await Promise.all([readState(user.id), getGiftCatalog(bot)]);
+          const today = kyivDay();
+          const freeAvailable = fresh.lastSpinDay !== today, totalAvailable = fresh.bonusSpins + (freeAvailable ? 1 : 0);
+          const spinCost = x2Mode ? 2 : 1;
+          if (totalAvailable < spinCost) { json(res, 409, { ok: false, error: x2Mode ? "Для режима x2 нужны две доступные прокрутки." : "Сегодня ты уже использовал бесплатную попытку.", canSpin: false, bonusSpins: fresh.bonusSpins }); return true; }
+          const usedBonusSpin = !freeAvailable;
+          if (x2Mode) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - (freeAvailable ? 1 : 2));
+          else if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
+          if (freeAvailable && fresh.lastStreakDay !== today) {
+            const yesterday = new Date(Date.parse(today + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
+            fresh.streak = fresh.lastStreakDay === yesterday ? fresh.streak + 1 : 1;
+            fresh.lastStreakDay = today;
+            const streakBonus = fresh.streak === 30 ? 5 : fresh.streak === 7 ? 2 : fresh.streak === 3 ? 1 : 0;
+            fresh.bonusSpins = Math.min(100000, fresh.bonusSpins + streakBonus);
+          }
+          
+          let prizeList = catalog.prizes.map(item => ({ ...item }));
+          const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
+          const streakMultiplier = fresh.streak >= 30 ? 5 : fresh.streak >= 7 ? 3 : fresh.streak >= 3 ? 2 : 1;
+          const luckMultiplier = streakMultiplier * (event.active ? 2 : 1) * (x2Mode ? 2 : 1);
+          if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot"].includes(item.type) ? luckMultiplier : 1) }));
+          let prize = choosePrize(prizeList);
+          // Track the shared premium dry spell. After 200 non-premium spins,
+          // activate a 3-minute boost; a premium win resets it to normal odds.
+          const premiumLuck = await readGlobal("premiumLuck", { misses: 0, boostUntil: 0 });
+          const nowForLuck = Date.now();
+          if (Number(premiumLuck.boostUntil || 0) <= nowForLuck) premiumLuck.boostUntil = 0;
+          const premiumWin = ["telegram_premium", "nexus_plus", "nexus_ultra"].includes(prize.type);
+          if (premiumWin) {
+            premiumLuck.misses = 0;
+            premiumLuck.boostUntil = 0;
+          } else if (premiumLuck.boostUntil) {
+            // Keep the active window; the catalog automatically restores base odds on expiry.
+          } else {
+            premiumLuck.misses = Math.max(0, Number(premiumLuck.misses || 0)) + 1;
+            if (premiumLuck.misses >= 200) {
+              premiumLuck.misses = 0;
+              premiumLuck.boostUntil = nowForLuck + 3 * 60 * 1000;
+            }
+          }
+          await writeGlobal("premiumLuck", premiumLuck);
+          // A single teddy-bear wheel sector resolves to a random real Telegram gift.
+          if (["gift_random", "secret", "jackpot"].includes(prize.type)) {
+            const sourceType = prize.type;
+            const wheelIndex = prize.wheelIndex;
+            const eligible = sourceType === "jackpot"
+              ? catalog.gifts.filter(g => g.cost === 1000)
+              : catalog.gifts.filter(g => g.cost >= 15 && g.cost <= 999);
+            const selectedGift = eligible.length ? eligible[crypto.randomInt(0, eligible.length)] : null;
+            prize = selectedGift
+              ? { ...selectedGift, label: sourceType === "jackpot" ? "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐" : sourceType === "secret" ? "🎁 СЕКРЕТНЫЙ ПОДАРОК · " + selectedGift.cost + " ⭐" : selectedGift.label, short: sourceType === "jackpot" ? "ДЖЕКПОТ · 1000 ⭐" : sourceType === "secret" ? "Секрет · " + selectedGift.cost + " ⭐" : selectedGift.short, wheelIndex, sectorId: sourceType === "jackpot" ? "jackpot_1000" : sourceType === "secret" ? "secret_gift" : "telegram_gift_random", type: "gift", jackpot: sourceType === "jackpot", secret: sourceType === "secret" }
+              : { id: sourceType === "jackpot" ? "gift:pending-jackpot" : "gift:pending-random", giftId: "", label: sourceType === "jackpot" ? "💎 ДЖЕКПОТ · подарок за 1000 ⭐ (ожидает отправки)" : sourceType === "secret" ? "🎁 Секретный подарок (ожидает отправки)" : "🧸 Подарок Telegram · 15–999 ⭐", short: sourceType === "jackpot" ? "ДЖЕКПОТ · ожидание" : sourceType === "secret" ? "Секретный приз" : "Мишка · подарок ожидает", type: "gift", cost: sourceType === "jackpot" ? 1000 : 0, wheelIndex, sectorId: sourceType === "jackpot" ? "jackpot_1000" : sourceType === "secret" ? "secret_gift" : "telegram_gift_random", jackpot: sourceType === "jackpot", secret: sourceType === "secret" };
+          }
+          const spinId = crypto.randomUUID();
+          const row = {
+            spinId, day: today, prize: prize.id, label: prize.label,
+            giftId: prize.giftId || "", cost: prize.cost || 0,
+            status: "processing", at: Date.now(), source: "roulette_spin"
+          };
+          fresh.lastSpinDay = today;
+          fresh.coins = Math.min(100000000, (fresh.coins || 0) + (x2Mode ? 2 : 1));
+          fresh.history.push(row);
+          fresh.history = fresh.history.slice(-100);
+          await writeState(user.id, fresh);
+          try {
+            const playerStats = await readGlobal("playerStats", {});
+            const player = playerStats[String(user.id)] || { userId: user.id, name: user.firstName || "Игрок", wins: 0, losses: 0, spins: 0, cost: 0 };
+            player.name = user.firstName || player.name || "Игрок"; player.spins = (Number(player.spins) || 0) + 1;
+            if (prize.type === "none") player.losses = (Number(player.losses) || 0) + 1;
+            else { player.wins = (Number(player.wins) || 0) + 1; player.cost = (Number(player.cost) || 0) + Number(prize.cost || 0); }
+            playerStats[String(user.id)] = player; await writeGlobal("playerStats", playerStats);
+            const stats = await readGlobal("stats", { totalSpins: 0, wins: 0, losses: 0 });
+            stats.totalSpins = (Number(stats.totalSpins) || 0) + 1;
+            if (prize.type === "none") stats.losses = (Number(stats.losses) || 0) + 1;
+            else stats.wins = (Number(stats.wins) || 0) + 1;
+            stats.updatedAt = Date.now();
+            await writeGlobal("stats", stats);
+          } catch (statsError) {
+            console.error("NEXUS roulette stats:", String(statsError.message || statsError).slice(0, 180));
+          }
+
+          let delivered = false, deliveryMessage = "";
+          if (prize.type === "gift" || prize.type === "telegram_premium") {
+            const queue = await readPendingQueue();
+            if (!queue.some(item => item.spinId === spinId)) {
+              queue.push({
+                spinId,
+                userId: user.id,
+                type: prize.type === "telegram_premium" ? "telegram_premium" : (prize.jackpot ? "jackpot" : "gift"),
+                giftId: prize.giftId || "",
+                label: prize.label,
+                cost: prize.type === "telegram_premium" ? 2500 : (prize.cost || 0),
+                createdAt: Date.now()
+              });
+              await writePendingQueue(queue);
+            }
+            await processPendingGiftQueue();
+            const refreshed = await readState(user.id);
+            const savedRow = refreshed.history.find(item => item.spinId === spinId);
+            delivered = savedRow?.status === "delivered";
+            if (!delivered) deliveryMessage = prize.type === "telegram_premium"
+              ? "Telegram Premium на 12 месяцев сохранён в очереди. Бот автоматически оформит его, когда на балансе будет 2500 ⭐."
+              : "Подарок сохранён в очереди. Бот отправит его автоматически, когда на балансе появятся нужные Stars.";
+          } else try {
+            if (prize.type === "nexus_plus" || prize.type === "nexus_ultra") {
+              if (typeof grantPrize !== "function") throw new Error("Выдача NEXUS Premium не подключена.");
+              await grantPrize(user.id, prize.type === "nexus_ultra" ? "ultra" : "plus");
+              delivered = true;
+            } else {
+              delivered = true;
+            }
+          } catch (error) {
+            deliveryMessage = String(error.message || error).slice(0, 300);
+            console.error("NEXUS gift roulette delivery:", user.id, prize.id, deliveryMessage);
+          }
+          if (delivered && prize.type !== "none") {
+            const winners = await readGlobal("winners", []);
+            winners.push({ userId: user.id, name: user.firstName || "Игрок", label: prize.label, cost: prize.cost || 0, at: Date.now() });
+            await writeGlobal("winners", winners.slice(-200));
+          }
+          const latestState = await readState(user.id);
+          const latestRow = latestState.history.find(item => item.spinId === spinId);
+          if (latestRow && latestRow.status !== "delivered" && latestRow.status !== "declined") {
+            latestRow.status = delivered ? "delivered" : "pending";
+            latestRow.deliveryMessage = deliveryMessage;
+            await writeState(user.id, latestState);
+          }
+          json(res, 200, {
+            ok: true, canSpin: fresh.bonusSpins > 0, bonusSpins: fresh.bonusSpins, totalSpinsAvailable: fresh.bonusSpins, spinId, x2Mode, jackpot: Boolean(prize.jackpot),
+            prize: publicPrize(prize),
+            prizeIndex: prize.wheelIndex,
+            delivered,
+            message: delivered
+              ? (prize.type === "gift" ? "🎁 Настоящий Telegram-подарок отправлен тебе в личный чат с ботом!" : prize.type === "nexus_plus" ? "💎 Тебе выдан NEXUS Premium на 30 дней!" : prize.type === "nexus_ultra" ? "🚀 Тебе выдан NEXUS Ultra на 30 дней!" : prize.type === "telegram_premium" ? "⭐ Telegram Premium на 12 месяцев отправлен тебе! Бот списал 2500 Stars." : "Сегодня без приза. Новая попытка будет завтра.")
+              : prize.type === "telegram_premium"
+                ? "⭐ Telegram Premium на 12 месяцев выигран и сохранён в очереди. Бот автоматически оформит его, когда на балансе будет 2500 Stars. Повторно крутить не нужно."
+                : "🧸 Мишка выигран! Подарок сохранён. Бот автоматически отправит его, когда на балансе появятся нужные Stars. Повторно крутить не нужно."
+          });
+          return true;
+        } finally {
+          locks.delete(String(user.id));
+        }
+      }
+      json(res, 404, { ok: false, error: "Маршрут не найден." });
+      return true;
+    } catch (error) {
+      console.error("NEXUS gift roulette HTTP:", error.stack || error.message);
+      json(res, 500, { ok: false, error: "Ошибка рулетки: " + String(error.message || error).slice(0, 220) });
+      return true;
+    }
+  }
+  const queuePoller = setInterval(() => { processPendingGiftQueue().catch(() => {}); }, 60 * 1000);
+  if (typeof queuePoller.unref === "function") queuePoller.unref();
+  processPendingGiftQueue().catch(() => {});
+  return { handleHttp, webAppUrl, registerReferral };
+}
+module.exports = { installRoulette };          // Витринные предметы — визуальные элементы кейса, не выдаются как Telegram gifts.
+
           previewPool.push(
             { title: "NEXUS Premium · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
             { title: "NEXUS Ultra · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
