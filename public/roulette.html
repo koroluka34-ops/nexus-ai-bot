@@ -47,7 +47,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .gift-art{display:block;width:64px;height:64px;object-fit:contain;margin:0 auto 8px;filter:drop-shadow(0 5px 10px #0008)}.emoji-art{display:grid;place-items:center;font-size:42px}.prize b{display:block;font-size:11px;line-height:1.35;color:#f3f6ff;margin-bottom:5px;overflow-wrap:anywhere}
 .prize span{font-size:10px;color:#a8b7d1}
 .prize.no-prize{border-color:#4b5267}.prize.unavailable{opacity:.72;border-style:dashed}
-.disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}
+.disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}.jackpot-flash{animation:jackpotPulse 1s ease-in-out 4}@keyframes jackpotPulse{0%,100%{box-shadow:0 0 0 1px #f7d78a55,0 0 12px #f7d78a33}50%{box-shadow:0 0 0 5px #f7d78a99,0 0 55px #f7d78a}}.field{display:flex;gap:7px;margin-top:10px}.field input{min-width:0;flex:1;background:#0a1225;border:1px solid #34415e;border-radius:12px;padding:11px;color:white}.field button{border:1px solid #f5d78b;border-radius:12px;padding:10px;background:#d99a32;color:#171528;font-weight:900}.quest{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #2d3d5e;font-size:11px}.quest button{background:#243b66;color:white;border:1px solid #516b9c;border-radius:10px;padding:8px;font-weight:800}.mode{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#f7d78a;margin:10px 0}
 @media(min-width:420px){body{padding-top:22px}.panel{padding:19px}.outer{width:310px}}
 </style>
 </head>
@@ -58,6 +58,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   <section class="panel">
     <div class="stats"><span>Твои прокрутки</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
     <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
+    <label class="mode"><input type="checkbox" id="x2Mode"> ⚡ Режим x2 — 2 попытки, шанс подарка x2</label>
     <button class="spin" id="spinButton" disabled>ПОДКЛЮЧАЕМ РУЛЕТКУ…</button>
     <p class="hint" id="balanceNote">Получаем список реальных подарков Telegram…</p>
     <p class="hint" id="spinsRemaining" style="color:#f4d47e;font-weight:850">Прокруток осталось: —</p>
@@ -69,6 +70,26 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="section-head"><strong>🎁 Твои ожидающие подарки</strong><span>Пока хранятся у бота</span></div>
     <div id="pendingGifts" class="prizes"></div>
     <p class="hint">Подарки отправятся автоматически, когда у бота появятся нужные Stars. Нажми «Отказаться», если не хочешь получать подарок.</p>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🎟 Промокод</strong><span>Бонусные прокрутки</span></div>
+    <div class="field"><input id="promoInput" maxlength="24" placeholder="ВВЕДИ ПРОМОКОД"><button id="promoButton">АКТИВИРОВАТЬ</button></div>
+    <p class="hint" id="promoStatus">Каждый промокод можно активировать один раз.</p>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🎯 Задания</strong><span>Дополнительные попытки</span></div>
+    <div class="quest"><span>🎰 Используй сегодняшнюю прокрутку — +1 попытка</span><button id="dailyQuest">ЗАБРАТЬ</button></div>
+    <div class="quest"><span>👥 Пригласи друга — +2 попытки</span><button id="inviteQuest">ЗАБРАТЬ</button></div>
+    <p class="hint" id="questStatus">Выполняй задания и забирай бонусы.</p>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>👥 Приглашения</strong><span id="referralCount">0 друзей</span></div>
+    <p class="hint">Другу +1 прокрутка, тебе +2 за каждого нового игрока.</p>
+    <div class="field"><input id="referralLink" readonly placeholder="Ссылка появится после загрузки"><button id="copyReferral">КОПИРОВАТЬ</button></div>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>📊 Прозрачные шансы</strong><span>Вероятности</span></div>
+    <p class="hint">Базовые шансы указаны в каталоге. Серия удачи, событие и x2 повышают вес подарочных секторов; вероятность «Без приза» уменьшается. Режим x2 не списывает Stars — он использует две попытки.</p>
   </section>
   <section class="panel">
     <div class="section-head"><strong>🔥 Серия удачи</strong><span id="luckStatus">Считаем серию…</span></div>
@@ -226,6 +247,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       actions.append(view,decline);
     }
   }
+  function playJackpotFanfare(){
+    try{const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;const ctx=new AudioCtx();
+      [523.25,659.25,783.99,1046.5].forEach((freq,i)=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type="triangle";osc.frequency.value=freq;gain.gain.setValueAtTime(.0001,ctx.currentTime+i*.13);gain.gain.exponentialRampToValueAtTime(.16,ctx.currentTime+i*.13+.03);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+i*.13+.28);osc.connect(gain);gain.connect(ctx.destination);osc.start(ctx.currentTime+i*.13);osc.stop(ctx.currentTime+i*.13+.3);});
+      setTimeout(()=>ctx.close().catch(()=>{}),1800);
+    }catch{}
+  }
   const kyivDateFormatter=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit"});
   function kyivDateAt(ms){return kyivDateFormatter.format(new Date(ms));}
   function nextKyivMidnight(){
@@ -255,10 +282,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"");
-      renderLeaderboard(data.leaderboard||[]);
+      renderLeaderboard(data.leaderboard||[]);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       renderCollection(data.collection||[]);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
-      spinButton.disabled=!data.canSpin;spinButton.textContent=data.canSpin?"🎁 КРУТИТЬ КОЛЕСО":"ВОЗВРАЩАЙСЯ ЗАВТРА";
+      const needed=$("x2Mode").checked?2:1;spinButton.disabled=!data.canSpin||(data.totalSpinsAvailable||0)<needed;spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";
       balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–1000 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
       if(data.lastResult?.day===new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date())){
         showResult({label:data.lastResult.label,type:data.lastResult.giftId||data.lastResult.cost?"gift":"none"},data.lastResult.status==="pending"?"Подарок сохранён в ожидании.":"Твой результат за сегодня.",data.lastResult.status!=="pending",data.lastResult.spinId);
@@ -271,16 +298,37 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       drawWheel([{id:"previewgift",short:"Подарок",label:"Подарок Telegram",type:"gift"},{id:"previewnone",short:"Без приза",label:"Без приза",type:"none"}]);
     }
   }
+  $("promoButton").addEventListener("click",async()=>{
+    const code=$("promoInput").value.trim().toUpperCase();if(!code){$("promoStatus").textContent="Введи промокод.";return;}
+    $("promoButton").disabled=true;
+    try{const data=await api("/roulette/api/redeem-code","POST",{code});$("promoStatus").textContent="✅ Начислено +"+data.spins+" прокрутки."; $("promoInput").value="";await refresh();}
+    catch(error){$("promoStatus").textContent="❌ "+error.message;}
+    finally{$("promoButton").disabled=false;}
+  });
+  async function claimQuest(quest){
+    const button=$(quest==="daily_spin"?"dailyQuest":"inviteQuest");button.disabled=true;
+    try{const data=await api("/roulette/api/quest/claim","POST",{quest});$("questStatus").textContent="✅ Награда получена! Бонусных прокруток: "+data.bonusSpins;await refresh();}
+    catch(error){$("questStatus").textContent="ℹ️ "+error.message;}
+    finally{button.disabled=false;}
+  }
+  $("dailyQuest").addEventListener("click",()=>claimQuest("daily_spin"));
+  $("inviteQuest").addEventListener("click",()=>claimQuest("invite_friend"));
+  $("copyReferral").addEventListener("click",async()=>{
+    const link=$("referralLink").value;if(!link){$("questStatus").textContent="Ссылка ещё загружается.";return;}
+    try{await navigator.clipboard.writeText(link);$("questStatus").textContent="✅ Ссылка скопирована.";}
+    catch{$("referralLink").select();document.execCommand("copy");$("questStatus").textContent="Ссылка скопирована.";}
+  });
+  $("x2Mode").addEventListener("change",()=>{const total=Number(($("spinsRemaining").textContent.match(/\d+/)||[0])[0]);spinButton.disabled=busy||total<($("x2Mode").checked?2:1);spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";});
   spinButton.addEventListener("click",async()=>{
     if(busy||spinButton.disabled)return;
     busy=true;spinButton.disabled=true;spinButton.textContent="КОЛЕСО ВРАЩАЕТСЯ…";result.classList.remove("show");errorBox.classList.remove("show");
     try{
-      const data=await api("/roulette/api/spin","POST");
+      const data=await api("/roulette/api/spin","POST",{mode:$("x2Mode").checked?"x2":"normal"});
       const count=currentPrizes.length||2,index=Number.isInteger(data.prizeIndex)?data.prizeIndex:count-1,step=360/count;
       const target=((360-((index+.5)*step))%360+360)%360;
       wheel.style.transition="none";wheel.style.transform="rotate(0deg)";void wheel.offsetWidth;wheel.style.transition="transform 5s cubic-bezier(.12,.72,.12,1)";wheel.style.transform="rotate("+(360*7+target)+"deg)";
       await new Promise(resolve=>setTimeout(resolve,5200));
-      showResult(data.prize,data.message,data.delivered,data.spinId);
+      showResult(data.prize,data.message,data.delivered,data.spinId);if(data.jackpot){$("result").classList.add("jackpot-flash");playJackpotFanfare();setTimeout(()=>$("result").classList.remove("jackpot-flash"),4500);}
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
     }catch(error){
