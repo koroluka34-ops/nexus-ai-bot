@@ -984,10 +984,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(caseOpening)return;
     $("caseModal").classList.remove("open");$("caseModal").setAttribute("aria-hidden","true");
   }
-  async function animateCaseOpening(reel){
+  async function animateCaseOpening(reelPool,winningEntry){
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
-    const source=Array.isArray(reel)?reel:[],previews=source.slice(0,-1),winningEntry=source.length?source[source.length-1]:null;
-    const entries=Array.from({length:3},()=>previews).flat().map(item=>({...item,winner:false}));
+    const source=Array.isArray(reelPool)?reelPool:[];
+    if(!source.length)throw new Error("Не удалось загрузить призы для прокрутки кейса.");
+    // Build a long, freshly randomized reel from the complete live gift catalogue.
+    // The server-selected weighted prize is placed only at the final stopping position.
+    const entries=Array.from({length:119},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
     if(winningEntry)entries.push({...winningEntry,winner:true});
     track.replaceChildren();
     entries.forEach(entry=>{
@@ -1026,7 +1029,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("caseModalPrize").textContent="🔓 "+selectedCase.name+" · ОТКРЫВАЕМ КЕЙС";
       $("caseModalStatus").textContent="Кейс выбран! Сейчас он откроется и покажет награду.";
       $("caseStage").style.display="flex";
-      await animateCaseOpening(data.reel);
+      await animateCaseOpening(data.reelPool,data.winningEntry);
       const stars=Number(data.reward.giftStars||0),rarity=caseRarity(stars,data.reward.type);
       $("caseModalPrize").textContent="🎯 НАГРАДА НАЙДЕНА";
       $("caseModalStatus").textContent="✨ Кейс открыт! Подготавливаем твою награду…";
