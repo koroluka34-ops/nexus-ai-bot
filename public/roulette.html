@@ -681,10 +681,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function openCaseModal(){
     $("caseModal").classList.add("open");$("caseModal").setAttribute("aria-hidden","false");
-    $("caseModalPrize").textContent="🎁 В кейсе — настоящие подарки Telegram";
-    $("caseModalStatus").textContent="Покупка стоит 100 ₿. Сначала прокрутится коллекция кейсов CS2, затем выбранный кейс откроется.";
-    $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");$("selectedCase").classList.remove("show","opening");$("caseSelectStage").style.display="flex";$("caseStage").style.display="none";loadCsCaseCatalog();
-    $("caseOpenConfirm").disabled=false;$("caseOpenConfirm").textContent="КУПИТЬ КЕЙС · 100 ₿";
+    $("caseModalPrize").textContent="🎁 КЕЙС ГОТОВ К ОТКРЫТИЮ";
+    $("caseModalStatus").textContent="🎰 Запускаем открытие…";
+    $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");
+    $("selectedCase").classList.remove("show","opening");
+    $("caseSelectStage").style.display="flex";$("caseStage").style.display="none";
+    $("caseOpenConfirm").style.display="none";
+    loadCsCaseCatalog();
   }
   function closeCaseModal(){
     if(caseOpening)return;
@@ -746,16 +749,16 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
           :"💎 Подписка NEXUS сохранена в очереди и будет автоматически активирована.";
       $("caseModalStatus").textContent=statusText;
       $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+(stars?stars+" ⭐":"подписка")+" · ожидает выдачи";
-      button.textContent="КЕЙС ОТКРЫТ";
+      button.textContent="КЕЙС ОТКРЫТ";button.style.display="none";
       await refresh();
     }catch(error){
       $("caseModalStatus").textContent="❌ "+error.message+" Если сервер отклонил открытие, 100 ₿ не должны списываться.";
-      button.disabled=false;button.textContent="ПОВТОРИТЬ · 100 ₿";
+      button.disabled=false;button.style.display="block";button.textContent="ПОВТОРИТЬ · 100 ₿";
     }finally{
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
     }
   }
-  $("caseButton").addEventListener("click",openCaseModal);
+  $("caseButton").addEventListener("click",()=>{if(caseOpening)return;openCaseModal();startCaseOpening();});
   $("caseClose").addEventListener("click",closeCaseModal);
   $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
   $("caseOpenConfirm").addEventListener("click",startCaseOpening);
