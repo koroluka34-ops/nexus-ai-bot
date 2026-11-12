@@ -597,6 +597,7 @@ const rouletteSuite = installRoulette(bot, {
     const memory = await loadMemory(userId);
     const ranks = { free: 0, plus: 1, ultra: 2 };
     const activeTier = currentPlan(memory);
+    const previousTier = activeTier;
     const finalTier = ranks[activeTier] > ranks[tier] ? activeTier : tier;
     const now = Date.now();
     const baseExpiry = activeTier !== "free"
@@ -610,7 +611,7 @@ const rouletteSuite = installRoulette(bot, {
     if (!await saveMemory(userId)) {
       throw new Error("Не удалось сохранить выигранную подписку в Cloudflare KV.");
     }
-    return { tier: finalTier, expiresAt: memory.premium.expiresAt };
+    return { tier: finalTier, previousTier, extended: activeTier !== "free", expiresAt: memory.premium.expiresAt };
   }
 });
 
