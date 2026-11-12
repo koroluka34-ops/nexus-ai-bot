@@ -15,6 +15,7 @@ const GIFT_TOTAL_WEIGHT = 380000; // 38.00%, split between eligible gifts
 const TELEGRAM_PREMIUM_WEIGHT = 100; // 0.01%, 12 months
 const JACKPOT_WEIGHT = 100; // 0.01%, exact 1000-Star Telegram gift
 const SECRET_WEIGHT = 100; // 0.01%, hidden gift prize
+const NFT_WEIGHT = 500; // 0.05%, unique NEXUS collectible
 const MAX_GIFTS_IN_WHEEL = 20;
 
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
@@ -179,11 +180,12 @@ async function getGiftCatalog(bot) {
   const settings = await readGlobal("settings", { giftPercent: 38 });
   const giftPercent = Math.max(1, Math.min(90, Number(settings.giftPercent) || 38));
   const giftWeight = Math.round(giftPercent * 10000);
-  const noPrizeWeight = 1000000 - giftWeight - PLUS_WEIGHT - ULTRA_WEIGHT - TELEGRAM_PREMIUM_WEIGHT - JACKPOT_WEIGHT - SECRET_WEIGHT;
+  const noPrizeWeight = 1000000 - giftWeight - PLUS_WEIGHT - ULTRA_WEIGHT - TELEGRAM_PREMIUM_WEIGHT - JACKPOT_WEIGHT - SECRET_WEIGHT - NFT_WEIGHT;
   const prizes = [
     { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, available: true, weight: TELEGRAM_PREMIUM_WEIGHT },
     { id: "jackpot_1000", label: "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐", short: "ДЖЕКПОТ · 1000 ⭐", probability: "0,01%", type: "jackpot", cost: 1000, available: true, weight: JACKPOT_WEIGHT },
     { id: "secret_gift", label: "🎁 Секретный подарок", short: "Секретный приз", probability: "0,01%", type: "secret", cost: 0, available: true, weight: SECRET_WEIGHT },
+    { id: "nexus_nft", label: "🪙 NFT-КОЛЛЕКЦИОНКА NEXUS · уникальный экземпляр", short: "NEXUS NFT", probability: "0,05%", type: "nft_collectible", cost: 0, available: true, weight: NFT_WEIGHT },
     { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
     { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
     { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–1000 ⭐", short: "Мишка · 15–1000 ⭐", probability: giftPercent.toLocaleString("ru-RU") + "%", type: "gift_random", cost: 0, available: true, weight: giftWeight },
@@ -202,7 +204,7 @@ function choosePrize(prizes) {
 }
 function publicPrize(prize) {
   const hiddenSecret = prize.type === "secret";
-  return { id: prize.id, label: hiddenSecret ? "❔ Неизвестный приз" : prize.label, short: hiddenSecret ? "???" : prize.short, probability: hiddenSecret ? "Сюрприз" : prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : "" };
+  return { id: prize.id, label: hiddenSecret ? "❔ Неизвестный приз" : prize.label, short: hiddenSecret ? "???" : prize.short, probability: hiddenSecret ? "Сюрприз" : prize.probability, type: prize.type, cost: prize.cost || 0, available: prize.available !== false, imageUrl: prize.type === "gift" && prize.stickerFileId ? "/roulette/api/gift-image/" + encodeURIComponent(prize.giftId) : prize.type === "gift_random" ? "/assets/teddy-bear.svg" : prize.type === "telegram_premium" ? "/assets/telegram-premium.svg" : prize.type === "nexus_plus" ? "/assets/nexus-premium.svg" : prize.type === "nexus_ultra" ? "/assets/nexus-ultra.svg" : prize.type === "nft_collectible" ? "/assets/nexus-nft.svg" : "" };
 }
 function makeWebAppUrl() {
   const configured = process.env.NEXUS_WEBAPP_URL || process.env.WEBAPP_URL || "";
@@ -584,7 +586,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const canSpin = freeSpinAvailable || state.bonusSpins > 0;
         const winners = await readGlobal("winners", []);
         const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
-        const collection = state.history.filter(item => item.status === "delivered" && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse();
+        const collection = state.history.filter(item => item.status === "delivered" && (item.nft || item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse();
         const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
           spinId: item.spinId,
           label: item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram"),
@@ -650,7 +652,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
           const streakMultiplier = fresh.streak >= 30 ? 5 : fresh.streak >= 7 ? 3 : fresh.streak >= 3 ? 2 : 1;
           const luckMultiplier = streakMultiplier * (event.active ? 2 : 1);
-          if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot"].includes(item.type) ? luckMultiplier : 1) }));
+          if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot", "nft_collectible"].includes(item.type) ? luckMultiplier : 1) }));
           let prize = choosePrize(prizeList);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
           if (["gift_random", "secret", "jackpot"].includes(prize.type)) {
@@ -668,6 +670,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const row = {
             spinId, day: today, prize: prize.id, label: prize.label,
             giftId: prize.giftId || "", cost: prize.cost || 0,
+            nft: prize.type === "nft_collectible" ? { collection: "NEXUS Genesis", tokenId: "NX-" + Date.now().toString(36).toUpperCase() + "-" + crypto.randomBytes(3).toString("hex").toUpperCase(), rarity: "MYTHIC", edition: "1/1", chain: "NEXUS in-app · not minted on TON", minted: false } : null,
             status: "processing", at: Date.now()
           };
           fresh.lastSpinDay = today;
