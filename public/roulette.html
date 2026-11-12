@@ -145,10 +145,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="section-head"><strong>🎲 Твои случайные задания</strong><span>Обновляются каждый день</span></div><div id="dailyQuestList"></div>
   </section>
   <section class="panel">
-    <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>20 ₿ за открытие</span></div>
+    <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>100 ₿ за открытие</span></div>
     <div class="coin-panel"><div><div>Твой баланс биткоинов</div><div class="coin-value" id="coinsValue">₿ 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Биткоины<br>и прокрутки</div></div>
-    <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 20 ₿</button>
-    <p class="case-panel-intro">Это отдельный магазинный кейс, а не режим рулетки: колесо и его призы не меняются. Покупай открытие за накопленные ₿ и получай настоящий Telegram-подарок.</p><p class="hint" id="caseStatus">Открытие кейса стоит 20 ₿. За каждую обычную прокрутку рулетки начисляется +1 ₿.</p>
+    <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 100 ₿</button>
+    <p class="case-panel-intro">Это отдельный магазинный кейс, а не режим рулетки: колесо и его призы не меняются. Покупай открытие за накопленные ₿ и получай настоящий Telegram-подарок.</p><p class="hint" id="caseStatus">Открытие кейса стоит 100 ₿. За каждую обычную прокрутку рулетки начисляется +1 ₿.</p>
   </section>
   <section class="panel">
     <div class="section-head"><strong>👥 Приглашения</strong><span id="referralCount">0 друзей</span></div>
@@ -200,12 +200,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 </main>
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
-    <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 20 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
+    <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
     <p class="case-modal-hint">Внутри настоящие подарки Telegram. Лента прокрутится и остановится на твоём выигрыше.</p>
     <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
     <div class="case-reveal" id="caseReveal"><img id="caseRevealImage" alt="Выигранный Telegram-подарок"><div class="case-reveal-rarity" id="caseRevealRarity"></div><h3 id="caseRevealTitle"></h3><div class="case-reveal-value" id="caseRevealValue"></div></div>
-    <button class="spin" id="caseOpenConfirm">ОТКРЫТЬ ЗА 20 ₿</button>
+    <button class="spin" id="caseOpenConfirm">ОТКРЫТЬ ЗА 100 ₿</button>
     <p class="hint" id="caseModalStatus">Нажми кнопку, чтобы открыть кейс.</p>
   </div>
 </div>
@@ -562,9 +562,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function openCaseModal(){
     $("caseModal").classList.add("open");$("caseModal").setAttribute("aria-hidden","false");
     $("caseModalPrize").textContent="🎁 В кейсе — настоящие подарки Telegram";
-    $("caseModalStatus").textContent="Это отдельный кейс. Открытие стоит 20 ₿ и не расходует прокрутки рулетки.";
+    $("caseModalStatus").textContent="Это отдельный кейс. Открытие стоит 100 ₿ и не расходует прокрутки рулетки.";
     $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");
-    $("caseOpenConfirm").disabled=false;$("caseOpenConfirm").textContent="ОТКРЫТЬ ЗА 20 ₿";
+    $("caseOpenConfirm").disabled=false;$("caseOpenConfirm").textContent="ОТКРЫТЬ ЗА 100 ₿";
   }
   function closeCaseModal(){
     if(caseOpening)return;
@@ -622,7 +622,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       await refresh();
     }catch(error){
       $("caseModalStatus").textContent="ℹ️ "+error.message;
-      button.disabled=false;button.textContent="ПОВТОРИТЬ · 20 ₿";
+      button.disabled=false;button.textContent="ПОВТОРИТЬ · 100 ₿";
     }finally{
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
     }
