@@ -1011,7 +1011,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const tile=document.createElement("div");tile.className="case-tile case-reel-item rarity-"+rarity.key;
       const art=document.createElement("div");art.className="case-showcase-emoji";art.textContent=entry.emoji||(entry.type==="telegram_premium"?"⭐":entry.type==="nexus_ultra"?"🚀":entry.type==="nexus_plus"?"💎":"🎁");art.setAttribute("aria-label",entry.title||"Подарок Telegram");tile.append(art);
       if(entry.imageUrl){
-        const image=document.createElement("img");image.src=entry.imageUrl;image.alt=entry.title||"Подарок Telegram";image.loading="eager";
+        const image=document.createElement("img");image.src=entry.imageUrl;image.alt=entry.title||"Подарок Telegram";image.loading="lazy";image.decoding="async";
         image.onload=()=>{art.style.display="none";};image.onerror=()=>{image.remove();art.style.display="block";};tile.insertBefore(image,art);
       }
       const name=document.createElement("div");name.className="case-name";name.textContent=entry.title||"Подарок Telegram";tile.append(name);
