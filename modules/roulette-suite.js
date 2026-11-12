@@ -801,9 +801,13 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
           luckBoost: catalog.luckBoost,
           achievements: [
-            { id: "first_spin", title: "Первый запуск", icon: "🎰", done: state.history.length >= 1, progress: Math.min(state.history.length, 1), target: 1 },
-            { id: "collector", title: "Коллекционер", icon: "🎁", done: state.history.filter(item => item.status === "delivered" && item.cost > 0).length >= 3, progress: Math.min(state.history.filter(item => item.status === "delivered" && item.cost > 0).length, 3), target: 3 },
-            { id: "lucky7", title: "Неделя удачи", icon: "🔥", done: state.streak >= 7, progress: Math.min(state.streak, 7), target: 7 },
+            { id: "first_spin", title: "Первый запуск", icon: "🎰", done: mySpinCount >= 1, progress: Math.min(mySpinCount, 1), target: 1 },
+            { id: "spin10", title: "Разогрев", icon: "⚡", done: mySpinCount >= 10, progress: Math.min(mySpinCount, 10), target: 10 },
+            { id: "spin50", title: "Постоянный игрок", icon: "🎯", done: mySpinCount >= 50, progress: Math.min(mySpinCount, 50), target: 50 },
+            { id: "collector", title: "Начинающий коллекционер", icon: "🎁", done: state.history.filter(item => item.status === "delivered" && item.giftId).length >= 3, progress: Math.min(state.history.filter(item => item.status === "delivered" && item.giftId).length, 3), target: 3 },
+            { id: "case3", title: "Охотник за кейсами", icon: "📦", done: state.history.filter(item => item.source === "case").length >= 3, progress: Math.min(state.history.filter(item => item.source === "case").length, 3), target: 3 },
+            { id: "lucky7", title: "Неделя активности", icon: "🔥", done: state.streak >= 7, progress: Math.min(state.streak, 7), target: 7 },
+            { id: "referral1", title: "Первый друг", icon: "👥", done: (state.referralCount || 0) >= 1, progress: Math.min(state.referralCount || 0, 1), target: 1 },
             { id: "jackpot", title: "Охотник за джекпотом", icon: "💎", done: state.history.some(item => /ДЖЕКПОТ/.test(item.label || "")), progress: state.history.some(item => /ДЖЕКПОТ/.test(item.label || "")) ? 1 : 0, target: 1 },
             { id: "premium", title: "Премиум-клуб", icon: "👑", done: state.history.some(item => /Premium|Ultra/.test(item.label || "")), progress: state.history.some(item => /Premium|Ultra/.test(item.label || "")) ? 1 : 0, target: 1 }
           ],
