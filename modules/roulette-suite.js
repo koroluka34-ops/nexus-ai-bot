@@ -303,6 +303,24 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       let queue = await readPendingQueue();
       if (!queue.length) return;
       let balance = await getStarBalance();
+      const nexusQueue = queue.filter(item => item.type === "nexus_plus" || item.type === "nexus_ultra");
+      for (const item of nexusQueue) {
+        try {
+          if (typeof grantPrize !== "function") throw new Error("Выдача подписок NEXUS не подключена.");
+          const tier = item.type === "nexus_ultra" ? "ultra" : "plus";
+          await grantPrize(Number(item.userId), tier);
+          queue = queue.filter(q => q.spinId !== item.spinId);
+          await writePendingQueue(queue);
+          const state = await readState(item.userId);
+          const row = state.history.find(h => h.spinId === item.spinId);
+          if (row) { row.status = "delivered"; row.deliveryMessage = ""; row.deliveredAt = Date.now(); await writeState(item.userId, state); }
+          await bot.api.sendMessage(Number(item.userId), tier === "ultra"
+            ? "🚀 Ты выиграл NEXUS Ultra на 30 дней! Подписка активирована."
+            : "💎 Ты выиграл NEXUS Premium на 30 дней! Подписка активирована.").catch(() => {});
+        } catch (error) {
+          console.error("NEXUS pending subscription:", item.spinId, String(error.message || error).slice(0, 200));
+        }
+      }
       const premiumQueue = queue.filter(item => item.type === "telegram_premium");
       for (const item of premiumQueue) {
         if (balance < 2500) continue;
@@ -812,59 +830,91 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         locks.add("case:" + user.id);
         try {
           const [state, giftResponse] = await Promise.all([
-            readState(user.id), telegramApi("getAvailableGifts")
+            readState(user.id), telegramApi("getAvailableGifts").catch(() => ({ gifts: [] }))
           ]);
           const cost = 100;
           if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Для открытия кейса нужно 100 ₿." }); return true; }
           const available = (Array.isArray(giftResponse?.gifts) ? giftResponse.gifts : [])
             .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
             .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
-          if (!available.length) {
-            json(res, 503, { ok: false, error: "В каталоге Telegram сейчас нет доступных подарков для кейса. Попробуй позже — твои 100 ₿ не списаны." });
-            return true;
-          }
-          const pickFrom = (min, max) => available.filter(g => Number(g.star_count) >= min && Number(g.star_count) <= max);
-          const roll = crypto.randomInt(10000);
-          const tiers = [
-            { limit: 5500, min: 15, max: 50 },
-            { limit: 8200, min: 51, max: 100 },
-            { limit: 9600, min: 101, max: 250 },
-            { limit: 9900, min: 251, max: 500 },
-            { limit: 10000, min: 501, max: 1000 }
-          ];
-          const tier = tiers.find(t => roll < t.limit) || tiers[0];
-          let candidates = pickFrom(tier.min, tier.max);
-          if (!candidates.length) candidates = available;
-          const gift = candidates[crypto.randomInt(0, candidates.length)];
+          const rewardPool = [];
+          if (available.length) rewardPool.push({ type: "gift", weight: 8500 });
+          rewardPool.push(
+            { type: "nexus_plus", weight: 1000 },
+            { type: "nexus_ultra", weight: 300 },
+            { type: "telegram_premium", weight: 200 }
+          );
+          const totalWeight = rewardPool.reduce((sum, item) => sum + item.weight, 0);
+          let ticket = crypto.randomInt(0, totalWeight);
+          const selectedType = rewardPool.find(item => (ticket -= item.weight) < 0)?.type || rewardPool[0].type;
+          let reward, queueItem, historyLabel;
           const spinId = crypto.randomUUID();
-          const giftEmoji = gift.sticker?.emoji || "🎁";
-          const giftTitle = giftEmoji + " Telegram-подарок";
-          const reward = {
-            title: giftTitle, detail: Number(gift.star_count) + " ⭐ · настоящий подарок Telegram",
-            type: "gift", giftId: gift.id, giftStars: Number(gift.star_count),
-            imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(gift.id),
-            dropChance: (100 / available.length).toFixed(2) + "%",
-            coins: 0, spins: 0, status: "processing"
-          };
-          const row = {
-            spinId, day: kyivDay(), prize: "case_gift", label: giftTitle + " · " + Number(gift.star_count) + " ⭐",
-            giftId: gift.id, cost: Number(gift.star_count), status: "processing", at: Date.now(), source: "case"
-          };
-          const queueItem = {
-            spinId, userId: String(user.id), type: "case_gift", giftId: gift.id,
-            cost: Number(gift.star_count), label: row.label, createdAt: Date.now(), source: "case"
-          };
-          const reelPool = Array.from({ length: 59 }, () => {
-            const item = available[crypto.randomInt(0, available.length)];
-            return {
-              title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
-              detail: Number(item.star_count) + " ⭐",
-              stars: Number(item.star_count),
-              probability: (100 / available.length).toFixed(2) + "%",
-              imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
+          if (selectedType === "gift") {
+            const roll = crypto.randomInt(10000);
+            const tiers = [
+              { limit: 5500, min: 15, max: 50 },
+              { limit: 8200, min: 51, max: 100 },
+              { limit: 9600, min: 101, max: 250 },
+              { limit: 9900, min: 251, max: 500 },
+              { limit: 10000, min: 501, max: 1000 }
+            ];
+            const tier = tiers.find(item => roll < item.limit) || tiers[0];
+            let candidates = available.filter(g => Number(g.star_count) >= tier.min && Number(g.star_count) <= tier.max);
+            if (!candidates.length) candidates = available;
+            const gift = candidates[crypto.randomInt(0, candidates.length)];
+            const stars = Number(gift.star_count);
+            const title = (gift.sticker?.emoji || "🎁") + " Telegram-подарок";
+            reward = {
+              title, detail: stars + " ⭐ · настоящий подарок Telegram", type: "gift",
+              giftId: gift.id, giftStars: stars,
+              imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(gift.id),
+              dropChance: "85%", coins: 0, spins: 0, status: "processing"
             };
-          });
-          const reel = [...reelPool, { title: giftTitle, detail: Number(gift.star_count) + " ⭐", imageUrl: reward.imageUrl }];
+            historyLabel = title + " · " + stars + " ⭐";
+            queueItem = { spinId, userId: String(user.id), type: "case_gift", giftId: gift.id, cost: stars, label: historyLabel, createdAt: Date.now(), source: "case" };
+          } else if (selectedType === "telegram_premium") {
+            reward = {
+              title: "⭐ Telegram Premium · 12 месяцев", detail: "Официальная подписка Telegram на 12 месяцев",
+              type: "telegram_premium", imageUrl: "/assets/telegram-premium.svg",
+              dropChance: "2%", coins: 0, spins: 0, status: "processing"
+            };
+            historyLabel = reward.title;
+            queueItem = { spinId, userId: String(user.id), type: "telegram_premium", cost: 2500, label: historyLabel, createdAt: Date.now(), source: "case" };
+          } else {
+            const ultra = selectedType === "nexus_ultra";
+            reward = {
+              title: ultra ? "🚀 NEXUS Ultra · 30 дней" : "💎 NEXUS Premium · 30 дней",
+              detail: ultra ? "Максимальный тариф бота на 30 дней" : "Premium-тариф бота на 30 дней",
+              type: selectedType, imageUrl: ultra ? "/assets/nexus-ultra.svg" : "/assets/nexus-premium.svg",
+              dropChance: ultra ? "3%" : "10%", coins: 0, spins: 0, status: "processing"
+            };
+            historyLabel = reward.title;
+            queueItem = { spinId, userId: String(user.id), type: selectedType, label: historyLabel, createdAt: Date.now(), source: "case" };
+          }
+          const row = {
+            spinId, day: kyivDay(), prize: "case_" + selectedType, label: historyLabel,
+            giftId: reward.giftId || "", cost: Number(reward.giftStars || queueItem.cost || 0),
+            status: "processing", at: Date.now(), source: "case"
+          };
+          const previewPool = [];
+          if (available.length) {
+            const samples = available.slice(0, Math.min(18, available.length));
+            for (const item of samples) previewPool.push({
+              title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
+              detail: Number(item.star_count) + " ⭐", stars: Number(item.star_count), type: "gift",
+              imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
+            });
+          }
+          previewPool.push(
+            { title: "NEXUS Premium · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
+            { title: "NEXUS Ultra · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
+            { title: "Telegram Premium · 12 месяцев", detail: "Официальная подписка", stars: 0, type: "telegram_premium", imageUrl: "/assets/telegram-premium.svg" }
+          );
+          const reelPool = Array.from({ length: 59 }, () => previewPool[crypto.randomInt(0, previewPool.length)]);
+          const reel = [...reelPool, {
+            title: reward.title, detail: reward.detail, stars: Number(reward.giftStars || 0),
+            type: reward.type, imageUrl: reward.imageUrl
+          }];
           state.coins -= cost;
           state.history.push(row);
           state.history = state.history.slice(-100);
@@ -883,7 +933,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           json(res, 200, {
             ok: true, coins: state.coins, bonusSpins: state.bonusSpins,
             reward, reel, spinId,
-            message: "Кейс открыт! Настоящий Telegram-подарок поставлен на отправку."
+            message: "Кейс открыт! Награда сохранена в очереди выдачи."
           });
           return true;
         } finally { locks.delete("case:" + user.id); }
