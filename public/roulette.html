@@ -211,6 +211,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 @keyframes caseDialogIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(prefers-reduced-motion:reduce){.case-stage.rolling,.case-stage.rolling .case-tile,.case-center-pointer,.case-reveal.show img{animation:none!important}}
 
+.rarity-badge{display:inline-flex;align-items:center;justify-content:center;width:max-content;max-width:100%;margin:0 auto 7px;padding:4px 8px;border:1px solid #64748b;border-radius:99px;background:#263449;color:#dbeafe;font-size:8px!important;font-weight:1000;letter-spacing:.12em;text-align:center}.rarity-badge.rarity-rare{border-color:#3b82f6;background:#15365c;color:#bfdbfe}.rarity-badge.rarity-epic{border-color:#a855f7;background:#3b1d55;color:#e9d5ff}.rarity-badge.rarity-legendary{border-color:#e5a33b;background:#543717;color:#ffe3a0}.rarity-badge.rarity-mythic{border-color:#f06a9b;background:#54213f;color:#ffd2e4}
 </style>
 </head>
 <body>
@@ -468,10 +469,24 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🏆 Победителей пока нет";card.append(b);box.append(card);return;}
     items.slice(0,10).forEach((item,index)=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent=(index+1)+". "+(item.name||"Игрок");const meta=document.createElement("span");meta.textContent="Выиграно: "+(item.cost||0)+" ⭐ · побед: "+(item.wins||0)+" · прокруток: "+(item.spins||0);card.append(b,meta);box.append(card);});
   }
+  function rarityBadge(stars,type){
+    const rarity=caseRarity(stars,type);
+    const badge=document.createElement("span");badge.className="rarity-badge rarity-"+rarity.key;badge.textContent=rarity.label;
+    return badge;
+  }
   function renderCollection(items){
     const box=$("collectionList");box.replaceChildren();
     if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎁 Здесь будут твои выигранные подарки";const meta=document.createElement("span");meta.textContent="Все доставленные призы сохраняются в коллекции.";card.append(b,meta);box.append(card);return;}
-    items.forEach(item=>{const card=document.createElement("div");card.className="prize";if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt=item.label||"Telegram Gift";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}const b=document.createElement("b");b.textContent=item.label||"🎁 Выигранный приз";const meta=document.createElement("span");meta.textContent=item.day||"NEXUS Gift Roulette";card.append(b,meta);box.append(card);});
+    items.forEach(item=>{
+      const card=document.createElement("div");card.className="prize";
+      if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt=item.label||"Telegram Gift";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}
+      const stars=Number(item.cost||0),label=String(item.label||"");
+      const type=/Telegram Premium/i.test(label)?"telegram_premium":/NEXUS Ultra/i.test(label)?"nexus_ultra":/NEXUS Premium/i.test(label)?"nexus_plus":"gift";
+      card.append(rarityBadge(stars,type));
+      const b=document.createElement("b");b.textContent=item.label||"🎁 Выигранный приз";
+      const meta=document.createElement("span");meta.textContent=(stars?stars+" ⭐ · ":"")+(item.day||"NEXUS Gift Roulette");
+      card.append(b,meta);box.append(card);
+    });
   }
   let inventoryItems=[],selectedInventory=new Set();
   function renderInventory(items){
@@ -481,11 +496,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     inventoryItems.forEach(item=>{
       const card=document.createElement("div");card.className="inventory-card";
       if(item.imageUrl){const img=document.createElement("img");img.src=item.imageUrl;img.alt=item.label||"Подарок";img.onerror=()=>img.style.display="none";card.append(img);}
+      const rarity=rarityBadge(Number(item.cost||0),"gift");
       const title=document.createElement("b");title.textContent=item.label||"Telegram Gift";
       const value=document.createElement("span");value.textContent=Number(item.cost||0)+" ⭐";
       const checkLabel=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=selectedInventory.has(item.spinId);check.addEventListener("change",()=>{if(check.checked){if(selectedInventory.size>=5){check.checked=false;return;}selectedInventory.add(item.spinId);}else selectedInventory.delete(item.spinId);$("contractButton").disabled=selectedInventory.size!==5;});checkLabel.append(check,document.createTextNode("В контракт")); 
       const upgrade=document.createElement("button");upgrade.textContent="⬆️ АПГРЕЙД · 35%";upgrade.addEventListener("click",async()=>{if(!confirm("Использовать этот подарок для апгрейда? Шанс успеха — 35%. При неудаче подарок сгорит."))return;upgrade.disabled=true;try{const result=await api("/roulette/api/upgrade","POST",{spinId:item.spinId});$("contractStatus").textContent=result.message+" "+result.label;selectedInventory.clear();await refresh();}catch(error){upgrade.disabled=false;$("contractStatus").textContent=error.message;}}); 
-      card.append(title,value,checkLabel,upgrade);box.append(card);
+      card.append(rarity,title,value,checkLabel,upgrade);box.append(card);
     });
     $("contractButton").disabled=selectedInventory.size!==5;
   }
@@ -636,7 +652,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     (data.achievements||[]).forEach(item=>{const card=document.createElement("div");card.className="achievement"+(item.done?" done":"");const b=document.createElement("b");b.textContent=(item.done?"✅ ":"🔒 ")+item.icon+" "+item.title;const span=document.createElement("span");span.textContent=item.done?"Получено":item.progress+"/"+item.target+" выполнено";card.append(b,span);grid.append(card);});
 
     const winners=$("recentWinners");winners.replaceChildren();
-    (data.recentWinners||[]).forEach(item=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎉 "+item.name+" — "+item.label;const span=document.createElement("span");span.textContent=(item.cost||0)+" ⭐ · "+(item.at?new Date(item.at).toLocaleString("ru-RU"):"недавно");card.append(b,span);winners.append(card);});
+    (data.recentWinners||[]).forEach(item=>{const card=document.createElement("div");card.className="prize";const label=String(item.label||"Подарок"),type=/Telegram Premium/i.test(label)?"telegram_premium":/NEXUS Ultra/i.test(label)?"nexus_ultra":/NEXUS Premium/i.test(label)?"nexus_plus":"gift";card.append(rarityBadge(Number(item.cost||0),type));const b=document.createElement("b");b.textContent="🎉 "+item.name+" — "+label;const span=document.createElement("span");span.textContent=(item.cost||0)+" ⭐ · "+(item.at?new Date(item.at).toLocaleString("ru-RU"):"недавно");card.append(b,span);winners.append(card);});
     if(!winners.children.length){const empty=document.createElement("div");empty.className="prize";empty.textContent="Пока нет подтверждённых выигрышей.";winners.append(empty);}
     $("dailyTheme").textContent="✨ "+(data.dailyTheme||"Тема дня");
     $("luckySector").textContent="🎯 "+(data.luckySector||"Счастливый сектор появится во время события.");
