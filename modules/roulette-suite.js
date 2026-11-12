@@ -561,8 +561,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
       const keyboard = new InlineKeyboard();
       const lines = pending.map((item, index) => {
         const label = item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram");
-        if (item.claimedAt) keyboard.text("⏳ Отправка запрошена №" + (index + 1), "rstatus_" + item.spinId).row();
-        else {
+        if (!item.claimedAt) {
           keyboard.text("🎁 Забрать №" + (index + 1), "rclaim_" + item.spinId).row();
           keyboard.text("🗑 Удалить №" + (index + 1), "rdecline_" + item.spinId).row();
         }
