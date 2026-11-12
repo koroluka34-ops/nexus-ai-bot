@@ -182,6 +182,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),pointer=document.querySelector(".pointer"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
   let busy=false,currentPrizes=[],wheelRotation=0;
+  let hourlyQuestEndsAt=0,hourlyQuestProgress=0;
   async function api(path,method="GET",body=null){
     const options={method,headers:{"X-Telegram-Init-Data":initData},cache:"no-store"};
     if(method==="POST"){options.headers["Content-Type"]="application/json";options.body=JSON.stringify(body||{});}
@@ -409,9 +410,15 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(remaining===0&&!countdownRefreshDone){countdownRefreshDone=true;refresh().finally(()=>{rouletteResetAt=nextKyivMidnight();countdownRefreshDone=false;});}
   }
   setInterval(updateRouletteCountdown,1000);
+  setInterval(updateHourlyQuestText,1000);
   setInterval(()=>{if(!busy)refresh();},20000);
   updateRouletteCountdown();
 
+  function updateHourlyQuestText(){
+    const el=$("timedQuestText");if(!el||!hourlyQuestEndsAt)return;
+    const seconds=Math.max(0,Math.ceil((hourlyQuestEndsAt-Date.now())/1000));
+    el.textContent="⏱ Сделай 3 прокрутки за час — +2 попытки ("+hourlyQuestProgress+"/3) · обновление через "+Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0");
+  }
   function renderDailyQuests(tasks){
     const box=$("dailyQuestList");box.replaceChildren();
     tasks.forEach(task=>{const row=document.createElement("div");row.className="daily-task";const label=document.createElement("span");label.textContent=task.title+" · "+task.progress+"/"+task.target+" · награда "+task.reward+" ₿";const button=document.createElement("button");button.textContent=task.claimed?"ПОЛУЧЕНО":task.done?"ЗАБРАТЬ":"В ПРОЦЕССЕ";button.disabled=!!task.claimed||!task.done;button.dataset.quest="daily_"+task.id;row.append(label,button);box.append(row);});
@@ -459,9 +466,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"")+(data.luckBoost?.active?" · 🍀 ПРЕМИУМ-ШАНС УСИЛЕН!":"");
       renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       $("dailyQuest").disabled=!!data.dailyQuestClaimed;$("dailyQuest").textContent=data.dailyQuestClaimed?"ПОЛУЧЕНО":"ЗАБРАТЬ";
-      const tq=data.timedQuest||{progress:0,target:3,endsAt:Date.now()+300000,claimed:false};
-      const questSeconds=Math.max(0,Math.ceil(((tq.endsAt||Date.now()+300000)-Date.now())/1000));
-      $("timedQuestText").textContent="⏱ Сделай 3 прокрутки за час — +2 попытки ("+Math.min(tq.progress||0,3)+"/3) · "+Math.floor(questSeconds/60)+":"+String(questSeconds%60).padStart(2,"0");
+      const tq=data.timedQuest||{progress:0,target:3,endsAt:Date.now()+3600000,claimed:false};
+      hourlyQuestEndsAt=tq.endsAt||Date.now()+3600000;hourlyQuestProgress=Math.min(tq.progress||0,3);
+      updateHourlyQuestText();
       $("timedQuest").disabled=!!tq.claimed||(tq.progress||0)<3;$("timedQuest").textContent=tq.claimed?"ПОЛУЧЕНО":(tq.progress||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
       $("inviteQuestRow").style.display=data.inviteQuestAvailable===false?"none":"flex";
       $("inviteQuestText").textContent="👥 Пригласи 3 новых друзей — +3 попытки ("+Math.min(data.referralCount||0,3)+"/3)";
@@ -497,11 +504,33 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("timedQuest").addEventListener("click",()=>claimQuest("timed_spin"));
   $("inviteQuest").addEventListener("click",()=>claimQuest("invite_friend"));
   $("dailyQuestList").addEventListener("click",event=>{const button=event.target.closest("button[data-quest]");if(button)claimQuest(button.dataset.quest);});
+  async function animateCaseOpening(reward){
+    const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
+    const pool=["🎁 Сюрприз","🪙 Биткоины","💰 Большой выигрыш","🎰 Прокрутка","💎 Редкий приз","✨ Бонус"];
+    const entries=Array.from({length:18},(_,i)=>({icon:["🎁","🪙","💰","🎰","💎","✨"][i%6],label:pool[i%pool.length]}));
+    entries.push({icon:reward.spins>=10?"👑":reward.spins?"🎰":reward.coins>=35?"💎":"₿",label:reward.title+" · "+reward.detail,winner:true});
+    track.replaceChildren();
+    entries.forEach(entry=>{const tile=document.createElement("div");tile.className="case-tile"+(entry.winner?" winner":"");const icon=document.createElement("span");icon.textContent=entry.icon;const small=document.createElement("small");small.textContent=entry.label;tile.append(icon,small);track.append(tile);});
+    track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
+    void track.offsetWidth;
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const tileWidth=124,finalX=-(entries.length-1)*tileWidth+(stage.clientWidth-116)/2;
+    track.style.transition="transform 4.8s cubic-bezier(.08,.72,.08,1)";
+    track.style.transform="translateX("+finalX+"px)";
+    await new Promise(resolve=>setTimeout(resolve,4950));
+    stage.classList.remove("rolling");
+  }
   $("caseButton").addEventListener("click",async()=>{
-    const button=$("caseButton");button.disabled=true;
-    try{const data=await api("/roulette/api/case/open","POST",{});$("caseStatus").textContent="🎉 Выпало: "+data.reward.title+" — "+data.reward.detail;$("coinsValue").textContent="₿ "+data.coins;await refresh();}
-    catch(error){$("caseStatus").textContent="ℹ️ "+error.message;}
-    finally{button.disabled=false;}
+    const button=$("caseButton");button.disabled=true;button.textContent="🎲 ОТКРЫВАЕМ КЕЙС…";
+    $("caseStatus").textContent="Кейс вращается — ждём, что выпадет!";
+    try{
+      const data=await api("/roulette/api/case/open","POST",{});
+      await animateCaseOpening(data.reward);
+      $("caseStatus").textContent="🎉 ВЫПАЛО: "+data.reward.title+" — "+data.reward.detail;
+      $("coinsValue").textContent="₿ "+data.coins;
+      await refresh();
+    }catch(error){$("caseStatus").textContent="ℹ️ "+error.message;}
+    finally{button.disabled=false;button.textContent="ОТКРЫТЬ КЕЙС · 20 ₿";}
   });
   $("copyReferral").addEventListener("click",async()=>{
     const link=$("referralLink").value;if(!link){$("questStatus").textContent="Ссылка ещё загружается.";return;}
