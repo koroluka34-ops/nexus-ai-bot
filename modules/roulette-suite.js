@@ -695,7 +695,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         }));
         json(res, 200, {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
-          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, coins: state.coins || 0, dailyQuests, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.wins) - Number(a.wins)) || (Number(b.cost) - Number(a.cost))).slice(0, 10),
+          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, coins: state.coins || 0, dailyQuests, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.cost) - Number(a.cost)) || (Number(b.wins) - Number(a.wins))).slice(0, 10),
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
           luckBoost: catalog.luckBoost,
           achievements: [
