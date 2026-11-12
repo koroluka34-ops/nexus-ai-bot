@@ -174,12 +174,12 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const item=document.createElement("div");item.className="prize";
       if(gift.imageUrl){
         const img=document.createElement("img");img.className="gift-art";img.src=gift.imageUrl;img.alt=gift.label;img.loading="lazy";
-        img.onerror=()=>{img.style.display="none";};item.append(img);
+        img.onerror=()=>{const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent="🎁";img.replaceWith(art);};item.append(img);
       }else{
         const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent="🎁";item.append(art);
       }
       const b=document.createElement("b");b.textContent=gift.label;
-      const s=document.createElement("span");s.textContent="Цена: "+gift.cost+" ⭐ · шанс: "+gift.probability;
+      const s=document.createElement("span");s.textContent="Цена: "+gift.cost+" ⭐"+(gift.collectible?" · 💠 NFT-апгрейд: +"+gift.upgradeStarCount+" ⭐":"")+" · шанс: "+gift.probability;
       item.append(b,s);prizesBox.append(item);
     });
     rewards.forEach(prize=>{
