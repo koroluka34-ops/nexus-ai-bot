@@ -719,7 +719,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const usedBonusSpin = !freeAvailable;
           if (x2Mode) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - (freeAvailable ? 1 : 2));
           else if (usedBonusSpin) fresh.bonusSpins = Math.max(0, fresh.bonusSpins - 1);
-          else if (fresh.lastStreakDay !== today) {
+          if (freeAvailable && fresh.lastStreakDay !== today) {
             const yesterday = new Date(Date.parse(today + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
             fresh.streak = fresh.lastStreakDay === yesterday ? fresh.streak + 1 : 1;
             fresh.lastStreakDay = today;
