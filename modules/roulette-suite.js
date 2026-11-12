@@ -811,17 +811,16 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         if (locks.has("case:" + user.id)) { json(res, 409, { ok: false, error: "Кейс уже открывается." }); return true; }
         locks.add("case:" + user.id);
         try {
-          const [state, giftResponse, botBalance] = await Promise.all([
-            readState(user.id), telegramApi("getAvailableGifts"), getStarBalance()
+          const [state, giftResponse] = await Promise.all([
+            readState(user.id), telegramApi("getAvailableGifts")
           ]);
           const cost = 100;
           if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Для открытия кейса нужно 100 ₿." }); return true; }
           const available = (Array.isArray(giftResponse?.gifts) ? giftResponse.gifts : [])
             .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
-            .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
-            .filter(g => Number(g.star_count) <= botBalance);
+            .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0);
           if (!available.length) {
-            json(res, 503, { ok: false, error: "Сейчас нет Telegram-подарков, которые бот может отправить. Попробуй позже — твои 100 ₿ не списаны." });
+            json(res, 503, { ok: false, error: "В каталоге Telegram сейчас нет доступных подарков для кейса. Попробуй позже — твои 100 ₿ не списаны." });
             return true;
           }
           const pickFrom = (min, max) => available.filter(g => Number(g.star_count) >= min && Number(g.star_count) <= max);
