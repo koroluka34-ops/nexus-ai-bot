@@ -779,9 +779,64 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           })(),
           prizes: catalog.prizes.map(publicPrize),
           unavailableReason: catalog.gifts.length ? "" : "Нет доступных подарков стоимостью 15–1000 ⭐ или не хватает Stars на балансе бота.",
+          inventory: state.history.filter(item => item.status === "delivered" && item.giftId && Number(item.cost) > 0).slice(-50).reverse().map(item => ({ spinId: item.spinId, label: item.label || "Telegram Gift", cost: Number(item.cost || 0), imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.giftId), at: item.deliveredAt || item.at || 0 })),
+          history: state.history.slice(-40).reverse().map(item => ({ spinId: item.spinId, label: item.label || item.prize || "Прокрутка", cost: Number(item.cost || 0), status: item.status || "unknown", source: item.source || "roulette", at: item.at || 0 })),
+          bestWin: state.history.filter(item => item.status === "delivered").sort((a,b) => Number(b.cost||0)-Number(a.cost||0))[0] || null,
           lastResult: state.history.at(-1) || null
         });
         return true;
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/contract") {
+        if (locks.has("inventory:" + user.id)) { json(res, 409, { ok: false, error: "Инвентарь уже обрабатывается." }); return true; }
+        locks.add("inventory:" + user.id);
+        try {
+          const body = await readBody(req), ids = Array.isArray(body.spinIds) ? [...new Set(body.spinIds.map(String))] : [];
+          if (ids.length !== 5) { json(res, 400, { ok: false, error: "Для контракта выбери ровно 5 подарков." }); return true; }
+          const [state, catalog, queue] = await Promise.all([readState(user.id), telegramApi("getAvailableGifts"), readPendingQueue()]);
+          const selected = ids.map(id => state.history.find(row => row.spinId === id));
+          if (selected.some(row => !row || row.status !== "delivered" || !row.giftId || Number(row.cost) <= 0)) { json(res, 409, { ok: false, error: "Один или несколько подарков уже использованы или недоступны." }); return true; }
+          const average = selected.reduce((sum,row)=>sum+Number(row.cost||0),0)/selected.length;
+          const available = (catalog?.gifts || []).filter(g => g && typeof g.id === "string" && Number(g.star_count) >= Math.max(15, Math.floor(average*1.5)) && Number(g.star_count) <= 1000 && (g.remaining_count === undefined || Number(g.remaining_count)>0));
+          if (!available.length) { json(res, 503, { ok: false, error: "Сейчас нет доступного подарка для такого контракта. Твои 5 подарков сохранены." }); return true; }
+          const gift = available[crypto.randomInt(0, available.length)], spinId = crypto.randomUUID(), stars = Number(gift.star_count);
+          selected.forEach(row => { row.status = "contracted"; row.deliveryMessage = "Использован в контракте обмена."; });
+          const label = (gift.sticker?.emoji || "🎁") + " Подарок из контракта · " + stars + " ⭐";
+          state.history.push({ spinId, day: kyivDay(), prize: "contract_gift", label, giftId: gift.id, cost: stars, status: "processing", at: Date.now(), source: "contract" });
+          state.history = state.history.slice(-100);
+          await writeState(user.id, state);
+          queue.push({ spinId, userId: String(user.id), type: "case_gift", giftId: gift.id, cost: stars, label, createdAt: Date.now(), source: "contract" });
+          await writePendingQueue(queue);
+          processPendingGiftQueue().catch(()=>{});
+          json(res, 200, { ok: true, label, stars, message: "Контракт собран. Награда добавлена в очередь отправки." }); return true;
+        } finally { locks.delete("inventory:" + user.id); }
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/upgrade") {
+        if (locks.has("inventory:" + user.id)) { json(res, 409, { ok: false, error: "Инвентарь уже обрабатывается." }); return true; }
+        locks.add("inventory:" + user.id);
+        try {
+          const body = await readBody(req), spinId = String(body.spinId || "");
+          const [state, catalog, queue] = await Promise.all([readState(user.id), telegramApi("getAvailableGifts"), readPendingQueue()]);
+          const source = state.history.find(row => row.spinId === spinId);
+          if (!source || source.status !== "delivered" || !source.giftId || Number(source.cost) <= 0) { json(res, 409, { ok: false, error: "Этот подарок уже использован или недоступен для апгрейда." }); return true; }
+          const sourceCost = Number(source.cost);
+          const available = (catalog?.gifts || []).filter(g => g && typeof g.id === "string" && Number(g.star_count) >= sourceCost*2 && Number(g.star_count) <= 1000 && (g.remaining_count === undefined || Number(g.remaining_count)>0));
+          if (!available.length) { json(res, 503, { ok: false, error: "Нет доступного подарка минимум в 2 раза дороже. Твой подарок сохранён." }); return true; }
+          source.status = "upgrade_used"; source.deliveryMessage = "Использован в апгрейде.";
+          const success = crypto.randomInt(100) < 35;
+          let label = "Апгрейд не удался · подарок использован";
+          if (success) {
+            const gift = available[crypto.randomInt(0, available.length)], stars = Number(gift.star_count), newId = crypto.randomUUID();
+            label = (gift.sticker?.emoji || "🎁") + " Подарок после апгрейда · " + stars + " ⭐";
+            state.history.push({ spinId: newId, day: kyivDay(), prize: "upgrade_gift", label, giftId: gift.id, cost: stars, status: "processing", at: Date.now(), source: "upgrade" });
+            queue.push({ spinId: newId, userId: String(user.id), type: "case_gift", giftId: gift.id, cost: stars, label, createdAt: Date.now(), source: "upgrade" });
+          } else {
+            state.history.push({ spinId: crypto.randomUUID(), day: kyivDay(), prize: "upgrade_failed", label, cost: 0, status: "upgrade_failed", at: Date.now(), source: "upgrade" });
+          }
+          state.history = state.history.slice(-100);
+          await writeState(user.id, state);
+          if (success) { await writePendingQueue(queue); processPendingGiftQueue().catch(()=>{}); }
+          json(res, 200, { ok: true, success, label, chance: "35%", message: success ? "Удача! Новый подарок сохранён в очереди отправки." : "Не повезло. Подарок был использован, апгрейд не прошёл." }); return true;
+        } finally { locks.delete("inventory:" + user.id); }
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/redeem-code") {
         const body = await readBody(req), code = String(body.code || "").trim().toUpperCase();
