@@ -925,27 +925,22 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         // Acquire synchronously after the worker check so a new worker run sees the lock.
         locks.add("pending-upgrade");
         try{
-          const body=await readBody(req),spinId=String(body.spinId||"");
+          const body=await readBody(req),ids=Array.isArray(body.spinIds)?[...new Set(body.spinIds.map(String))]:[String(body.spinId||"")].filter(Boolean);
+          if(!ids.length||ids.length>50){json(res,400,{ok:false,error:"Выбери от 1 до 50 подарков."});return true;}
           const [state,catalog,queue]=await Promise.all([readState(user.id),telegramApi("getAvailableGifts"),readPendingQueue()]);
           const oldState=JSON.parse(JSON.stringify(state)),oldQueue=JSON.parse(JSON.stringify(queue));
-          const item=queue.find(q=>q.spinId===spinId&&String(q.userId)===String(user.id)&&q.giftId&&!["telegram_premium","nexus_plus","nexus_ultra"].includes(q.type));
-          const row=state.history.find(h=>h.spinId===spinId);
-          if(!item||!row||row.status!=="processing"){json(res,409,{ok:false,error:"Подарок уже отправлен или недоступен для улучшения."});return true;}
-          const price=Number(item.cost||row.cost||0);
-          const candidates=(catalog?.gifts||[]).filter(g=>g&&typeof g.id==="string"&&g.id!==item.giftId&&Number(g.star_count)>=price*2&&Number(g.star_count)<=1000&&(g.remaining_count===undefined||Number(g.remaining_count)>0));
-          if(!candidates.length){json(res,503,{ok:false,error:"Нет доступного подарка минимум в 2 раза дороже. Твой подарок остался в очереди."});return true;}
-          const success=crypto.randomInt(100)<35;
-          if(success){
-            const gift=candidates[crypto.randomInt(0,candidates.length)],stars=Number(gift.star_count);
-            item.giftId=gift.id;item.cost=stars;item.label=(gift.sticker?.emoji||"🎁")+" Улучшенный подарок · "+stars+" ⭐";
-            row.giftId=gift.id;row.cost=stars;row.label=item.label;row.prize="pending_upgrade_gift";row.source="upgrade";row.at=Date.now();
-          }else{
-            queue.splice(queue.indexOf(item),1);row.status="upgrade_failed";row.prize="pending_upgrade_failed";row.deliveryMessage="Подарок сгорел при неудачном улучшении до отправки.";
-          }
-          try{await writeState(user.id,state);await writePendingQueue(queue);}
-          catch(error){await writeState(user.id,oldState).catch(()=>{});await writePendingQueue(oldQueue).catch(()=>{});throw error;}
-          if(success)processPendingGiftQueue().catch(()=>{});
-          json(res,200,{ok:true,success,chance:"35%",label:success?row.label:"Подарок сгорел",message:success?"Улучшение прошло! Новый подарок сохранён в очереди.":"Неудача. Ожидающий подарок сгорел и удалён из очереди."});return true;
+          const items=ids.map(id=>queue.find(q=>q.spinId===id&&String(q.userId)===String(user.id)&&q.giftId&&![ "telegram_premium","nexus_plus","nexus_ultra"].includes(q.type)));
+          const rows=ids.map(id=>state.history.find(h=>h.spinId===id));
+          if(items.some(x=>!x)||rows.some(x=>!x||x.status!=="processing")||items.some(x=>x.claimedAt||x.listingId||x.tradeLock)){json(res,409,{ok:false,error:"Один или несколько подарков уже забраны или недоступны."});return true;}
+          const average=items.reduce((sum,x)=>sum+Number(x.cost||0),0)/items.length;
+          const candidates=(catalog?.gifts||[]).filter(g=>g&&typeof g.id==="string"&&Number(g.star_count)>=Math.max(15,Math.floor(average*2))&&Number(g.star_count)<=1000&&(g.remaining_count===undefined||Number(g.remaining_count)>0));
+          if(!candidates.length){json(res,503,{ok:false,error:"Нет подходящего подарка для улучшения. Твои подарки сохранены."});return true;}
+          const success=crypto.randomInt(100)<50;let label="Выбранные подарки сгорели";
+          if(success){const gift=candidates[crypto.randomInt(0,candidates.length)],stars=Number(gift.star_count),newId=crypto.randomUUID();label=(gift.sticker?.emoji||"🎁")+" Улучшенный подарок · "+stars+" ⭐";items.forEach((item,index)=>{queue.splice(queue.indexOf(item),1);rows[index].status="upgrade_used";rows[index].deliveryMessage="Использован в улучшении.";});state.history.push({spinId:newId,day:kyivDay(),prize:"pending_upgrade_gift",label,giftId:gift.id,cost:stars,status:"processing",at:Date.now(),source:"upgrade"});queue.push({spinId:newId,userId:String(user.id),type:"case_gift",giftId:gift.id,cost:stars,label,createdAt:Date.now(),source:"upgrade"});}
+          else items.forEach((item,index)=>{queue.splice(queue.indexOf(item),1);rows[index].status="upgrade_failed";rows[index].prize="pending_upgrade_failed";rows[index].deliveryMessage="Подарок сгорел при неудачном улучшении.";});
+          state.history=state.history.slice(-100);
+          try{await writeState(user.id,state);await writePendingQueue(queue);}catch(error){await writeState(user.id,oldState).catch(()=>{});await writePendingQueue(oldQueue).catch(()=>{});throw error;}
+          json(res,200,{ok:true,success,chance:"50%",label,message:success?"Улучшение прошло! Новый подарок сохранён в ожидании.":"Неудача. Все выбранные подарки сгорели."});return true;
         }finally{locks.delete("pending-upgrade");}
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/upgrade") {
