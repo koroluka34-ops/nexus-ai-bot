@@ -24,9 +24,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .stats strong{color:#fff;font-size:13px}
 .balance{padding:7px 10px;border-radius:12px;background:#0a1225;border:1px solid #34415e;color:#f7d77e;font-weight:850;white-space:nowrap}
 .wheel-wrap{display:flex;flex-direction:column;align-items:center;padding:17px 0 13px}
-.pointer{width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:0;border-bottom:25px solid #fff;filter:drop-shadow(0 3px 5px #000b);margin-bottom:-7px;z-index:4;transform:rotate(180deg);transform-origin:50% 75%}
-.pointer.spinning{animation:pointerBounce .32s ease-in-out infinite alternate}
-@keyframes pointerBounce{from{transform:rotate(180deg) translateY(0) scale(1)}to{transform:rotate(180deg) translateY(5px) scale(1.08)}}
+.pointer{width:0;height:0;position:relative;border-left:13px solid transparent;border-right:13px solid transparent;border-top:0;border-bottom:25px solid #fff;filter:drop-shadow(0 3px 5px #000b);margin-bottom:-7px;z-index:4;transform:rotate(180deg);transform-origin:50% 0}
+.pointer.hit{animation:pointerHit .16s cubic-bezier(.2,.8,.3,1)}
+@keyframes pointerHit{0%{transform:rotate(180deg)}38%{transform:rotate(207deg) translateY(2px)}70%{transform:rotate(171deg)}100%{transform:rotate(180deg)}}
+.wheel-peg{position:absolute;z-index:2;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff9d7 0 18%,#e8bd60 42%,#8b571a 100%);box-shadow:0 0 4px #ffe6a9,0 1px 2px #000b;pointer-events:none}
 .outer{width:min(76vw,310px);aspect-ratio:1;padding:9px;border-radius:50%;background:conic-gradient(from 30deg,#9a5a14,#ffedaa,#c68a34,#fff1b9,#a65e18,#f4d17d);box-shadow:0 0 0 1px #ffe7a355,0 13px 30px #0009,0 0 38px #eab64b26}
 .wheel{width:100%;height:100%;position:relative;overflow:hidden;border-radius:50%;border:5px solid #10182c;background:conic-gradient(from -90deg,#284c9a 0 50%,#172b59 50% 100%);transition:transform 5s cubic-bezier(.12,.72,.12,1);box-shadow:inset 0 0 30px #02061799}
 .wheel:after{content:"N";position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#aab8d1);color:#101a34;font-size:25px;font-weight:1000;border:5px solid #10182c;box-shadow:0 5px 15px #000a}
@@ -181,7 +182,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     currentPrizes=Array.isArray(prizes)&&prizes.length?prizes:[{id:"gift_preview",short:"Подарок",label:"Подарок Telegram",type:"gift"},{id:"no_prize",short:"Попробуй завтра",label:"Без приза",type:"none"}];
     const step=360/currentPrizes.length;
     wheel.style.background="conic-gradient(from -90deg,"+currentPrizes.map((_,i)=>colors[i%colors.length]+" "+(i*step)+"deg "+((i+1)*step)+"deg").join(",")+")";
-    wheel.querySelectorAll(".slice-label").forEach(node=>node.remove());
+    wheel.querySelectorAll(".slice-label,.wheel-peg").forEach(node=>node.remove());
     currentPrizes.forEach((prize,index)=>{
       const label=document.createElement("span");label.className="slice-label";
       const angle=index*step+step/2;
@@ -192,6 +193,52 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const text=document.createElement("span");text.className="slice-text";
       text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"???":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
+      const peg=document.createElement("i");peg.className="wheel-peg";
+      peg.style.transform="rotate("+((index+.5)*step)+"deg) translateY(-"+(wheel.clientWidth*.465)+"px)";
+      wheel.append(peg);
+    });
+  }
+  function pointerHit(){
+    if(!pointer)return;
+    pointer.classList.remove("hit");void pointer.offsetWidth;pointer.classList.add("hit");
+  }
+  function playWheelTick(){
+    try{
+      const Ctx=window.AudioContext||window.webkitAudioContext;
+      if(!Ctx)return;
+      const ctx=playWheelTick.ctx||(playWheelTick.ctx=new Ctx());
+      if(ctx.state==="suspended")ctx.resume().catch(()=>{});
+      const osc=ctx.createOscillator(),gain=ctx.createGain(),now=ctx.currentTime;
+      osc.type="triangle";osc.frequency.setValueAtTime(1050,now);
+      osc.frequency.exponentialRampToValueAtTime(620,now+.035);
+      gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(.055,now+.004);
+      gain.gain.exponentialRampToValueAtTime(.0001,now+.045);
+      osc.connect(gain);gain.connect(ctx.destination);osc.start(now);osc.stop(now+.05);
+    }catch{}
+  }
+  function animateWheelTo(targetAngle,step,duration=7600){
+    return new Promise(resolve=>{
+      const start=performance.now();let lastPeg=-1;
+      wheel.style.transition="none";wheel.style.transform="rotate(0deg)";
+      const frame=now=>{
+        const t=Math.min(1,(now-start)/duration);
+        const eased=1-Math.pow(1-t,4);
+        const angle=targetAngle*eased;
+        wheel.style.transform="rotate("+angle+"deg)";
+        const passed=Math.floor(angle/step);
+        if(passed>lastPeg){
+          const count=Math.min(passed-lastPeg,36);
+          for(let n=0;n<count;n++){pointerHit();playWheelTick();}
+          lastPeg=passed;
+        }
+        if(t<1)requestAnimationFrame(frame);
+        else{
+          wheel.style.transform="rotate("+targetAngle+"deg)";
+          pointer?.classList.remove("hit");
+          resolve();
+        }
+      };
+      requestAnimationFrame(frame);
     });
   }
   function renderLeaderboard(items){
@@ -396,8 +443,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const data=await api("/roulette/api/spin","POST",{mode:$("x2Mode").checked?"x2":"normal"});
       const count=currentPrizes.length||2,index=Number.isInteger(data.prizeIndex)?data.prizeIndex:count-1,step=360/count;
       const target=((360-((index+.5)*step))%360+360)%360;
-      wheel.style.transition="none";wheel.style.transform="rotate(0deg)";void wheel.offsetWidth;wheel.style.transition="transform 5s cubic-bezier(.12,.72,.12,1)";wheel.style.transform="rotate("+(360*7+target)+"deg)";
-      await new Promise(resolve=>setTimeout(resolve,5200));
+      await animateWheelTo(360*7+target,step,7600);
       showResult(data.prize,data.message,data.delivered,data.spinId);celebrateWin(data.prize,data.message,data.jackpot);if(data.jackpot){$("result").classList.add("jackpot-flash");playJackpotFanfare();setTimeout(()=>$("result").classList.remove("jackpot-flash"),4500);}
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
