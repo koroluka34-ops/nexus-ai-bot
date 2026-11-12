@@ -435,7 +435,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       $("dailyQuest").disabled=!!data.dailyQuestClaimed;$("dailyQuest").textContent=data.dailyQuestClaimed?"ПОЛУЧЕНО":"ЗАБРАТЬ";
       const tq=data.timedQuest||{progress:0,target:3,endsAt:Date.now()+300000,claimed:false};
-      $("timedQuestText").textContent="⏱ Сделай 3 прокрутки за 5 минут — +2 попытки ("+Math.min(tq.progress||0,3)+"/3)";
+      const questSeconds=Math.max(0,Math.ceil(((tq.endsAt||Date.now()+300000)-Date.now())/1000));
+      $("timedQuestText").textContent="⏱ Сделай 3 прокрутки за 5 минут — +2 попытки ("+Math.min(tq.progress||0,3)+"/3) · "+Math.floor(questSeconds/60)+":"+String(questSeconds%60).padStart(2,"0");
       $("timedQuest").disabled=!!tq.claimed||(tq.progress||0)<3;$("timedQuest").textContent=tq.claimed?"ПОЛУЧЕНО":(tq.progress||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
       $("inviteQuestRow").style.display=data.inviteQuestAvailable===false?"none":"flex";
       $("inviteQuestText").textContent="👥 Пригласи 3 новых друзей — +3 попытки ("+Math.min(data.referralCount||0,3)+"/3)";
@@ -466,7 +467,6 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const button=$(quest==="daily_spin"?"dailyQuest":quest==="invite_friend"?"inviteQuest":"timedQuest");button.disabled=true;
     try{const data=await api("/roulette/api/quest/claim","POST",{quest});$("questStatus").textContent="✅ Награда получена! Бонусных прокруток: "+data.bonusSpins;await refresh();}
     catch(error){$("questStatus").textContent="ℹ️ "+error.message;await refresh();}
-    finally{if(button.isConnected)button.disabled=false;}
   }
   $("dailyQuest").addEventListener("click",()=>claimQuest("daily_spin"));
   $("timedQuest").addEventListener("click",()=>claimQuest("timed_spin"));
