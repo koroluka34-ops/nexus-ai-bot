@@ -756,6 +756,17 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const winners = await readGlobal("winners", []);
         const event = await readGlobal("event", { active: false, label: "NEXUS EVENT" });
         const playerStats = await readGlobal("playerStats", {});
+        const myStats = playerStats[String(user.id)] || { userId: user.id, name: user.firstName || "Игрок", wins: 0, losses: 0, spins: 0, cost: 0 };
+        const myRecentSpins = state.history.filter(item => isRouletteSpinEntry(item)).slice().reverse();
+        let currentWinStreak = 0;
+        for (const spin of myRecentSpins) {
+          if (String(spin.prize || "") === "no_prize" || String(spin.prize || "").includes("no_prize")) break;
+          currentWinStreak++;
+        }
+        const vipTiers = [{ key: "bronze", label: "BRONZE", min: 0 }, { key: "silver", label: "SILVER", min: 25 }, { key: "gold", label: "GOLD", min: 100 }, { key: "diamond", label: "DIAMOND", min: 300 }];
+        const mySpinCount = Math.max(0, Number(myStats.spins) || 0);
+        const vipIndex = vipTiers.reduce((best, tier, index) => mySpinCount >= tier.min ? index : best, 0);
+        const vipTier = vipTiers[vipIndex], nextVipTier = vipTiers[vipIndex + 1] || null;
         const me = await bot.api.getMe().catch(() => ({}));
         const collection = state.history.filter(item => item.status === "delivered" && !/NFT|коллекцион/i.test(item.label || "") && (item.giftId || item.cost || /Premium|Ultra|подарок/i.test(item.label || ""))).slice(-30).reverse().map(item => ({ ...item, imageUrl: item.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(item.giftId) : "" }));
         const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
@@ -764,7 +775,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           cost: Number(item.cost || 0), createdAt: item.createdAt || 0
         }));
         json(res, 200, {
-          ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
+          ok: true, profile: { userId: String(user.id), name: myStats.name || user.firstName || "Игрок", spins: mySpinCount, wins: Math.max(0, Number(myStats.wins) || 0), losses: Math.max(0, Number(myStats.losses) || 0), prizeValue: Math.max(0, Number(myStats.cost) || 0), winStreak: currentWinStreak, vip: vipTier.key, vipLabel: vipTier.label, vipNext: nextVipTier ? { label: nextVipTier.label, min: nextVipTier.min } : null }, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
           lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, coins: state.coins || 0, dailyQuests, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.cost) - Number(a.cost)) || (Number(b.wins) - Number(a.wins))).slice(0, 10),
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
           luckBoost: catalog.luckBoost,
