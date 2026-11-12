@@ -936,9 +936,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       await new Promise(resolve=>setTimeout(resolve,700));
       return {name:"NEXUS GIFT CASE",image:""};
     }
-    const winner=catalog[Math.floor(Math.random()*catalog.length)];
-    const entries=Array.from({length:90},()=>({...catalog[Math.floor(Math.random()*catalog.length)],winner:false}));
-    entries.push({...winner,winner:true});
+    const base=Array.from({length:48},()=>({...catalog[Math.floor(Math.random()*catalog.length)]}));
+    const winner=base[Math.floor(Math.random()*base.length)];
+    const entries=[...base,...base,...base.slice(0,-1),{...winner,winner:true}];
     track.replaceChildren();
     entries.forEach(item=>{
       const tile=document.createElement("div");tile.className="case-select-tile";
@@ -948,13 +948,26 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     track.style.transition="none";track.style.transform="translateX(0px)";stage.style.display="flex";
     void track.offsetWidth;
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9;
-    const finalX=(stage.clientWidth-w)/2-(entries.length-1)*(w+gap)-4;
-    const duration=$("fastOpen").checked?2600:8500;
-    playCaseSound("spin");scheduleCaseTicks(duration);
+    const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9,cycleWidth=base.length*(w+gap);
+    let offset=0,lastTime=0,raf=0;
+    const loopStart=performance.now(),loopDuration=5200,speed=cycleWidth/1250;
+    const loop=now=>{
+      if(!lastTime)lastTime=now;
+      const dt=Math.min(40,now-lastTime);lastTime=now;
+      offset=(offset+speed*dt)%cycleWidth;
+      track.style.transform="translateX("+(-offset)+"px)";
+      if(now-loopStart<loopDuration)raf=requestAnimationFrame(loop);
+    };
+    const duration=$("fastOpen").checked?5200:9200;
+    playCaseSound("spin");scheduleCaseTicks(loopDuration+duration);
     stage.classList.add("case-select-spinning");
+    raf=requestAnimationFrame(loop);
+    await new Promise(resolve=>setTimeout(resolve,loopDuration));
+    cancelAnimationFrame(raf);
+    const finalIndex=entries.length-1;
+    const finalX=finalIndex*(w+gap)-(stage.clientWidth-w)/2+4;
     track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";
-    track.style.transform="translateX("+finalX+"px)";
+    track.style.transform="translateX("+(-finalX)+"px)";
     await new Promise(resolve=>setTimeout(resolve,duration+100));
     stage.classList.remove("case-select-spinning");
     track.lastElementChild?.classList.add("winner");playCaseSound("stop");caseBurst("normal");
@@ -988,18 +1001,18 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
     const source=Array.isArray(reelPool)?reelPool:[];
     if(!source.length)throw new Error("Не удалось загрузить призы для прокрутки кейса.");
-    // Build a long, freshly randomized reel from the complete live gift catalogue.
-    // The server-selected weighted prize is placed only at the final stopping position.
-    const entries=Array.from({length:159},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
-    if(winningEntry)entries.push({...winningEntry,winner:true});
+    // Loop seamlessly through a repeated randomized strip, then brake on the
+    // server-authoritative weighted winner.
+    const base=Array.from({length:180},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
+    const entries=[...base,...base,...base.slice(0,-1),{...(winningEntry||base[0]),winner:true}];
     track.replaceChildren();
     entries.forEach(entry=>{
       const stars=Number(entry.stars||String(entry.detail||"").match(/\d+/)?.[0]||0),rarity=caseRarity(stars,entry.type);
       const tile=document.createElement("div");tile.className="case-tile case-reel-item rarity-"+rarity.key;
-      const art=document.createElement("div");art.className="case-showcase-emoji";art.textContent=entry.emoji|| (entry.type==="telegram_premium"?"⭐":entry.type==="nexus_ultra"?"🚀":entry.type==="nexus_plus"?"💎":"🎁");art.setAttribute("aria-label",entry.title||"Подарок Telegram");tile.append(art);
+      const art=document.createElement("div");art.className="case-showcase-emoji";art.textContent=entry.emoji||(entry.type==="telegram_premium"?"⭐":entry.type==="nexus_ultra"?"🚀":entry.type==="nexus_plus"?"💎":"🎁");art.setAttribute("aria-label",entry.title||"Подарок Telegram");tile.append(art);
       if(entry.imageUrl){
         const image=document.createElement("img");image.src=entry.imageUrl;image.alt=entry.title||"Подарок Telegram";image.loading="eager";
-        image.onload=()=>{art.style.display="none";};image.onerror=()=>{image.remove();art.style.display="block";};tile.insertBefore(image,art); 
+        image.onload=()=>{art.style.display="none";};image.onerror=()=>{image.remove();art.style.display="block";};tile.insertBefore(image,art);
       }
       const name=document.createElement("div");name.className="case-name";name.textContent=entry.title||"Подарок Telegram";tile.append(name);
       const tier=document.createElement("div");tier.className="case-rarity";tier.textContent=rarity.label;tile.append(tier);
@@ -1007,11 +1020,27 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     });
     track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
     void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const firstTile=track.firstElementChild,tileWidth=(firstTile?.getBoundingClientRect().width||140)+8,center=(stage.clientWidth-(firstTile?.getBoundingClientRect().width||140))/2,finalX=center-4-(entries.length-1)*tileWidth;
-    const duration=$("fastOpen").checked?3200:10500;
-    playCaseSound("spin");scheduleCaseTicks(duration);
-    track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";track.style.transform="translateX("+finalX+"px)";
-    await new Promise(resolve=>setTimeout(resolve,duration+100));stage.classList.remove("rolling");
+    const firstTile=track.firstElementChild,cardWidth=firstTile?.getBoundingClientRect().width||140,tileWidth=cardWidth+8,cycleWidth=base.length*tileWidth;
+    let offset=0,lastTime=0,raf=0;
+    const loopDuration=$("fastOpen").checked?4200:6500,speed=cycleWidth/1400,loopStart=performance.now();
+    const loop=now=>{
+      if(!lastTime)lastTime=now;
+      const dt=Math.min(40,now-lastTime);lastTime=now;
+      offset=(offset+speed*dt)%cycleWidth;
+      track.style.transform="translateX("+(-offset)+"px)";
+      if(now-loopStart<loopDuration)raf=requestAnimationFrame(loop);
+    };
+    const brakeDuration=$("fastOpen").checked?5200:9000;
+    playCaseSound("spin");scheduleCaseTicks(loopDuration+brakeDuration);
+    raf=requestAnimationFrame(loop);
+    await new Promise(resolve=>setTimeout(resolve,loopDuration));
+    cancelAnimationFrame(raf);
+    const finalIndex=entries.length-1;
+    const finalX=finalIndex*tileWidth-(stage.clientWidth-cardWidth)/2+4;
+    track.style.transition="transform "+(brakeDuration/1000)+"s cubic-bezier(.06,.78,.08,1)";
+    track.style.transform="translateX("+(-finalX)+"px)";
+    await new Promise(resolve=>setTimeout(resolve,brakeDuration+100));
+    stage.classList.remove("rolling");
     const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
     playCaseSound("stop");if(winningEntry&&Number(winningEntry.stars||0)>=251)playCaseSound("rare");caseBurst("normal");
   }
@@ -1084,7 +1113,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const data=await api("/roulette/api/spin","POST",{mode:$("x2Mode").checked?"x2":"normal"});
       const count=currentPrizes.length||2,index=Number.isInteger(data.prizeIndex)?data.prizeIndex:count-1,step=360/count;
       const target=((360-((index+.5)*step))%360+360)%360;
-      await animateWheelTo(360*7+target,step,7600);
+      await animateWheelTo(360*18+target,step,11200);
       showResult(data.prize,data.message,data.delivered,data.spinId);celebrateWin(data.prize,data.message,data.jackpot);if(data.jackpot){$("result").classList.add("jackpot-flash");playJackpotFanfare();setTimeout(()=>$("result").classList.remove("jackpot-flash"),4500);}
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
