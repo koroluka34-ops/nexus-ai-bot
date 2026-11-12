@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#62e6ff"/><stop offset=".5" stop-color="#8764ff"/><stop offset="1" stop-color="#ff70d8"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+<rect x="22" y="22" width="468" height="468" rx="92" fill="#0b1025" stroke="url(#g)" stroke-width="8"/>
+<circle cx="256" cy="220" r="170" fill="url(#r)"/>
+<path d="M256 76 390 154v156l-134 78-134-78V154z" fill="#111b3d" stroke="url(#g)" stroke-width="10" stroke-linejoin="round"/>
+<path d="m256 118 96 55v112l-96 56-96-56V173z" fill="none" stroke="#d8f8ff" stroke-width="5" opacity=".8"/>
+<path d="m256 154 57 33v66l-57 33-57-33v-66z" fill="url(#g)"/>
+<path d="m256 154v132m-57-99 114 66m0-66-114 66" stroke="#fff" stroke-width="5" opacity=".7"/>
+<text x="256" y="438" fill="#fff" font-family="Arial,sans-serif" font-size="34" font-weight="700" text-anchor="middle" letter-spacing="5">NEXUS NFT</text>
+</svg>
