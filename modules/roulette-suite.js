@@ -17,36 +17,6 @@ const JACKPOT_WEIGHT = 100; // 0.01%, exact 1000-Star Telegram gift
 const SECRET_WEIGHT = 100; // 0.01%, hidden gift prize
 const MAX_GIFTS_IN_WHEEL = 20;
 
-// These are the 11 real Telegram gifts previously confirmed in the bot's /realgifts
-// catalogue. Match them against Telegram's live Bot API response; never invent IDs.
-const FEATURED_TELEGRAM_GIFTS = [
-  { emoji: "🍦", name: "Мороженое" },
-  { emoji: "🥅", name: "Хоккейная маска" },
-  { emoji: "🗽", name: "Статуя Свободы" },
-  { emoji: "🐊", name: "Крокодил с короной" },
-  { emoji: "🍜", name: "Золотая лапша" },
-  { emoji: "🏮", name: "Фонарь" },
-  { emoji: "🍭", name: "Леденец" },
-  { emoji: "🍫", name: "Шоколадное эскимо" },
-  { emoji: "🦩", name: "Розовый фламинго" },
-  { emoji: "🎒", name: "Рюкзак" },
-  { emoji: "💩", name: "Забавный сюрприз" },
-  { emoji: "🐝", name: "Пчелиный сюрприз" },
-  { emoji: "🌸", name: "Цветочный подарок" },
-  { emoji: "☃️", name: "Снеговик" },
-  { emoji: "🍬", name: "Новогодняя конфета" },
-  { emoji: "🍀", name: "Четырёхлистный клевер" },
-  { emoji: "🛷", name: "Новогодние сани" },
-  { emoji: "🧦", name: "Носки" },
-  { emoji: "🎁", name: "Подарочная коробка" },
-  { emoji: "🎂", name: "Happy Birthday" },
-  { emoji: "🗡️", name: "Световой меч" }
-];
-function getFeaturedTelegramGift(gift) {
-  const emoji = String(gift?.sticker?.emoji || "").replace(/\uFE0F/g, "");
-  return FEATURED_TELEGRAM_GIFTS.find(item => item.emoji.replace(/\uFE0F/g, "") === emoji) || null;
-}
-
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
 function kvUrl(userId) {
   return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +
@@ -283,26 +253,21 @@ async function getGiftCatalog(bot) {
     .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
     .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
     .map(g => {
-      const featuredGift = getFeaturedTelegramGift(g);
       const emoji = g.sticker?.emoji || "🎁";
       const stars = Number(g.star_count);
       return {
         id: "gift:" + g.id,
         giftId: g.id,
-        label: emoji + " " + (featuredGift?.name || "Подарок Telegram") + " · " + stars + " ⭐",
+        label: emoji + " Подарок Telegram · " + stars + " ⭐",
         short: emoji + " " + stars + " ⭐",
         stickerFileId: g.sticker?.thumbnail?.file_id || g.sticker?.file_id || "",
         stickerFormat: g.sticker?.format || "",
         probability: "",
         type: "gift",
-        cost: stars,
-        featured: Boolean(featuredGift),
-        featuredName: featuredGift?.name || ""
+        cost: stars
       };
     })
-    // Keep the 21 pictured Telegram gifts at the top, while retaining the
-    // rest of Telegram's live sendable catalogue below them.
-    .sort((a, b) => Number(b.featured) - Number(a.featured) || a.cost - b.cost);
+    .sort((a, b) => a.cost - b.cost);
   const premiumAvailable = balance >= 2500;
   const settings = await readGlobal("settings", { giftPercent: 38 });
   const giftPercent = Math.max(1, Math.min(90, Number(settings.giftPercent) || 38));
@@ -1101,19 +1066,6 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
               imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
             });
           }
-          const showcaseItems = [
-            ["🍦","Мороженое",300],["🥅","Хоккейная маска",929],["🗽","Статуя Свободы",563],
-            ["🐊","Крокодил с короной",581],["🍜","Золотая лапша",430],["🏮","Фонарь",480],
-            ["🍭","Леденец",500],["🍫","Шоколадное эскимо",500],["🦩","Розовый фламинго",490],
-            ["🎒","Рюкзак",562],["💩","Забавный сюрприз",500],["🐝","Пчелиный сюрприз",581],
-            ["🌸","Цветочный подарок",484],["☃️","Снеговик",435],["🍬","Новогодняя конфета",420],
-            ["🍀","Четырёхлистный клевер",581],["🛷","Новогодние сани",425],["🧦","Носки",510],
-            ["🎁","Подарочная коробка",500],["🎂","Happy Birthday",500],["🗡️","Световой меч",500]
-          ];
-          for (const [emoji, name, value] of showcaseItems) previewPool.push({
-            title: emoji + " " + name, detail: "Витрина · около " + value + " ⭐",
-            stars: value, type: "showcase", emoji, showcaseOnly: true
-          });
           previewPool.push(
             { title: "NEXUS Premium · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
             { title: "NEXUS Ultra · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
