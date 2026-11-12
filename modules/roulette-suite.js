@@ -1072,10 +1072,10 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             { title: "Telegram Premium · 12 месяцев", detail: "Официальная подписка", stars: 0, type: "telegram_premium", imageUrl: "/assets/telegram-premium.svg" }
           );
           const reelPool = Array.from({ length: 59 }, () => previewPool[crypto.randomInt(0, previewPool.length)]);
-          const reel = [...reelPool, {
+          const winningEntry = {
             title: reward.title, detail: reward.detail, stars: Number(reward.giftStars || 0),
             type: reward.type, imageUrl: reward.imageUrl
-          }];
+          };
           state.coins -= cost;
           state.history.push(row);
           state.history = state.history.slice(-100);
@@ -1093,7 +1093,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           processPendingGiftQueue().catch(() => {});
           json(res, 200, {
             ok: true, coins: state.coins, bonusSpins: state.bonusSpins,
-            reward, reel, spinId,
+            reward, reelPool, winningEntry, spinId,
             message: "Кейс открыт! Награда сохранена в очереди выдачи."
           });
           return true;
