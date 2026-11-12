@@ -843,6 +843,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             title: giftTitle, detail: Number(gift.star_count) + " ⭐ · настоящий подарок Telegram",
             type: "gift", giftId: gift.id, giftStars: Number(gift.star_count),
             imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(gift.id),
+            dropChance: (100 / available.length).toFixed(2) + "%",
             coins: 0, spins: 0, status: "processing"
           };
           const row = {
@@ -858,6 +859,8 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             return {
               title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
               detail: Number(item.star_count) + " ⭐",
+              stars: Number(item.star_count),
+              probability: (100 / available.length).toFixed(2) + "%",
               imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
             };
           });
