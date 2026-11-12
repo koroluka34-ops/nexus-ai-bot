@@ -65,12 +65,14 @@ async function readState(userId) {
     headers: { Authorization: "Bearer " + TOKEN },
     signal: AbortSignal.timeout(9000)
   });
-  if (r.status === 404) return { lastSpinDay: "", bonusSpins: 0, history: [], streak: 0, lastStreakDay: "", claimedCodes: [], questClaims: {}, referralCount: 0 };
+  if (r.status === 404) return { lastSpinDay: "", bonusSpins: 0, coins: 0, history: [], streak: 0, lastStreakDay: "", claimedCodes: [], questClaims: {}, referralCount: 0, dailyQuests: null };
   if (!r.ok) throw new Error("Cloudflare KV HTTP " + r.status);
   const value = JSON.parse(await r.text());
   return {
     lastSpinDay: String(value.lastSpinDay || ""),
     bonusSpins: Math.max(0, Math.min(100000, Math.floor(Number(value.bonusSpins) || 0))),
+    coins: Math.max(0, Math.min(100000000, Math.floor(Number(value.coins) || 0))),
+    dailyQuests: value.dailyQuests && typeof value.dailyQuests === "object" ? value.dailyQuests : null,
     history: Array.isArray(value.history) ? value.history.slice(-100) : [],
     streak: Math.max(0, Math.min(3650, Math.floor(Number(value.streak) || 0))),
     lastStreakDay: String(value.lastStreakDay || ""),
@@ -90,6 +92,35 @@ async function writeState(userId, state) {
 }
 function kyivDay() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
+}
+function dailyQuestProgress(state, quest, today) {
+  if (quest.kind === "spins") return state.history.filter(item => item.day === today).length;
+  if (quest.kind === "wins") return state.history.filter(item => item.day === today && item.prize !== "no_prize" && item.status !== "declined").length;
+  if (quest.kind === "referrals") return Number(state.referralCount || 0);
+  return 0;
+}
+function ensureDailyQuests(state, userId) {
+  const today = kyivDay();
+  if (!state.dailyQuests || state.dailyQuests.day !== today || !Array.isArray(state.dailyQuests.tasks)) {
+    const pool = [
+      { id: "spin3", title: "Сделай 3 прокрутки", kind: "spins", target: 3, reward: 8 },
+      { id: "spin5", title: "Сделай 5 прокруток", kind: "spins", target: 5, reward: 12 },
+      { id: "win1", title: "Получи любой приз", kind: "wins", target: 1, reward: 10 },
+      { id: "invite1", title: "Пригласи нового игрока", kind: "referrals", target: Number(state.referralCount || 0) + 1, reward: 15 }
+    ];
+    const seed = crypto.createHash("sha256").update(String(userId) + ":" + today).digest();
+    const chosen = [];
+    while (chosen.length < 2 && pool.length) {
+      const index = seed[chosen.length] % pool.length;
+      chosen.push(pool.splice(index, 1)[0]);
+    }
+    state.dailyQuests = { day: today, tasks: chosen.map(q => ({ ...q, claimed: false })) };
+  }
+  return state.dailyQuests.tasks.map(q => ({
+    ...q,
+    progress: Math.min(q.target, dailyQuestProgress(state, q, today)),
+    done: dailyQuestProgress(state, q, today) >= q.target
+  }));
 }
 function verifyInitData(initData) {
   if (!BOT_TOKEN || !initData || initData.length > 10000) return null;
@@ -634,6 +665,8 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     try {
       if (req.method === "GET" && url.pathname === "/roulette/api/status") {
         const [state, catalog, queue] = await Promise.all([readState(user.id), getGiftCatalog(bot), readPendingQueue()]);
+        const dailyQuests = ensureDailyQuests(state, user.id);
+        await writeState(user.id, state);
         const freeSpinAvailable = state.lastSpinDay !== kyivDay();
         const canSpin = freeSpinAvailable || state.bonusSpins > 0;
         const winners = await readGlobal("winners", []);
@@ -648,7 +681,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         }));
         json(res, 200, {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
-          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.wins) - Number(a.wins)) || (Number(b.cost) - Number(a.cost))).slice(0, 10),
+          lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, coins: state.coins || 0, dailyQuests, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.wins) - Number(a.wins)) || (Number(b.cost) - Number(a.cost))).slice(0, 10),
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
           luckBoost: catalog.luckBoost,
           achievements: [
@@ -719,8 +752,37 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           if (state.questClaims.timedSpinCycle === cycle) { json(res, 409, { ok: false, error: "Награда за это пятиминутное задание уже получена." }); return true; }
           if (progress < 3) { json(res, 409, { ok: false, error: "Нужно сделать 3 прокрутки за это пятиминутное задание. Сейчас: " + progress + "/3." }); return true; }
           state.questClaims.timedSpinCycle = cycle; state.bonusSpins = Math.min(100000, state.bonusSpins + 2);
+        } else if (quest.startsWith("daily_")) {
+          const dailyId = quest.slice(6), tasks = ensureDailyQuests(state, user.id);
+          const task = state.dailyQuests.tasks.find(item => item.id === dailyId);
+          const view = tasks.find(item => item.id === dailyId);
+          if (!task || !view) { json(res, 404, { ok: false, error: "Это задание уже обновилось." }); return true; }
+          if (task.claimed) { json(res, 409, { ok: false, error: "Награда за это задание уже получена." }); return true; }
+          if (!view.done) { json(res, 409, { ok: false, error: "Задание ещё не выполнено: " + view.progress + "/" + view.target }); return true; }
+          task.claimed = true; state.coins = Math.min(100000000, (state.coins || 0) + task.reward);
         } else { json(res, 400, { ok: false, error: "Неизвестное задание." }); return true; }
-        await writeState(user.id, state); json(res, 200, { ok: true, bonusSpins: state.bonusSpins }); return true;
+        await writeState(user.id, state); json(res, 200, { ok: true, bonusSpins: state.bonusSpins, coins: state.coins || 0 }); return true;
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/case/open") {
+        if (locks.has("case:" + user.id)) { json(res, 409, { ok: false, error: "Кейс уже открывается." }); return true; }
+        locks.add("case:" + user.id);
+        try {
+          const state = await readState(user.id), cost = 20;
+          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Нужно 20 NEXUS Coins для открытия кейса." }); return true; }
+          state.coins -= cost;
+          const roll = crypto.randomInt(100);
+          let reward;
+          if (roll < 42) { state.coins += 8; reward = { title: "🪙 Возврат монет", detail: "+8 NEXUS Coins", coins: 8, spins: 0 }; }
+          else if (roll < 72) { state.bonusSpins = Math.min(100000, state.bonusSpins + 1); reward = { title: "🎰 Бонусная прокрутка", detail: "+1 прокрутка", coins: 0, spins: 1 }; }
+          else if (roll < 90) { state.coins += 18; reward = { title: "💰 Большой возврат", detail: "+18 NEXUS Coins", coins: 18, spins: 0 }; }
+          else if (roll < 99) { state.bonusSpins = Math.min(100000, state.bonusSpins + 3); reward = { title: "🎁 Пакет прокруток", detail: "+3 прокрутки", coins: 0, spins: 3 }; }
+          else { state.bonusSpins = Math.min(100000, state.bonusSpins + 10); reward = { title: "👑 МЕГА-ДРОП", detail: "+10 прокруток", coins: 0, spins: 10 }; }
+          state.caseHistory = Array.isArray(state.caseHistory) ? state.caseHistory.slice(-19) : [];
+          state.caseHistory.push({ at: Date.now(), reward: reward.title, detail: reward.detail });
+          await writeState(user.id, state);
+          json(res, 200, { ok: true, coins: state.coins, bonusSpins: state.bonusSpins, reward });
+          return true;
+        } finally { locks.delete("case:" + user.id); }
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/decline") {
         const body = await readBody(req);
@@ -801,6 +863,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             status: "processing", at: Date.now()
           };
           fresh.lastSpinDay = today;
+          fresh.coins = Math.min(100000000, (fresh.coins || 0) + (x2Mode ? 2 : 1));
           fresh.history.push(row);
           fresh.history = fresh.history.slice(-100);
           await writeState(user.id, fresh);
