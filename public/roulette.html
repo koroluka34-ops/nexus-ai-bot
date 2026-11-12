@@ -71,7 +71,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .theme-blue{filter:hue-rotate(20deg)}.theme-green{filter:hue-rotate(95deg)}.theme-purple{filter:hue-rotate(220deg)}.theme-ruby{filter:hue-rotate(300deg)}
 .extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.achievement{padding:11px;border:1px solid #34446b;border-radius:14px;background:#0b1428}.achievement b{display:block;font-size:11px}.achievement span{display:block;margin-top:5px;color:#9fb0ce;font-size:10px}.achievement.done{border-color:#d9aa52;background:#392b1b88}
 .calendar-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}.calendar-day{padding:8px 2px;text-align:center;border:1px solid #34446b;border-radius:10px;color:#aab8d2;font-size:9px}.calendar-day.today{border-color:#f5d78b;color:#ffe4a0;background:#6b4b1d66}
-.page-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 0}.page-nav button{flex:1;border:1px solid #3a4c78;background:#17213c;color:#eaf0ff;border-radius:12px;padding:11px 8px;font-weight:850}.page-nav button:disabled{opacity:.35}.page-indicator{color:#f4d47e;font-size:11px;font-weight:900;white-space:nowrap}.app-page{display:none}.app-page.active{display:block}.coin-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid #80622d;background:#342817;border-radius:13px;margin:10px 0}.coin-value{font-size:20px;font-weight:950;color:#ffe39b}.daily-task{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #34446b;border-radius:12px;background:#111a30}.daily-task button{flex-shrink:0;padding:9px 12px;border-radius:10px;border:0;font-weight:900;background:linear-gradient(120deg,#f3cf7d,#b77b2b);color:#24180a}.daily-task button:disabled{opacity:.45}
+.page-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 0}.page-nav button{flex:1;border:1px solid #3a4c78;background:#17213c;color:#eaf0ff;border-radius:12px;padding:11px 8px;font-weight:850}.page-nav button:disabled{opacity:.35}.page-indicator{color:#f4d47e;font-size:11px;font-weight:900;white-space:nowrap}.app-page{display:none}.app-page.active{display:block}.coin-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid #80622d;background:#342817;border-radius:13px;margin:10px 0}.coin-value{font-size:20px;font-weight:950;color:#ffe39b}.case-stage{height:112px;margin:12px 0;overflow:hidden;position:relative;border:1px solid #8a6b35;border-radius:14px;background:linear-gradient(135deg,#111a30,#302319);display:flex;align-items:center}.case-stage:before,.case-stage:after{content:"";position:absolute;z-index:2;top:0;bottom:0;width:28px;pointer-events:none}.case-stage:before{left:0;background:linear-gradient(90deg,#111a30,transparent)}.case-stage:after{right:0;background:linear-gradient(270deg,#111a30,transparent)}.case-track{display:flex;align-items:center;gap:8px;will-change:transform;padding:0 4px}.case-tile{flex:0 0 116px;height:82px;border:1px solid #53658e;border-radius:12px;background:linear-gradient(150deg,#26395d,#141d33);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:25px;color:#fff;box-sizing:border-box}.case-tile small{font-size:9px;text-align:center;color:#d7e1fa;padding:0 4px}.case-tile.winner{border:2px solid #f5d47d;background:linear-gradient(145deg,#59421d,#26203a);box-shadow:0 0 24px #e9bc5a88}.case-stage.rolling{border-color:#f5d47d;box-shadow:0 0 18px #e9bc5a33}.daily-task{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #34446b;border-radius:12px;background:#111a30}.daily-task button{flex-shrink:0;padding:9px 12px;border-radius:10px;border:0;font-weight:900;background:linear-gradient(120deg,#f3cf7d,#b77b2b);color:#24180a}.daily-task button:disabled{opacity:.45}
 </style>
 </head>
 <body>
@@ -103,16 +103,17 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   <section class="panel">
     <div class="section-head"><strong>🎯 Задания</strong><span>Дополнительные попытки</span></div>
     <div class="quest"><span>🎰 Используй сегодняшнюю прокрутку — +1 попытка</span><button id="dailyQuest">ЗАБРАТЬ</button></div>
-    <div class="quest" id="timedQuestRow"><span id="timedQuestText">⏱ Сделай 3 прокрутки за 5 минут — +2 попытки</span><button id="timedQuest">ЗАБРАТЬ</button></div>
+    <div class="quest" id="timedQuestRow"><span id="timedQuestText">⏱ Сделай 3 прокрутки за час — +2 попытки</span><button id="timedQuest">ЗАБРАТЬ</button></div>
     <div class="quest" id="inviteQuestRow"><span id="inviteQuestText">👥 Пригласи 3 новых друзей — +3 попытки</span><button id="inviteQuest">ЗАБРАТЬ</button></div>
     <p class="hint" id="questStatus">Выполняй задания и забирай бонусы.</p>
     <div class="section-head"><strong>🎲 Твои случайные задания</strong><span>Обновляются каждый день</span></div><div id="dailyQuestList"></div>
   </section>
   <section class="panel">
-    <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>20 монет за открытие</span></div>
-    <div class="coin-panel"><div><div>Твой баланс</div><div class="coin-value" id="coinsValue">🪙 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Обычный кейс<br>Случайные бонусы</div></div>
-    <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 20 🪙</button>
-    <p class="hint" id="caseStatus">В кейсе могут выпасть монеты или бонусные прокрутки. За каждую прокрутку рулетки начисляется 1 монета.</p>
+    <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>20 ₿ за открытие</span></div>
+    <div class="coin-panel"><div><div>Твой баланс биткоинов</div><div class="coin-value" id="coinsValue">₿ 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Биткоины<br>и прокрутки</div></div>
+    <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 20 ₿</button>
+    <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-track" id="caseTrack"><div class="case-tile">🎁<small>Кейс NEXUS</small></div></div></div>
+    <p class="hint" id="caseStatus">В кейсе всегда выпадает награда не меньше стоимости открытия: от +22 ₿ или бонусные прокрутки. За каждую прокрутку рулетки начисляется +1 ₿.</p>
   </section>
   <section class="panel">
     <div class="section-head"><strong>👥 Приглашения</strong><span id="referralCount">0 друзей</span></div>
@@ -413,7 +414,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 
   function renderDailyQuests(tasks){
     const box=$("dailyQuestList");box.replaceChildren();
-    tasks.forEach(task=>{const row=document.createElement("div");row.className="daily-task";const label=document.createElement("span");label.textContent=task.title+" · "+task.progress+"/"+task.target+" · награда "+task.reward+" 🪙";const button=document.createElement("button");button.textContent=task.claimed?"ПОЛУЧЕНО":task.done?"ЗАБРАТЬ":"В ПРОЦЕССЕ";button.disabled=!!task.claimed||!task.done;button.dataset.quest="daily_"+task.id;row.append(label,button);box.append(row);});
+    tasks.forEach(task=>{const row=document.createElement("div");row.className="daily-task";const label=document.createElement("span");label.textContent=task.title+" · "+task.progress+"/"+task.target+" · награда "+task.reward+" ₿";const button=document.createElement("button");button.textContent=task.claimed?"ПОЛУЧЕНО":task.done?"ЗАБРАТЬ":"В ПРОЦЕССЕ";button.disabled=!!task.claimed||!task.done;button.dataset.quest="daily_"+task.id;row.append(label,button);box.append(row);});
     if(!tasks.length){const empty=document.createElement("p");empty.className="hint";empty.textContent="Новые задания появятся после обновления.";box.append(empty);}
   }
   function renderExtraFeatures(data){
@@ -453,14 +454,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(!initData){spinStatus.textContent="Открой через Telegram";balanceNote.textContent="Запусти Mini App кнопкой /roulette в боте.";spinButton.disabled=true;return;}
     try{
       const data=await api("/roulette/api/status");
-      renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;$("coinsValue").textContent="🪙 "+(data.coins||0);renderDailyQuests(data.dailyQuests||[]);
+      renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;$("coinsValue").textContent="₿ "+(data.coins||0);renderDailyQuests(data.dailyQuests||[]);
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"")+(data.luckBoost?.active?" · 🍀 ПРЕМИУМ-ШАНС УСИЛЕН!":"");
       renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       $("dailyQuest").disabled=!!data.dailyQuestClaimed;$("dailyQuest").textContent=data.dailyQuestClaimed?"ПОЛУЧЕНО":"ЗАБРАТЬ";
       const tq=data.timedQuest||{progress:0,target:3,endsAt:Date.now()+300000,claimed:false};
       const questSeconds=Math.max(0,Math.ceil(((tq.endsAt||Date.now()+300000)-Date.now())/1000));
-      $("timedQuestText").textContent="⏱ Сделай 3 прокрутки за 5 минут — +2 попытки ("+Math.min(tq.progress||0,3)+"/3) · "+Math.floor(questSeconds/60)+":"+String(questSeconds%60).padStart(2,"0");
+      $("timedQuestText").textContent="⏱ Сделай 3 прокрутки за час — +2 попытки ("+Math.min(tq.progress||0,3)+"/3) · "+Math.floor(questSeconds/60)+":"+String(questSeconds%60).padStart(2,"0");
       $("timedQuest").disabled=!!tq.claimed||(tq.progress||0)<3;$("timedQuest").textContent=tq.claimed?"ПОЛУЧЕНО":(tq.progress||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
       $("inviteQuestRow").style.display=data.inviteQuestAvailable===false?"none":"flex";
       $("inviteQuestText").textContent="👥 Пригласи 3 новых друзей — +3 попытки ("+Math.min(data.referralCount||0,3)+"/3)";
@@ -498,7 +499,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("dailyQuestList").addEventListener("click",event=>{const button=event.target.closest("button[data-quest]");if(button)claimQuest(button.dataset.quest);});
   $("caseButton").addEventListener("click",async()=>{
     const button=$("caseButton");button.disabled=true;
-    try{const data=await api("/roulette/api/case/open","POST",{});$("caseStatus").textContent="🎉 Выпало: "+data.reward.title+" — "+data.reward.detail;$("coinsValue").textContent="🪙 "+data.coins;await refresh();}
+    try{const data=await api("/roulette/api/case/open","POST",{});$("caseStatus").textContent="🎉 Выпало: "+data.reward.title+" — "+data.reward.detail;$("coinsValue").textContent="₿ "+data.coins;await refresh();}
     catch(error){$("caseStatus").textContent="ℹ️ "+error.message;}
     finally{button.disabled=false;}
   });
