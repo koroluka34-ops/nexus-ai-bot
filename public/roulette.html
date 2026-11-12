@@ -604,7 +604,6 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(remaining===0&&!countdownRefreshDone){countdownRefreshDone=true;refresh().finally(()=>{rouletteResetAt=nextKyivMidnight();countdownRefreshDone=false;});}
   }
   setInterval(updateRouletteCountdown,1000);
-  setInterval(updateHourlyQuestText,1000);
   setInterval(()=>{if(!busy)refresh();},20000);
   setInterval(updateQuestTimers,1000);
   updateRouletteCountdown();
