@@ -1057,6 +1057,21 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
               imageUrl: "/roulette/api/gift-image/" + encodeURIComponent(item.id)
             });
           }
+          // Screenshot-inspired showcase items are reel decorations only.
+          // They are never selected as rewards and cannot be delivered by Telegram.
+          const showcaseItems = [
+            ["🍦","Мороженое",300],["🥅","Хоккейная маска",929],["🗽","Статуя Свободы",563],
+            ["🐊","Крокодил с короной",581],["🍜","Золотая лапша",430],["🏮","Фонарь",480],
+            ["🍭","Леденец",500],["🍫","Шоколадное эскимо",500],["🦩","Розовый фламинго",490],
+            ["🎒","Рюкзак",562],["💩","Забавный сюрприз",500],["🐝","Пчелиный сюрприз",581],
+            ["🌸","Цветочный подарок",484],["☃️","Снеговик",435],["🍬","Новогодняя конфета",420],
+            ["🍀","Четырёхлистный клевер",581],["🛷","Новогодние сани",425],["🧦","Носки",510],
+            ["🎁","Подарочная коробка",500],["🎂","Happy Birthday",500],["🗡️","Световой меч",500]
+          ];
+          for (const [emoji, name, value] of showcaseItems) previewPool.push({
+            title: emoji + " " + name, detail: "Витрина · около " + value + " ⭐",
+            stars: value, type: "showcase", emoji, showcaseOnly: true
+          });
           previewPool.push(
             { title: "NEXUS Premium · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_plus", imageUrl: "/assets/nexus-premium.svg" },
             { title: "NEXUS Ultra · 30 дней", detail: "Подписка бота", stars: 0, type: "nexus_ultra", imageUrl: "/assets/nexus-ultra.svg" },
