@@ -75,7 +75,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .case-modal{display:none;position:fixed;inset:0;z-index:9999;background:#050914ef;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.case-modal.open{display:flex}.case-dialog{width:min(100%,520px);max-height:90vh;overflow:auto;padding:18px;border:1px solid #8b6b38;border-radius:20px;background:linear-gradient(155deg,#1b2741,#17131e 70%);box-shadow:0 24px 90px #000b;color:#fff}.case-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.case-modal-head strong{display:block;font-size:18px}.case-modal-head small{display:block;color:#e6c77e;margin-top:5px}.case-close{width:36px;height:36px;border:1px solid #65718a;border-radius:10px;background:#26334d;color:white;font-size:18px}.case-modal-hint{text-align:center;color:#c5cee0;font-size:13px}.case-stage{height:126px;margin:16px 0;overflow:hidden;position:relative;border:1px solid #8a6b35;border-radius:14px;background:linear-gradient(135deg,#111a30,#302319);display:flex;align-items:center}.case-stage:before,.case-stage:after{content:"";position:absolute;z-index:2;top:0;bottom:0;width:28px;pointer-events:none}.case-stage:before{left:0;background:linear-gradient(90deg,#111a30,transparent)}.case-stage:after{right:0;background:linear-gradient(270deg,#111a30,transparent)}.case-track{display:flex;align-items:center;gap:8px;will-change:transform;padding:0 4px}.case-tile{flex:0 0 116px;height:96px;border:1px solid #53658e;border-radius:12px;background:linear-gradient(150deg,#26395d,#141d33);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:25px;color:#fff;box-sizing:border-box;padding:5px}.case-tile img{width:48px;height:48px;object-fit:contain}.case-tile small{font-size:10px;text-align:center;color:#d7e1fa;padding:0 4px}.case-tile.winner{border:2px solid #f5d47d;background:linear-gradient(145deg,#59421d,#26203a);box-shadow:0 0 24px #e9bc5a88}.case-stage.rolling{border-color:#f5d47d;box-shadow:0 0 18px #e9bc5a33}.case-modal-prize{text-align:center;min-height:24px;color:#ffe39b;font-weight:900;margin:10px 0}.case-modal .spin{width:100%}
 /* Dedicated CS2-style gift case — separate from the roulette wheel */
 .case-cover{margin:12px 0;padding:12px;border:1px solid #b58a48;border-radius:17px;background:radial-gradient(ellipse at 50% 65%,#75501d88,#1a2540 60%,#0b1222);box-shadow:inset 0 0 28px #0009,0 0 24px #d99a3222}.case-cover svg{display:block;width:100%;height:142px;filter:drop-shadow(0 8px 12px #000b)}.case-cover-caption{text-align:center;font-size:9px;font-weight:950;letter-spacing:.24em;color:#f5d78b}.case-panel-intro{color:#b8c5dd;font-size:12px;line-height:1.55;margin:0 0 12px}
-.case-modal{backdrop-filter:blur(9px)}
+.case-crate{position:relative;overflow:hidden;margin:12px auto 18px;width:min(100%,390px);padding:8px 8px 5px;border:1px solid #b58a48;border-radius:16px;background:radial-gradient(ellipse at 50% 65%,#a36b2533,#10182b 72%);box-shadow:inset 0 0 30px #0009,0 8px 25px #0007}.case-crate-glow{position:absolute;inset:15% 18%;border-radius:50%;background:#f8c65a33;filter:blur(25px);opacity:.65}.case-crate svg{position:relative;display:block;width:100%;height:155px;overflow:visible;filter:drop-shadow(0 8px 10px #000b)}.case-lid{transform-box:fill-box;transform-origin:50% 100%;transition:transform 1.15s cubic-bezier(.2,.8,.2,1)}.case-crate.lid-open .case-lid{transform:translateY(-25px) rotateX(115deg) rotateZ(-9deg);opacity:.25}.case-crate.lid-open .case-crate-glow{animation:crateFlash 1.1s ease-out both}.case-crate-caption{text-align:center;color:#f5d78b;font-size:9px;font-weight:950;letter-spacing:.25em;padding:0 0 5px}@keyframes crateFlash{0%{opacity:.2;transform:scale(.7)}45%{opacity:1;transform:scale(1.2)}100%{opacity:.55;transform:scale(1)}}.case-modal{backdrop-filter:blur(9px)}
 .case-dialog{width:min(100%,620px);padding:22px;background:radial-gradient(ellipse at 50% 0,#34466e 0,#1a2540 43%,#100f1b 100%);border-color:#b58a48}
 .case-modal-head strong{font-size:20px;letter-spacing:.06em}
 .case-modal-hint{max-width:440px;margin:15px auto;color:#b9c6df;line-height:1.5}
@@ -202,7 +202,23 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
     <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
-    <p class="case-modal-hint">Внутри настоящие подарки Telegram. Длинная лента подарков прокрутится как в CS2, замедлится и остановится на твоём выигрыше.</p>
+    <p class="case-modal-hint">Кейс NEXUS открывается как в CS2: сначала крышка, затем длинная лента подарков и остановка на выигрыше.</p>
+    <div class="case-crate" id="caseCrate" aria-label="Закрытый кейс NEXUS">
+      <div class="case-crate-glow"></div>
+      <svg viewBox="0 0 360 170" role="img" aria-label="Золотой кейс NEXUS">
+        <defs><linearGradient id="crateGold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1b2"/><stop offset=".25" stop-color="#e0a63d"/><stop offset=".65" stop-color="#8d511d"/><stop offset="1" stop-color="#f8d987"/></linearGradient><linearGradient id="crateFront" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c18432"/><stop offset="1" stop-color="#4d2b18"/></linearGradient></defs>
+        <ellipse cx="180" cy="151" rx="110" ry="12" fill="#e7ad48" opacity=".28"/>
+        <path d="M83 65l97-30 97 30v72l-97 25-97-25z" fill="url(#crateFront)" stroke="#f5d78b" stroke-width="3"/>
+        <path d="M83 65l97 28 97-28-97-30z" fill="#e4b85d" stroke="#fff0b0" stroke-width="3"/>
+        <path d="M83 65v72l97 25V93z" fill="#9b6129" stroke="#f5d78b" stroke-width="2"/>
+        <path d="M180 93l97-28v72l-97 25z" fill="#75431e" stroke="#f5d78b" stroke-width="2"/>
+        <path d="M102 76l78 23 78-23v13l-78 24-78-24z" fill="url(#crateGold)" stroke="#ffe9a6" stroke-width="2"/>
+        <path d="M165 96h30v43h-30z" fill="#e4b75d" stroke="#fff0b0" stroke-width="2"/>
+        <text x="180" y="122" text-anchor="middle" font-size="12" font-weight="900" letter-spacing="2" fill="#fff4ca">NEXUS</text>
+        <g class="case-lid"><path d="M83 65l97-39 97 39-97 29z" fill="url(#crateGold)" stroke="#fff0b0" stroke-width="3"/><path d="M83 65l97-30 97 30-97 28z" fill="none" stroke="#75451d" stroke-width="2"/><path d="M151 54l29-12 29 12-29 10z" fill="#1a2540" stroke="#fff0b0" stroke-width="2"/></g>
+      </svg>
+      <div class="case-crate-caption">NEXUS SUPPLY DROP</div>
+    </div>
     <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
     <div class="case-reveal" id="caseReveal"><img id="caseRevealImage" alt="Выигранный Telegram-подарок"><div class="case-reveal-rarity" id="caseRevealRarity"></div><h3 id="caseRevealTitle"></h3><div class="case-reveal-value" id="caseRevealValue"></div></div>
@@ -563,8 +579,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function openCaseModal(){
     $("caseModal").classList.add("open");$("caseModal").setAttribute("aria-hidden","false");
     $("caseModalPrize").textContent="🎁 В кейсе — настоящие подарки Telegram";
-    $("caseModalStatus").textContent="Это отдельный кейс. Открытие стоит 100 ₿ и не расходует прокрутки рулетки.";
+    $("caseModalStatus").textContent="Открытие стоит 100 ₿. Нажми «ОТКРЫТЬ ЗА 100 ₿».";
     $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");
+    $("caseCrate").classList.remove("lid-open");
     $("caseOpenConfirm").disabled=false;$("caseOpenConfirm").textContent="ОТКРЫТЬ ЗА 100 ₿";
   }
   function closeCaseModal(){
@@ -598,16 +615,18 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     stage.classList.remove("rolling");
     const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
   }
-  $("caseButton").addEventListener("click",openCaseModal);
-  $("caseClose").addEventListener("click",closeCaseModal);
-  $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
-  $("caseOpenConfirm").addEventListener("click",async()=>{
+  async function startCaseOpening(){
     const button=$("caseOpenConfirm");if(caseOpening)return;
     caseOpening=true;button.disabled=true;button.textContent="🎁 ОТКРЫВАЕМ КЕЙС…";
     $("caseClose").disabled=true;$("caseModal").classList.add("case-open-lock");
-    $("caseModalStatus").textContent="Лента подарков запускается... Баланс ₿ спишется только за этот кейс.";
+    $("caseModalStatus").textContent="Крышка кейса открывается... Подбираем подарок.";
+    $("caseCrate").classList.remove("lid-open");
     try{
-      const data=await api("/roulette/api/case/open","POST",{});
+      const crateAnimation=new Promise(resolve=>setTimeout(()=>{$("caseCrate").classList.add("lid-open");setTimeout(resolve,1150);},120));
+      const dataPromise=api("/roulette/api/case/open","POST",{});
+      const data=await dataPromise;
+      await crateAnimation;
+      $("caseModalStatus").textContent="Кейс открыт! Лента подарков прокручивается...";
       await animateCaseOpening(data.reel);
       const stars=Number(data.reward.giftStars||0),rarity=caseRarity(stars);
       $("caseModalPrize").textContent="🏆 ВЫИГРЫШ НАЙДЕН!";
@@ -616,18 +635,22 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("caseRevealRarity").textContent=rarity.label;
       $("caseRevealValue").textContent=stars+" ⭐ · стоимость подарка";
       $("caseReveal").classList.add("show");
-      $("caseModalStatus").textContent="Подарок поставлен в очередь отправки. Статус доставки смотри в разделе «Ожидающие подарки».";
+      $("caseModalStatus").textContent="🎉 Подарок поставлен в очередь отправки. Статус доставки смотри в разделе «Ожидающие подарки».";
       $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+stars+" ⭐";
       $("coinsValue").textContent="₿ "+data.coins;
       button.textContent="КЕЙС ОТКРЫТ";
       await refresh();
     }catch(error){
-      $("caseModalStatus").textContent="ℹ️ "+error.message;
+      $("caseModalStatus").textContent="❌ "+error.message+" Баланс не должен списываться, если сервер отклонил открытие.";
       button.disabled=false;button.textContent="ПОВТОРИТЬ · 100 ₿";
     }finally{
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
     }
-  });
+  }
+  $("caseButton").addEventListener("click",()=>{openCaseModal();startCaseOpening();});
+  $("caseClose").addEventListener("click",closeCaseModal);
+  $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
+  $("caseOpenConfirm").addEventListener("click",startCaseOpening);
   $("copyReferral").addEventListener("click",async()=>{
     const link=$("referralLink").value;if(!link){$("questStatus").textContent="Ссылка ещё загружается.";return;}
     try{await navigator.clipboard.writeText(link);$("questStatus").textContent="✅ Ссылка скопирована.";}
