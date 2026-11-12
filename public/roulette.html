@@ -49,6 +49,18 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .prize.no-prize{border-color:#4b5267}.prize.unavailable{opacity:.72;border-style:dashed}
 .disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}.jackpot-flash{animation:jackpotPulse 1s ease-in-out 4}@keyframes jackpotPulse{0%,100%{box-shadow:0 0 0 1px #f7d78a55,0 0 12px #f7d78a33}50%{box-shadow:0 0 0 5px #f7d78a99,0 0 55px #f7d78a}}.field{display:flex;gap:7px;margin-top:10px}.field input{min-width:0;flex:1;background:#0a1225;border:1px solid #34415e;border-radius:12px;padding:11px;color:white}.field button{border:1px solid #f5d78b;border-radius:12px;padding:10px;background:#d99a32;color:#171528;font-weight:900}.quest{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #2d3d5e;font-size:11px}.quest button{background:#243b66;color:white;border:1px solid #516b9c;border-radius:10px;padding:8px;font-weight:800}.mode{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#f7d78a;margin:10px 0}
 @media(min-width:420px){body{padding-top:22px}.panel{padding:19px}.outer{width:310px}}
+
+/* NEXUS celebration and personalization */
+.win-screen{position:fixed;inset:0;z-index:99;display:none;place-items:center;padding:22px;background:#050817ef;backdrop-filter:blur(12px);overflow:hidden}
+.win-screen.show{display:grid;animation:screenIn .35s ease-out}
+.win-card{position:relative;width:min(100%,390px);text-align:center;padding:28px 20px;border:1px solid #f5d78b;border-radius:28px;background:radial-gradient(circle at 50% 0,#65502b,#172443 55%,#0b1225);box-shadow:0 0 90px #f6c96a55;animation:cardPop .65s cubic-bezier(.16,1.3,.3,1)}
+.win-card h2{font-size:25px;margin:10px 0;color:#ffe6a1}.win-card p{color:#d5def2;font-size:13px;line-height:1.5}
+.win-art{width:150px;height:150px;object-fit:contain;filter:drop-shadow(0 0 24px #f7d78a88);animation:prizeFloat 2s ease-in-out infinite}
+.win-close{margin-top:14px;border:0;border-radius:14px;padding:13px 24px;background:linear-gradient(100deg,#f4c66c,#fff0b2);color:#20172b;font-weight:950}
+.confetti{position:absolute;top:-20px;width:9px;height:15px;border-radius:3px;background:hsl(var(--hue),90%,65%);animation:confettiFall var(--dur) linear forwards;left:var(--x);transform:rotate(var(--rot))}
+.theme-blue{filter:hue-rotate(20deg)}.theme-green{filter:hue-rotate(95deg)}.theme-purple{filter:hue-rotate(220deg)}.theme-ruby{filter:hue-rotate(300deg)}
+.extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.achievement{padding:11px;border:1px solid #34446b;border-radius:14px;background:#0b1428}.achievement b{display:block;font-size:11px}.achievement span{display:block;margin-top:5px;color:#9fb0ce;font-size:10px}.achievement.done{border-color:#d9aa52;background:#392b1b88}
+.calendar-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}.calendar-day{padding:8px 2px;text-align:center;border:1px solid #34446b;border-radius:10px;color:#aab8d2;font-size:9px}.calendar-day.today{border-color:#f5d78b;color:#ffe4a0;background:#6b4b1d66}
 </style>
 </head>
 <body>
@@ -111,6 +123,19 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     </div>
     <p class="hint">Здесь показаны настоящие подарки Telegram. Подарок за 1000 ⭐ — отдельный джекпот.</p>
   </section>
+  <section class="panel">
+    <div class="section-head"><strong>🏅 Достижения</strong><span>Твои этапы</span></div>
+    <div id="achievementGrid" class="extra-grid"><div class="achievement"><b>Загрузка достижений…</b></div></div>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🗓️ Календарь удачи</strong><span id="dailyTheme">Тема дня</span></div>
+    <p class="hint" id="luckySector">Счастливый сектор появится во время события.</p>
+    <div id="calendarDays" class="calendar-days"></div>
+    <div class="field"><button id="themeBlue" type="button">🔵 Неон</button><button id="themeGreen" type="button">🟢 Изумруд</button><button id="themePurple" type="button">🟣 Космос</button></div>
+  </section>
+  <div class="win-screen" id="winScreen" role="dialog" aria-modal="true" aria-label="Твой выигрыш">
+    <div class="win-card"><div style="font-size:12px;letter-spacing:.2em;color:#f7d78a;font-weight:950">NEXUS · ПОЗДРАВЛЯЕМ</div><div id="winEmoji" style="font-size:48px;margin:12px">🎁</div><img id="winArt" class="win-art" alt="Выигранный подарок" style="display:none"><h2 id="winTitle">ТЫ ВЫИГРАЛ!</h2><p id="winMessage"></p><button class="win-close" id="winClose">ЗАБРАТЬ ПОБЕДУ ✨</button></div>
+  </div>
   <p class="disclaimer">В секторах показаны призы NEXUS. Настоящие Telegram-подарки отправляются ботом после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
 </main>
 <script>
@@ -275,6 +300,30 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   setInterval(updateRouletteCountdown,1000);
   updateRouletteCountdown();
+
+  function renderExtraFeatures(data){
+    const grid=$("achievementGrid");grid.replaceChildren();
+    (data.achievements||[]).forEach(item=>{const card=document.createElement("div");card.className="achievement"+(item.done?" done":"");const b=document.createElement("b");b.textContent=(item.done?"✅ ":"🔒 ")+item.icon+" "+item.title;const span=document.createElement("span");span.textContent=item.done?"Получено":item.progress+"/"+item.target+" выполнено";card.append(b,span);grid.append(card);});
+    $("dailyTheme").textContent="✨ "+(data.dailyTheme||"Тема дня");
+    $("luckySector").textContent="🎯 "+(data.luckySector||"Счастливый сектор появится во время события.");
+    const days=$("calendarDays");days.replaceChildren();const labels=["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"];const now=new Date();const monday=(now.getDay()+6)%7;
+    labels.forEach((label,index)=>{const el=document.createElement("div");el.className="calendar-day"+(index===monday?" today":"");el.textContent=label+" · "+(index===monday?"СЕГОДНЯ":index<monday?"✓":"🎁");days.append(el);});
+  }
+  function celebrateWin(prize,message,jackpot){
+    const screen=$("winScreen"),art=$("winArt"),emoji=$("winEmoji");
+    $("winTitle").textContent=jackpot?"💎 ДЖЕКПОТ!":prize?.type==="none"?"ПОПРОБУЕМ ЕЩЁ?":"ТЫ ВЫИГРАЛ!";
+    $("winMessage").textContent=message||"Твой приз уже в истории рулетки.";
+    emoji.style.display=prize?.imageUrl?"none":"block";
+    if(prize?.imageUrl){art.src=prize.imageUrl;art.style.display="block";}else art.style.display="none";
+    screen.classList.add("show");
+    for(let i=0;i<46;i++){const bit=document.createElement("i");bit.className="confetti";bit.style.setProperty("--x",Math.random()*100+"%");bit.style.setProperty("--hue",Math.floor(Math.random()*360));bit.style.setProperty("--dur",(2+Math.random()*2)+"s");bit.style.setProperty("--rot",Math.floor(Math.random()*360)+"deg");screen.append(bit);setTimeout(()=>bit.remove(),4200);}
+    if(jackpot||prize?.type!=="none")playJackpotFanfare();
+  }
+  $("winClose").addEventListener("click",()=>$("winScreen").classList.remove("show"));
+  $("winScreen").addEventListener("click",event=>{if(event.target===$("winScreen"))$("winScreen").classList.remove("show");});
+  $("themeBlue").addEventListener("click",()=>{document.body.className="theme-blue";});
+  $("themeGreen").addEventListener("click",()=>{document.body.className="theme-green";});
+  $("themePurple").addEventListener("click",()=>{document.body.className="theme-purple";});
   async function refresh(){
     if(!initData){spinStatus.textContent="Открой через Telegram";balanceNote.textContent="Запусти Mini App кнопкой /roulette в боте.";spinButton.disabled=true;return;}
     try{
@@ -282,7 +331,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"");
-      renderLeaderboard(data.leaderboard||[]);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
+      renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       renderCollection(data.collection||[]);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
       const needed=$("x2Mode").checked?2:1;spinButton.disabled=!data.canSpin||(data.totalSpinsAvailable||0)<needed;spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";
@@ -328,7 +377,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const target=((360-((index+.5)*step))%360+360)%360;
       wheel.style.transition="none";wheel.style.transform="rotate(0deg)";void wheel.offsetWidth;wheel.style.transition="transform 5s cubic-bezier(.12,.72,.12,1)";wheel.style.transform="rotate("+(360*7+target)+"deg)";
       await new Promise(resolve=>setTimeout(resolve,5200));
-      showResult(data.prize,data.message,data.delivered,data.spinId);if(data.jackpot){$("result").classList.add("jackpot-flash");playJackpotFanfare();setTimeout(()=>$("result").classList.remove("jackpot-flash"),4500);}
+      showResult(data.prize,data.message,data.delivered,data.spinId);celebrateWin(data.prize,data.message,data.jackpot);if(data.jackpot){$("result").classList.add("jackpot-flash");playJackpotFanfare();setTimeout(()=>$("result").classList.remove("jackpot-flash"),4500);}
       spinStatus.textContent="Попытка использована";spinButton.textContent="ВОЗВРАЩАЙСЯ ЗАВТРА";
       await refresh();
     }catch(error){
