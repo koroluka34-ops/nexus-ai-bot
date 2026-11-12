@@ -644,6 +644,16 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         json(res, 200, {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
           lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.wins) - Number(a.wins)) || (Number(b.cost) - Number(a.cost))).slice(0, 10),
+          recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
+          achievements: [
+            { id: "first_spin", title: "Первый запуск", icon: "🎰", done: state.history.length >= 1, progress: Math.min(state.history.length, 1), target: 1 },
+            { id: "collector", title: "Коллекционер", icon: "🎁", done: state.history.filter(item => item.status === "delivered" && item.cost > 0).length >= 3, progress: Math.min(state.history.filter(item => item.status === "delivered" && item.cost > 0).length, 3), target: 3 },
+            { id: "lucky7", title: "Неделя удачи", icon: "🔥", done: state.streak >= 7, progress: Math.min(state.streak, 7), target: 7 },
+            { id: "jackpot", title: "Охотник за джекпотом", icon: "💎", done: state.history.some(item => /ДЖЕКПОТ/.test(item.label || "")), progress: state.history.some(item => /ДЖЕКПОТ/.test(item.label || "")) ? 1 : 0, target: 1 },
+            { id: "premium", title: "Премиум-клуб", icon: "👑", done: state.history.some(item => /Premium|Ultra/.test(item.label || "")), progress: state.history.some(item => /Premium|Ultra/.test(item.label || "")) ? 1 : 0, target: 1 }
+          ],
+          dailyTheme: ["Золотой день", "Синий неон", "Изумрудный шанс", "Фиолетовая ночь", "Рубиновый дроп", "Космический день", "Сюрприз выходного"][new Date().getDay()],
+          luckySector: event.active ? (event.label || "Счастливый сектор активен") : "Счастливый сектор появится во время события",
           referralLink: me.username ? "https://t.me/" + me.username + "?start=ref_" + user.id : "",
           referralCount: state.referralCount || 0,
           giftsAvailable: catalog.gifts.length, pendingGifts,
