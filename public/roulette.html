@@ -283,7 +283,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div id="leaderboardList" class="prizes"><div class="prize"><b>Победители появятся здесь</b></div></div>
   </section>
   <section class="panel">
-    <div class="section-head"><strong>🗃️ Моя коллекция</strong><span>Выигранные подарки Telegram</span></div>
+    <div class="section-head"><strong>🎖️ Дополнительные награды</strong><span>Premium и бонусы</span></div>
     <div id="collectionList" class="prizes"><div class="prize"><b>Коллекция пока пуста</b></div></div>
   </section>
   <section class="panel">
@@ -514,9 +514,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     return badge;
   }
   function renderCollection(items){
-    const box=$("collectionList");box.replaceChildren();
-    if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎁 Здесь будут твои выигранные подарки";const meta=document.createElement("span");meta.textContent="Все доставленные призы сохраняются в коллекции.";card.append(b,meta);box.append(card);return;}
-    items.forEach(item=>{
+    const box=$("collectionList");box.replaceChildren();const otherRewards=(Array.isArray(items)?items:[]).filter(item=>!item.giftId);
+    if(!otherRewards.length){const card=document.createElement("div");card.className="inventory-empty";const title=document.createElement("b");title.textContent="✨ Пока только Telegram-подарки?";const note=document.createElement("span");note.textContent="Они собраны в инвентаре выше. Здесь появятся Premium-подписки и другие награды без отдельного Telegram-подарка.";card.append(title,note);box.append(card);return;}
+    otherRewards.forEach(item=>{
       const card=document.createElement("div");card.className="prize";
       if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt=item.label||"Telegram Gift";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}
       const stars=Number(item.cost||0),label=String(item.label||"");
@@ -752,7 +752,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("inviteQuestRow").style.display=data.inviteQuestAvailable===false?"none":"flex";
       $("inviteQuestText").textContent="👥 Пригласи 3 новых друзей — +3 попытки ("+Math.min(data.referralCount||0,3)+"/3)";
       $("inviteQuest").disabled=(data.referralCount||0)<3;$("inviteQuest").textContent=(data.referralCount||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
-      renderCollection(data.collection||[]);const inventoryRows=Array.isArray(data.inventory)?data.inventory:[];const collectionRows=Array.isArray(data.collection)?data.collection:[];const inventoryIds=new Set(inventoryRows.map(item=>item.spinId));renderInventory([...inventoryRows,...collectionRows.filter(item=>!inventoryIds.has(item.spinId)).map(item=>({...item,tradeable:Boolean(item.giftId)}))]);renderHistory(data.history||[]);renderBestWin(data.bestWin);
+      renderCollection(data.collection||[]);const allInventoryRows=Array.isArray(data.inventory)?data.inventory:[];const inventoryRows=allInventoryRows.filter(item=>item.giftId||item.tradeable);const collectionRows=Array.isArray(data.collection)?data.collection:[];const inventoryIds=new Set(inventoryRows.map(item=>item.spinId));renderInventory([...inventoryRows,...collectionRows.filter(item=>item.giftId&&!inventoryIds.has(item.spinId)).map(item=>({...item,tradeable:true}))]);renderHistory(data.history||[]);renderBestWin(data.bestWin);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
       const needed=$("x2Mode").checked?2:1;spinButton.disabled=!data.canSpin||(data.totalSpinsAvailable||0)<needed;spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";
       balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–1000 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
