@@ -24,7 +24,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .stats strong{color:#fff;font-size:13px}
 .balance{padding:7px 10px;border-radius:12px;background:#0a1225;border:1px solid #34415e;color:#f7d77e;font-weight:850;white-space:nowrap}
 .wheel-wrap{display:flex;flex-direction:column;align-items:center;padding:17px 0 13px}
-.pointer{width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:0;border-bottom:25px solid #fff;filter:drop-shadow(0 3px 5px #000b);margin-bottom:-7px;z-index:4}
+.pointer{width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:0;border-bottom:25px solid #fff;filter:drop-shadow(0 3px 5px #000b);margin-bottom:-7px;z-index:4;transform:rotate(180deg);transform-origin:50% 75%}
+.pointer.spinning{animation:pointerBounce .32s ease-in-out infinite alternate}
+@keyframes pointerBounce{from{transform:rotate(180deg) translateY(0) scale(1)}to{transform:rotate(180deg) translateY(5px) scale(1.08)}}
 .outer{width:min(76vw,310px);aspect-ratio:1;padding:9px;border-radius:50%;background:conic-gradient(from 30deg,#9a5a14,#ffedaa,#c68a34,#fff1b9,#a65e18,#f4d17d);box-shadow:0 0 0 1px #ffe7a355,0 13px 30px #0009,0 0 38px #eab64b26}
 .wheel{width:100%;height:100%;position:relative;overflow:hidden;border-radius:50%;border:5px solid #10182c;background:conic-gradient(from -90deg,#284c9a 0 50%,#172b59 50% 100%);transition:transform 5s cubic-bezier(.12,.72,.12,1);box-shadow:inset 0 0 30px #02061799}
 .wheel:after{content:"N";position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#aab8d1);color:#101a34;font-size:25px;font-weight:1000;border:5px solid #10182c;box-shadow:0 5px 15px #000a}
@@ -153,7 +155,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   try{tg?.setHeaderColor?.("#080b18");tg?.setBackgroundColor?.("#080b18");}catch{}
   const initData=tg?.initData||"";
   const $=id=>document.getElementById(id);
-  const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),result=$("result"),errorBox=$("errorBox");
+  const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),pointer=document.querySelector(".pointer"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
   let busy=false,currentPrizes=[];
   async function api(path,method="GET",body=null){
@@ -349,7 +351,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const data=await api("/roulette/api/status");
       renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
-      $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"");
+      $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"")+(data.luckBoost?.active?" · 🍀 ПРЕМИУМ-ШАНС УСИЛЕН!":"");
       renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
       renderCollection(data.collection||[]);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
@@ -389,7 +391,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("x2Mode").addEventListener("change",()=>{const total=Number(($("spinsRemaining").textContent.match(/\d+/)||[0])[0]);spinButton.disabled=busy||total<($("x2Mode").checked?2:1);spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";});
   spinButton.addEventListener("click",async()=>{
     if(busy||spinButton.disabled)return;
-    busy=true;spinButton.disabled=true;spinButton.textContent="КОЛЕСО ВРАЩАЕТСЯ…";result.classList.remove("show");errorBox.classList.remove("show");
+    busy=true;spinButton.disabled=true;spinButton.textContent="КОЛЕСО ВРАЩАЕТСЯ…";pointer?.classList.add("spinning");result.classList.remove("show");errorBox.classList.remove("show");
     try{
       const data=await api("/roulette/api/spin","POST",{mode:$("x2Mode").checked?"x2":"normal"});
       const count=currentPrizes.length||2,index=Number.isInteger(data.prizeIndex)?data.prizeIndex:count-1,step=360/count;
@@ -401,7 +403,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       await refresh();
     }catch(error){
       errorBox.textContent=error.message;errorBox.classList.add("show");spinStatus.textContent="Ошибка";spinButton.textContent="ПОВТОРИТЬ ПОЗЖЕ";await refresh();
-    }finally{busy=false;}
+    }finally{busy=false;pointer?.classList.remove("spinning");}
   });
   drawWheel([]);refresh();
 })();
