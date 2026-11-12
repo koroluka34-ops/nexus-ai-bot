@@ -361,15 +361,18 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         try {
           if (typeof grantPrize !== "function") throw new Error("Выдача подписок NEXUS не подключена.");
           const tier = item.type === "nexus_ultra" ? "ultra" : "plus";
-          await grantPrize(Number(item.userId), tier);
+          const granted = await grantPrize(Number(item.userId), tier);
           queue = queue.filter(q => q.spinId !== item.spinId);
           await writePendingQueue(queue);
           const state = await readState(item.userId);
           const row = state.history.find(h => h.spinId === item.spinId);
           if (row) { row.status = "delivered"; row.deliveryMessage = ""; row.deliveredAt = Date.now(); await writeState(item.userId, state); }
-          await bot.api.sendMessage(Number(item.userId), tier === "ultra"
-            ? "🚀 Ты выиграл NEXUS Ultra на 30 дней! Подписка активирована."
-            : "💎 Ты выиграл NEXUS Premium на 30 дней! Подписка активирована.").catch(() => {});
+          const tierName = granted?.tier === "ultra" ? "NEXUS Ultra" : "NEXUS Premium";
+          const expiryText = granted?.expiresAt ? new Date(granted.expiresAt).toLocaleDateString("ru-RU") : "";
+          const activationMessage = granted?.extended
+            ? "🎉 Срок твоей подписки " + tierName + " продлён ещё на 30 дней" + (expiryText ? " — теперь действует до " + expiryText : "") + ". Ничего не пропало!"
+            : "🎉 Ты выиграл " + tierName + " на 30 дней! Подписка активирована" + (expiryText ? " до " + expiryText : "") + ".";
+          await bot.api.sendMessage(Number(item.userId), activationMessage).catch(() => {});
         } catch (error) {
           console.error("NEXUS pending subscription:", item.spinId, String(error.message || error).slice(0, 200));
         }
