@@ -171,8 +171,11 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   const pageGroups=[[0,1,10],[2,3,4,5],[6,7,8,9,11,12,13]];
   const allPanels=[...document.querySelectorAll("main > section.panel")];
   const pageHost=document.createElement("div");pageHost.id="pageHost";
-  const pages=pageGroups.map((indices,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});pageHost.append(page);return page;});
-  const firstPanel=allPanels[0];firstPanel.before(pageHost);
+  const firstPanel=allPanels[0];
+  firstPanel.before(pageHost);
+  const pages=pageGroups.map((indices,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);pageHost.append(page);indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});return page;});
+  $("pageNav").remove();
+  pageHost.after($("pageNav"));
   let activePage=0;
   function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="СТРАНИЦА "+(activePage+1)+" / "+pages.length;}
   $("prevPage").addEventListener("click",()=>showPage(activePage-1));$("nextPage").addEventListener("click",()=>showPage(activePage+1));
