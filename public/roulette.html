@@ -160,7 +160,41 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .selected-case.opening{animation:csCaseFlash .95s ease-out both}
 @keyframes csCaseOpen{0%{transform:scale(1) rotate(0);filter:brightness(1) drop-shadow(0 8px 12px #000)}35%{transform:scale(1.1) rotate(-5deg);filter:brightness(1.8) drop-shadow(0 0 25px #ffe29a)}70%{transform:scale(.92) rotate(4deg);filter:brightness(2.2) drop-shadow(0 0 35px #fff)}100%{transform:scale(.78) rotate(0);opacity:.25}}
 @keyframes csCaseFlash{0%{box-shadow:0 0 0 #ffe29a00}45%{box-shadow:0 0 65px #ffe29aaa}100%{box-shadow:0 0 18px #d8a64a33}}
-.inventory-actions{margin-top:10px}.inventory-actions .spin{padding:12px;font-size:12px}.inventory-card{position:relative;min-width:0;padding:10px;border:1px solid #34446b;border-radius:14px;background:linear-gradient(145deg,#101a31,#0a1224)}.inventory-card img{display:block;width:68px;height:68px;object-fit:contain;margin:0 auto 7px}.inventory-card b{display:block;font-size:10px;line-height:1.35;overflow-wrap:anywhere}.inventory-card span{display:block;margin-top:5px;color:#a8b7d1;font-size:10px}.inventory-card label{display:flex;align-items:center;gap:5px;margin:7px 0;font-size:10px;color:#f6d78b}.inventory-card button{width:100%;border:1px solid #a77d3e;border-radius:9px;background:#47351c;color:#ffe5a6;padding:8px 5px;font-size:9px;font-weight:900}.inventory-card input{accent-color:#f5c66a}.history-list{display:flex;flex-direction:column;gap:7px}.history-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid #293958;border-radius:11px;background:#0b1428;font-size:10px}.history-row b{display:block;line-height:1.35}.history-row span{color:#9eafcb;white-space:nowrap}.best-win{margin-top:10px;padding:12px;border:1px solid #a77d3e;border-radius:12px;background:#3a2a19;color:#ffe5a6;font-size:11px;line-height:1.5}.case-tools{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:8px 0}.case-tools label{display:flex;align-items:center;gap:6px;color:#c5cee0;font-size:11px}.case-tools input{accent-color:#f5c66a}.case-repeat{display:none;width:100%;margin-top:10px;border:1px solid #f5d78b;border-radius:13px;padding:13px;background:linear-gradient(100deg,#d99a32,#f4d47e);color:#171528;font-weight:1000}.case-repeat.show{display:block}.history-status{color:#f4d47e!important}</style>
+.inventory-actions{margin-top:10px}.inventory-actions .spin{padding:12px;font-size:12px}.inventory-card{position:relative;min-width:0;padding:10px;border:1px solid #34446b;border-radius:14px;background:linear-gradient(145deg,#101a31,#0a1224)}.inventory-card img{display:block;width:68px;height:68px;object-fit:contain;margin:0 auto 7px}.inventory-card b{display:block;font-size:10px;line-height:1.35;overflow-wrap:anywhere}.inventory-card span{display:block;margin-top:5px;color:#a8b7d1;font-size:10px}.inventory-card label{display:flex;align-items:center;gap:5px;margin:7px 0;font-size:10px;color:#f6d78b}.inventory-card button{width:100%;border:1px solid #a77d3e;border-radius:9px;background:#47351c;color:#ffe5a6;padding:8px 5px;font-size:9px;font-weight:900}.inventory-card input{accent-color:#f5c66a}.history-list{display:flex;flex-direction:column;gap:7px}.history-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid #293958;border-radius:11px;background:#0b1428;font-size:10px}.history-row b{display:block;line-height:1.35}.history-row span{color:#9eafcb;white-space:nowrap}.best-win{margin-top:10px;padding:12px;border:1px solid #a77d3e;border-radius:12px;background:#3a2a19;color:#ffe5a6;font-size:11px;line-height:1.5}.case-tools{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:8px 0}.case-tools label{display:flex;align-items:center;gap:6px;color:#c5cee0;font-size:11px}.case-tools input{accent-color:#f5c66a}.case-repeat{display:none;width:100%;margin-top:10px;border:1px solid #f5d78b;border-radius:13px;padding:13px;background:linear-gradient(100deg,#d99a32,#f4d47e);color:#171528;font-weight:1000}.case-repeat.show{display:block}.history-status{color:#f4d47e!important}
+/* Cinematic CS2 case opening: independent reel ticks, impacts, flashes and particles */
+.case-dialog{position:relative;overflow:hidden;isolation:isolate}
+.case-dialog>*:not(.case-screen-flash):not(.case-spark){position:relative;z-index:1}
+.case-select-stage.case-select-spinning{border-color:#ffe39a;box-shadow:0 0 18px #f8c85b66,inset 0 0 30px #000d;animation:caseReelPulse .72s ease-in-out infinite alternate}
+.case-select-stage.case-select-spinning:after{content:"";position:absolute;z-index:4;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 25%,#fff3 49%,#ffe4a055 52%,transparent 68%);transform:translateX(-120%);animation:caseSweep .8s linear infinite}
+.case-select-track .case-select-tile{transition:filter .15s,transform .15s}
+.case-select-spinning .case-select-tile{filter:brightness(1.18) saturate(1.25)}
+.case-select-track .case-select-tile.winner{animation:caseWinnerPulse .8s ease-in-out infinite alternate;transform:scale(1.06)}
+.case-stage.rolling{animation:caseReelPulse .5s ease-in-out infinite alternate}
+.case-stage.rolling .case-track{filter:brightness(1.2) saturate(1.25)}
+.case-stage.rolling .case-center-pointer{animation:pointerGlow .55s ease-in-out infinite alternate}
+.selected-case.opening{animation:caseCrateShake .12s linear infinite!important}
+.selected-case.opening img{animation:caseLidBurst 1.15s cubic-bezier(.15,.8,.2,1) both!important}
+.case-reveal.show{position:relative;overflow:hidden;animation:casePrizeReveal .8s cubic-bezier(.16,1.25,.3,1) both}
+.case-reveal.show:before{content:"";position:absolute;inset:-50%;pointer-events:none;background:conic-gradient(from 0deg,transparent,#ffe6a066,transparent,#7bd8ff44,transparent);animation:caseHaloSpin 5s linear infinite}
+.case-reveal.show>*{position:relative;z-index:1}
+.case-screen-flash{position:absolute;z-index:10;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,#fff8 0,#ffe09b66 18%,transparent 65%);animation:caseFlash .72s ease-out both}
+.case-screen-flash.win{background:radial-gradient(circle at 50% 42%,#fff 0,#ffe69dcc 12%,#f7c65c66 35%,transparent 72%);animation:caseWinFlash .85s ease-out both}
+.case-spark{position:absolute;z-index:11;left:50%;top:47%;width:var(--spark-size);height:var(--spark-size);border-radius:50%;background:hsl(var(--spark-hue) 100% 75%);box-shadow:0 0 9px 3px hsl(var(--spark-hue) 100% 65% / .8);pointer-events:none;animation:caseSparkFly 1s cubic-bezier(.12,.72,.2,1) var(--spark-delay) both}
+.case-shake{animation:caseDialogShake .5s ease-out both}
+@keyframes caseReelPulse{from{filter:brightness(1)}to{filter:brightness(1.28)}}
+@keyframes caseSweep{to{transform:translateX(120%)}}
+@keyframes caseWinnerPulse{from{box-shadow:0 0 12px #f5cf6866}to{box-shadow:0 0 34px #ffe18b, inset 0 0 20px #f5cf6866}}
+@keyframes pointerGlow{from{filter:brightness(1);box-shadow:0 0 7px #ffc65e}to{filter:brightness(1.8);box-shadow:0 0 24px #ffc65e}}
+@keyframes caseCrateShake{0%,100%{transform:translate(0,0) rotate(0)}25%{transform:translate(-3px,1px) rotate(-1.2deg)}50%{transform:translate(3px,-1px) rotate(1.2deg)}75%{transform:translate(-2px,-1px) rotate(-.7deg)}}
+@keyframes caseLidBurst{0%{transform:scale(1) rotate(0);filter:brightness(1)}28%{transform:scale(1.16) rotate(-7deg);filter:brightness(2.2) drop-shadow(0 0 28px #ffe49c)}58%{transform:scale(.88) rotate(8deg);filter:brightness(1.7) drop-shadow(0 0 36px #fff0b3)}100%{transform:scale(1.08) rotate(0);filter:brightness(1.2) drop-shadow(0 0 22px #ffdf8b)}}
+@keyframes casePrizeReveal{0%{opacity:0;transform:translateY(24px) scale(.72);filter:brightness(2.4)}55%{opacity:1;transform:translateY(-5px) scale(1.045);filter:brightness(1.5)}100%{opacity:1;transform:translateY(0) scale(1);filter:brightness(1)}}
+@keyframes caseHaloSpin{to{transform:rotate(360deg)}}
+@keyframes caseFlash{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
+@keyframes caseWinFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+@keyframes caseSparkFly{0%{opacity:0;transform:translate(0,0) scale(.25)}18%{opacity:1}100%{opacity:0;transform:translate(var(--sx),var(--sy)) scale(.05)}}
+@keyframes caseDialogShake{0%,100%{transform:translate(0,0)}15%{transform:translate(-5px,2px)}30%{transform:translate(5px,-2px)}45%{transform:translate(-4px,-1px)}60%{transform:translate(4px,1px)}75%{transform:translate(-2px,0)}}
+@media(prefers-reduced-motion:reduce){.case-select-spinning,.case-reveal.show,.case-spark,.case-screen-flash,.case-shake{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+</style>
 </head>
 <body>
 <main>
@@ -264,7 +298,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   </section>
 </main>
 <div class="case-modal" id="caseModal" aria-hidden="true">
-  <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
+  <div class="case-dialog" id="caseDialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
     <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
     <p class="case-modal-hint">Сначала выпадет настоящий кейс CS2. Он появится на экране и откроется, после чего прокрутится лента наград.</p>
     <div class="case-tools">
@@ -659,12 +693,81 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(n>=51)return {key:"rare",label:"РЕДКИЙ"};
     return {key:"common",label:"ОБЫЧНЫЙ"};
   }
+  let caseAudio=null,caseNoise=null,caseMaster=null;
+  function getCaseAudio(){
+    if(caseAudio)return caseAudio;
+    const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;
+    caseAudio=new C();caseMaster=caseAudio.createGain();caseMaster.gain.value=.72;caseMaster.connect(caseAudio.destination);
+    caseNoise=caseAudio.createBuffer(1,caseAudio.sampleRate*2,caseAudio.sampleRate);
+    const data=caseNoise.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    return caseAudio;
+  }
+  function unlockCaseAudio(){try{const c=getCaseAudio();if(c&&c.state!=="running")c.resume();}catch{}}
   function playCaseSound(kind){
     if(!$("caseSound")?.checked)return;
-    try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C(),now=c.currentTime;
-      const notes=kind==="win"?[523,659,784,1047]:kind==="tick"?[760]:[180,260,360];
-      notes.forEach((hz,i)=>{const o=c.createOscillator(),g=c.createGain();o.type=kind==="tick"?"square":"triangle";o.frequency.setValueAtTime(hz,now+i*.075);g.gain.setValueAtTime(.0001,now+i*.075);g.gain.exponentialRampToValueAtTime(kind==="tick"?.035:.11,now+i*.075+.012);g.gain.exponentialRampToValueAtTime(.0001,now+i*.075+.16);o.connect(g);g.connect(c.destination);o.start(now+i*.075);o.stop(now+i*.075+.17);});setTimeout(()=>c.close().catch(()=>{}),1200);
-    }catch{}
+    try{
+      const c=getCaseAudio();if(!c)return;const t=c.currentTime;
+      const tone=(freq,endFreq,duration,volume,type="sine",delay=0)=>{
+        const o=c.createOscillator(),g=c.createGain(),at=t+delay;
+        o.type=type;o.frequency.setValueAtTime(Math.max(1,freq),at);
+        if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(1,endFreq),at+duration);
+        g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(volume,at+.008);
+        g.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        o.connect(g);g.connect(caseMaster);o.start(at);o.stop(at+duration+.02);
+      };
+      const noise=(duration,volume,filterType,frequency,delay=0)=>{
+        const src=c.createBufferSource(),filter=c.createBiquadFilter(),g=c.createGain(),at=t+delay;
+        src.buffer=caseNoise;filter.type=filterType;filter.frequency.setValueAtTime(frequency,at);filter.Q.value=.7;
+        g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(volume,at+.006);g.gain.exponentialRampToValueAtTime(.0001,at+duration);
+        src.connect(filter);filter.connect(g);g.connect(caseMaster);src.start(at);src.stop(at+duration+.02);
+      };
+      if(kind==="unlock"){unlockCaseAudio();return;}
+      if(kind==="tick"){
+        tone(1250,480,.045,.075,"square");tone(2100,850,.028,.035,"triangle",.006);noise(.035,.055,"highpass",1800);
+      }else if(kind==="spin"){
+        tone(95,420,.85,.10,"sawtooth");tone(180,620,1.1,.055,"triangle");noise(.85,.075,"bandpass",520,.02);
+      }else if(kind==="stop"){
+        tone(105,42,.42,.32,"sine");tone(690,1320,.8,.11,"triangle",.035);tone(1450,980,.55,.045,"sine",.08);noise(.28,.2,"lowpass",850);
+      }else if(kind==="open"){
+        noise(.5,.16,"lowpass",480);tone(68,38,.62,.3,"sine");tone(130,520,.75,.08,"sawtooth",.08);
+      }else if(kind==="crate"){
+        tone(75,42,.72,.34,"sine");tone(180,55,.45,.16,"triangle",.02);noise(.62,.22,"lowpass",680);
+        tone(420,1120,.75,.095,"triangle",.18);tone(880,1760,.9,.06,"sine",.28);
+      }else if(kind==="win"){
+        tone(392,392,.9,.11,"sine");tone(494,494,.9,.10,"sine",.06);tone(587,587,1.05,.11,"sine",.12);
+        tone(784,1175,1.15,.13,"triangle",.2);tone(1175,1760,1.25,.075,"sine",.32);
+        noise(.7,.07,"highpass",3400,.18);
+      }else if(kind==="rare"){
+        tone(330,660,.75,.09,"triangle");tone(660,1320,.9,.08,"sine",.12);tone(990,1580,1,.06,"sine",.24);
+      }
+    }catch(error){console.debug("Case audio unavailable",error);}
+  }
+  function scheduleCaseTicks(durationMs){
+    if(!$("caseSound")?.checked)return;
+    let elapsed=0,interval=58;
+    while(elapsed<durationMs-180){
+      const delay=elapsed;
+      setTimeout(()=>{if($("caseSound")?.checked)playCaseSound("tick");},delay);
+      elapsed+=interval;interval=Math.min(245,interval*1.075);
+    }
+    setTimeout(()=>playCaseSound("stop"),durationMs);
+  }
+  function caseBurst(intensity="normal"){
+    const dialog=$("caseDialog");if(!dialog)return;
+    const flash=document.createElement("div");flash.className="case-screen-flash "+(intensity==="win"?"win":"");
+    dialog.append(flash);setTimeout(()=>flash.remove(),850);
+    const count=intensity==="win"?48:26;
+    for(let i=0;i<count;i++){
+      const spark=document.createElement("i");spark.className="case-spark";
+      const angle=Math.PI*2*i/count+(Math.random()-.5)*.18,dist=(intensity==="win"?105:75)+Math.random()*125;
+      spark.style.setProperty("--sx",Math.cos(angle)*dist+"px");spark.style.setProperty("--sy",Math.sin(angle)*dist+"px");
+      spark.style.setProperty("--spark-delay",Math.random()*.16+"s");
+      spark.style.setProperty("--spark-size",(3+Math.random()*6)+"px");
+      spark.style.setProperty("--spark-hue",intensity==="win"?(Math.random()>.45?"45":"195"):"42");
+      dialog.append(spark);setTimeout(()=>spark.remove(),1300);
+    }
+    dialog.classList.remove("case-shake");void dialog.offsetWidth;dialog.classList.add("case-shake");
+    setTimeout(()=>dialog.classList.remove("case-shake"),650);
   }
   let csCaseCatalog=[];
   async function loadCsCaseCatalog(){
@@ -713,10 +816,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9;
     const finalX=(stage.clientWidth-w)/2-(entries.length-1)*(w+gap)-4;
-    track.style.transition="transform 5.7s cubic-bezier(.08,.72,.08,1)";
+    const duration=$("fastOpen").checked?1450:6100;
+    playCaseSound("spin");scheduleCaseTicks(duration);
+    stage.classList.add("case-select-spinning");
+    track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";
     track.style.transform="translateX("+finalX+"px)";
-    await new Promise(resolve=>setTimeout(resolve,5850));
-    track.lastElementChild?.classList.add("winner");
+    await new Promise(resolve=>setTimeout(resolve,duration+100));
+    stage.classList.remove("case-select-spinning");
+    track.lastElementChild?.classList.add("winner");playCaseSound("stop");caseBurst("normal");
     $("selectedCaseImage").src=winner.image;
     $("selectedCaseImage").alt=winner.name;
     $("selectedCaseName").textContent=winner.name;
@@ -724,7 +831,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     stage.style.display="none";
     await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?120:850));
     $("selectedCase").classList.add("opening");
-    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?120:950));
+    playCaseSound("crate");caseBurst("normal");
+    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?350:1250));
     $("selectedCase").classList.remove("opening");
     return winner;
   }
@@ -759,13 +867,16 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
     void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const firstTile=track.firstElementChild,tileWidth=(firstTile?.getBoundingClientRect().width||140)+8,center=(stage.clientWidth-(firstTile?.getBoundingClientRect().width||140))/2,finalX=center-4-(entries.length-1)*tileWidth;
-    track.style.transition="transform "+($("fastOpen").checked?"1.2s":"6.8s")+" cubic-bezier(.08,.72,.08,1)";track.style.transform="translateX("+finalX+"px)";
-    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?1300:6950));stage.classList.remove("rolling");
+    const duration=$("fastOpen").checked?1450:7200;
+    playCaseSound("spin");scheduleCaseTicks(duration);
+    track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";track.style.transform="translateX("+finalX+"px)";
+    await new Promise(resolve=>setTimeout(resolve,duration+100));stage.classList.remove("rolling");
     const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
+    playCaseSound("stop");if(winningEntry&&Number(winningEntry.stars||0)>=251)playCaseSound("rare");caseBurst("normal");
   }
   async function startCaseOpening(){
     const button=$("caseOpenConfirm");if(caseOpening)return;
-    playCaseSound("open");caseOpening=true;$("caseRepeat").classList.remove("show");button.disabled=true;button.textContent="🎰 ВЫБИРАЕМ КЕЙС…";
+    unlockCaseAudio();playCaseSound("open");caseBurst("normal");caseOpening=true;$("caseRepeat").classList.remove("show");button.disabled=true;button.textContent="🎰 ВЫБИРАЕМ КЕЙС…";
     $("caseClose").disabled=true;$("caseModal").classList.add("case-open-lock");
     $("caseModalStatus").textContent="Списываем 100 ₿ и запускаем прокрутку кейсов CS2…";
     $("caseReveal").classList.remove("show");
@@ -788,7 +899,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("caseRevealTitle").textContent=data.reward.title;
       $("caseRevealRarity").textContent=rarity.label;
       $("caseRevealValue").textContent=(stars?stars+" ⭐ · ":"")+data.reward.detail+" · шанс: "+(data.reward.dropChance||"—");
-      $("caseReveal").classList.add("show");$("caseRepeat").classList.add("show");
+      $("caseReveal").classList.add("show");$("caseRepeat").classList.add("show");caseBurst("win");
       $("caseModalPrize").textContent="🏆 ТВОЙ ВЫИГРЫШ!";playCaseSound("win");
       const isGift=data.reward.type==="gift";
       const statusText=isGift
@@ -814,8 +925,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     catch(error){$("contractStatus").textContent=error.message;}
     finally{button.textContent="🔄 КОНТРАКТ · 5 ПОДАРКОВ";button.disabled=selectedInventory.size!==5;}
   });
-  $("caseRepeat").addEventListener("click",()=>{if(caseOpening)return;$("caseRepeat").classList.remove("show");$("caseReveal").classList.remove("show");$("caseSelectStage").style.display="flex";$("caseStage").style.display="none";$("caseModalPrize").textContent="🎁 ГОТОВИМ СЛЕДУЮЩИЙ КЕЙС";startCaseOpening();});
-  $("caseButton").addEventListener("click",()=>{if(caseOpening)return;openCaseModal();startCaseOpening();});
+  $("caseRepeat").addEventListener("click",()=>{if(caseOpening)return;unlockCaseAudio();$("caseRepeat").classList.remove("show");$("caseReveal").classList.remove("show");$("caseSelectStage").style.display="flex";$("caseStage").style.display="none";$("caseModalPrize").textContent="🎁 ГОТОВИМ СЛЕДУЮЩИЙ КЕЙС";startCaseOpening();});
+  $("caseButton").addEventListener("click",()=>{if(caseOpening)return;unlockCaseAudio();openCaseModal();startCaseOpening();});
   $("caseClose").addEventListener("click",closeCaseModal);
   $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
   $("caseOpenConfirm").addEventListener("click",startCaseOpening);
