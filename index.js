@@ -4436,6 +4436,8 @@ bot.command("kb", async ctx => {
 
 bot.command("start", async ctx => {
   await loadMemory(ctx.from.id);
+  const referralResult = await rouletteSuite.registerReferral(ctx.from.id, String(ctx.match || ""));
+  if (referralResult?.ok) await ctx.reply("🎁 Добро пожаловать! За переход по приглашению начислена +1 бонусная прокрутка NEXUS.");
 
   await ctx.reply(
     "👋 Привет! Я NEXUS AI.\n\n" +
@@ -4455,6 +4457,7 @@ bot.command("start", async ctx => {
     "⚡ OVERDRIVE — четыре ИИ работают над одной задачей\n" +
     "🧠 Долговременная память\n" +
     "🎙 Голосовой диалог\n\n" +
+    "🎁 Открой /roulette, чтобы испытать удачу и получить подарки.\n\n" +
     "Нажми «📚 Все команды», чтобы увидеть полный список команд.",
     { reply_markup: mainMenu() }
   );
