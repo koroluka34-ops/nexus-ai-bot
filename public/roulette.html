@@ -132,6 +132,34 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .case-reveal{background:#101c31!important;opacity:1!important}
 .case-open-lock{opacity:1!important;pointer-events:none}
 @media(max-width:420px){.case-stage{height:174px!important;min-height:174px!important}.case-tile.case-reel-item{flex-basis:126px!important;width:126px!important;height:148px!important}.case-reel-item img{width:62px!important;height:62px!important}}
+
+/* CS2 case selection phase: real in-game case artwork, opaque cards and a separate reveal. */
+.cs-case-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;align-items:center;min-height:106px}
+.cs-case-thumb{min-width:0;padding:7px 4px;border:1px solid #53627c;border-radius:9px;background:linear-gradient(160deg,#25334d,#0d1425);text-align:center}
+.cs-case-thumb img{width:100%;height:58px;object-fit:contain;display:block;filter:drop-shadow(0 4px 5px #000)}
+.cs-case-thumb span{display:block;font-size:8px;line-height:1.15;color:#e7edf8;margin-top:4px;min-height:18px}
+.cs-case-loading{grid-column:1/-1;text-align:center;color:#d8c28e;font-size:10px;font-weight:900;letter-spacing:.12em;padding:30px 0}
+.case-select-stage{height:150px;margin:20px 0 12px;overflow:hidden;position:relative;display:flex;align-items:center;border:1px solid #a17b42;border-radius:12px;background:linear-gradient(180deg,#080e1b,#202d46 50%,#080e1b);box-shadow:inset 0 0 25px #000b}
+.case-select-stage:before,.case-select-stage:after{content:"";position:absolute;z-index:3;top:0;bottom:0;width:48px;pointer-events:none}
+.case-select-stage:before{left:0;background:linear-gradient(90deg,#080e1b,#080e1bdd 45%,transparent)}
+.case-select-stage:after{right:0;background:linear-gradient(270deg,#080e1b,#080e1bdd 45%,transparent)}
+.case-select-pointer{position:absolute;z-index:4;left:50%;top:0;bottom:0;width:3px;transform:translateX(-50%);background:#f7d88b;box-shadow:0 0 12px #ffc65e}
+.case-select-pointer:before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);border-left:10px solid transparent;border-right:10px solid transparent;border-top:15px solid #ffe3a0}
+.case-select-pointer:after{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:15px solid #ffe3a0}
+.case-select-track{display:flex;align-items:center;gap:9px;padding:0 4px;will-change:transform}
+.case-select-tile{flex:0 0 116px;height:124px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 6px;background:linear-gradient(160deg,#293a57,#10192c);border:1px solid #65758f;border-radius:8px;box-shadow:inset 0 1px #ffffff16}
+.case-select-tile img{width:88px;height:82px;object-fit:contain;filter:drop-shadow(0 5px 6px #000)}
+.case-select-tile span{font-size:9px;line-height:1.1;text-align:center;color:#f2f5ff}
+.case-select-tile.winner{border:2px solid #ffe5a2;box-shadow:0 0 28px #f5c96a99;background:linear-gradient(160deg,#58421f,#1b2031)}
+.selected-case{display:none;align-items:center;justify-content:center;gap:18px;min-height:150px;margin:14px 0;padding:15px;border:1px solid #c79c52;border-radius:15px;background:radial-gradient(ellipse at 40% 50%,#5b4828,#17243a 72%);box-shadow:0 0 28px #d8a64a33}
+.selected-case.show{display:flex;animation:cardPop .55s cubic-bezier(.16,1.3,.3,1)}
+.selected-case img{width:142px;height:120px;object-fit:contain;filter:drop-shadow(0 8px 12px #000)}
+.selected-case b{display:block;font-size:14px;color:#fff0c2}
+.selected-case small{display:block;margin-top:7px;font-size:9px;letter-spacing:.13em;color:#e9c879;font-weight:950}
+.selected-case.opening img{animation:csCaseOpen .95s cubic-bezier(.2,.8,.2,1) both}
+.selected-case.opening{animation:csCaseFlash .95s ease-out both}
+@keyframes csCaseOpen{0%{transform:scale(1) rotate(0);filter:brightness(1) drop-shadow(0 8px 12px #000)}35%{transform:scale(1.1) rotate(-5deg);filter:brightness(1.8) drop-shadow(0 0 25px #ffe29a)}70%{transform:scale(.92) rotate(4deg);filter:brightness(2.2) drop-shadow(0 0 35px #fff)}100%{transform:scale(.78) rotate(0);opacity:.25}}
+@keyframes csCaseFlash{0%{box-shadow:0 0 0 #ffe29a00}45%{box-shadow:0 0 65px #ffe29aaa}100%{box-shadow:0 0 18px #d8a64a33}}
 </style>
 </head>
 <body>
@@ -170,7 +198,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   </section>
   <section class="panel">
     <div class="section-head"><strong>🎁 CS2 GIFT CASE · NEXUS</strong><span>100 ₿ за открытие</span></div>
-<div class="case-cover"><svg viewBox="0 0 340 150" role="img" aria-label="Золотой кейс NEXUS"><defs><linearGradient id="caseGold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a6"/><stop offset=".3" stop-color="#d99a32"/><stop offset=".7" stop-color="#8b531e"/><stop offset="1" stop-color="#f6d47b"/></linearGradient></defs><ellipse cx="170" cy="127" rx="115" ry="13" fill="#e8ad45" opacity=".3"/><path d="M111 39h118l13 14v66H98V53z" fill="#9a6229" stroke="#ffe6a0" stroke-width="3"/><path d="M111 39l12-19h94l12 19-12 12h-94z" fill="url(#caseGold)" stroke="#ffe6a0" stroke-width="3"/><path d="M126 61h88v44h-88z" fill="#17213b" stroke="#f8d77f" stroke-width="3"/><path d="M151 75l19-11 19 11v18l-19 11-19-11z" fill="url(#caseGold)" stroke="#fff0b5" stroke-width="2"/><path d="M142 20v-9q0-7 8-7h40q8 0 8 7v9" fill="none" stroke="#f5d98b" stroke-width="7" stroke-linecap="round"/><text x="170" y="89" fill="#fff2bd" text-anchor="middle" font-size="10" font-weight="900" letter-spacing="2">NEXUS</text></svg><div class="case-cover-caption">NEXUS · TELEGRAM GIFT CASE</div></div>
+<div class="case-cover" id="casePreview"><div class="cs-case-grid" id="csCaseGrid"><div class="cs-case-loading">ЗАГРУЖАЕМ КЕЙСЫ CS2…</div></div><div class="case-cover-caption">CS2 CASE COLLECTION · NEXUS</div></div>
     <div class="coin-panel"><div><div>Твой баланс биткоинов</div><div class="coin-value" id="coinsValue">₿ 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Биткоины<br>и прокрутки</div></div>
     <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 100 ₿</button>
     <p class="case-panel-intro">Это отдельный магазинный кейс, а не режим рулетки: колесо и его призы не меняются. Покупай открытие за накопленные ₿ и получай настоящий Telegram-подарок.</p><p class="hint" id="caseStatus">Открытие кейса стоит 100 ₿. За каждую обычную прокрутку рулетки начисляется +1 ₿.</p>
@@ -226,8 +254,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
     <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
-    <p class="case-modal-hint">Лента предметов прокручивается как в CS2. После остановки появится твой Telegram-подарок, его редкость, шанс и стоимость.</p>
-    <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
+    <p class="case-modal-hint">Сначала выпадет настоящий кейс CS2. Он появится на экране и откроется, после чего прокрутится лента наград.</p>
+    <div class="case-select-stage" id="caseSelectStage"><div class="case-select-pointer"></div><div class="case-select-track" id="caseSelectTrack"></div></div>
+    <div class="selected-case" id="selectedCase"><img id="selectedCaseImage" alt="Выбранный кейс CS2"><div><b id="selectedCaseName"></b><small>КЕЙС ВЫБРАН · ОТКРЫВАЕМ…</small></div></div>
+    <div class="case-stage" id="caseStage" aria-live="polite" style="display:none"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
     <div class="case-reveal" id="caseReveal"><img id="caseRevealImage" alt="Выигранный Telegram-подарок"><div class="case-reveal-rarity" id="caseRevealRarity"></div><h3 id="caseRevealTitle"></h3><div class="case-reveal-value" id="caseRevealValue"></div></div>
     <button class="spin" id="caseOpenConfirm">КУПИТЬ КЕЙС · 100 ₿</button>
@@ -576,7 +606,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("inviteQuest").addEventListener("click",()=>claimQuest("invite_friend"));
   $("dailyQuestList").addEventListener("click",event=>{const button=event.target.closest("button[data-quest]");if(button)claimQuest(button.dataset.quest);});
   let caseOpening=false;
-  function caseRarity(stars){
+  function caseRarity(stars,type){
+    if(type==="telegram_premium")return {key:"mythic",label:"УЛЬТРА-ПРЕМИУМ"};
+    if(type==="nexus_ultra")return {key:"legendary",label:"УЛЬТРА"};
+    if(type==="nexus_plus")return {key:"epic",label:"PREMIUM"};
     const n=Number(stars)||0;
     if(n>=501)return {key:"mythic",label:"МИФИЧЕСКИЙ"};
     if(n>=251)return {key:"legendary",label:"ЛЕГЕНДАРНЫЙ"};
@@ -584,11 +617,73 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(n>=51)return {key:"rare",label:"РЕДКИЙ"};
     return {key:"common",label:"ОБЫЧНЫЙ"};
   }
+  let csCaseCatalog=[];
+  async function loadCsCaseCatalog(){
+    if(csCaseCatalog.length)return csCaseCatalog;
+    const names=["Dreams & Nightmares Case","Revolution Case","Recoil Case","Prisma Case"];
+    try{
+      const response=await fetch("https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/crates.json",{cache:"force-cache"});
+      if(!response.ok)throw new Error("CS2 case catalog unavailable");
+      const all=await response.json();
+      csCaseCatalog=names.map(name=>all.find(item=>item.name===name&&item.type==="Case")).filter(item=>item&&item.image);
+    }catch(error){console.warn("CS2 case artwork:",error);}
+    if(csCaseCatalog.length){
+      $("csCaseGrid").replaceChildren();
+      csCaseCatalog.forEach(item=>{
+        const card=document.createElement("div");card.className="cs-case-thumb";
+        const img=document.createElement("img");img.src=item.image;img.alt=item.name;img.loading="lazy";card.append(img);
+        const label=document.createElement("span");label.textContent=item.name.replace(" Case","");card.append(label);
+        $("csCaseGrid").append(card);
+      });
+    }else $("csCaseGrid").innerHTML='<div class="cs-case-loading">CS2 CASE ART WILL LOAD WHEN AVAILABLE</div>';
+    return csCaseCatalog;
+  }
+  async function animateCaseSelection(){
+    const catalog=await loadCsCaseCatalog();
+    const stage=$("caseSelectStage"),track=$("caseSelectTrack");
+    $("selectedCase").classList.remove("show","opening");
+    $("caseStage").style.display="none";
+    if(!catalog.length){
+      $("selectedCaseName").textContent="NEXUS GIFT CASE";
+      $("selectedCaseImage").removeAttribute("src");
+      $("selectedCase").classList.add("show");
+      await new Promise(resolve=>setTimeout(resolve,700));
+      return {name:"NEXUS GIFT CASE",image:""};
+    }
+    const winner=catalog[Math.floor(Math.random()*catalog.length)];
+    const entries=Array.from({length:5},()=>catalog).flat().map(item=>({...item,winner:false}));
+    entries.push({...winner,winner:true});
+    track.replaceChildren();
+    entries.forEach(item=>{
+      const tile=document.createElement("div");tile.className="case-select-tile";
+      const img=document.createElement("img");img.src=item.image;img.alt=item.name;img.loading="eager";tile.append(img);
+      const label=document.createElement("span");label.textContent=item.name;tile.append(label);track.append(tile);
+    });
+    track.style.transition="none";track.style.transform="translateX(0px)";stage.style.display="flex";
+    void track.offsetWidth;
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9;
+    const finalX=(stage.clientWidth-w)/2-(entries.length-1)*(w+gap)-4;
+    track.style.transition="transform 5.7s cubic-bezier(.08,.72,.08,1)";
+    track.style.transform="translateX("+finalX+"px)";
+    await new Promise(resolve=>setTimeout(resolve,5850));
+    track.lastElementChild?.classList.add("winner");
+    $("selectedCaseImage").src=winner.image;
+    $("selectedCaseImage").alt=winner.name;
+    $("selectedCaseName").textContent=winner.name;
+    $("selectedCase").classList.add("show");
+    stage.style.display="none";
+    await new Promise(resolve=>setTimeout(resolve,850));
+    $("selectedCase").classList.add("opening");
+    await new Promise(resolve=>setTimeout(resolve,950));
+    $("selectedCase").classList.remove("opening");
+    return winner;
+  }
   function openCaseModal(){
     $("caseModal").classList.add("open");$("caseModal").setAttribute("aria-hidden","false");
     $("caseModalPrize").textContent="🎁 В кейсе — настоящие подарки Telegram";
-    $("caseModalStatus").textContent="Покупка стоит 100 ₿. Нажми кнопку — и сразу начнётся прокрутка предметов.";
-    $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");
+    $("caseModalStatus").textContent="Покупка стоит 100 ₿. Сначала прокрутится коллекция кейсов CS2, затем выбранный кейс откроется.";
+    $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");$("selectedCase").classList.remove("show","opening");$("caseSelectStage").style.display="flex";$("caseStage").style.display="none";loadCsCaseCatalog();
     $("caseOpenConfirm").disabled=false;$("caseOpenConfirm").textContent="КУПИТЬ КЕЙС · 100 ₿";
   }
   function closeCaseModal(){
@@ -618,28 +713,39 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   async function startCaseOpening(){
     const button=$("caseOpenConfirm");if(caseOpening)return;
-    caseOpening=true;button.disabled=true;button.textContent="🎁 КРУТИМ ЛЕНТУ…";
+    caseOpening=true;button.disabled=true;button.textContent="🎰 ВЫБИРАЕМ КЕЙС…";
     $("caseClose").disabled=true;$("caseModal").classList.add("case-open-lock");
-    $("caseModalStatus").textContent="🎰 Лента подарков запускается. Удачи!";
+    $("caseModalStatus").textContent="Списываем 100 ₿ и запускаем прокрутку кейсов CS2…";
     $("caseReveal").classList.remove("show");
     try{
       const data=await api("/roulette/api/case/open","POST",{});
-      $("caseModalStatus").textContent="🎰 Предметы ускоряются…";
+      $("coinsValue").textContent="₿ "+data.coins;
+      $("caseModalStatus").textContent="🎰 Крутится коллекция кейсов CS2…";
+      const selectedCase=await animateCaseSelection();
+      $("caseModalPrize").textContent="🔓 "+selectedCase.name+" · ОТКРЫВАЕМ КЕЙС";
+      $("caseModalStatus").textContent="Кейс выбран! Сейчас он откроется и покажет награду.";
+      $("caseStage").style.display="flex";
       await animateCaseOpening(data.reel);
-      const stars=Number(data.reward.giftStars||0),rarity=caseRarity(stars);
-      $("caseModalPrize").textContent="🎯 ЛЕНТА ОСТАНОВИЛАСЬ";
-      $("caseModalStatus").textContent="✨ Предмет найден! Определяем редкость…";
-      button.textContent="ПРЕДМЕТ ОТКРЫТ";
+      const stars=Number(data.reward.giftStars||0),rarity=caseRarity(stars,data.reward.type);
+      $("caseModalPrize").textContent="🎯 НАГРАДА НАЙДЕНА";
+      $("caseModalStatus").textContent="✨ Кейс открыт! Подготавливаем твою награду…";
+      button.textContent="НАГРАДА ОТКРЫТА";
       await new Promise(resolve=>setTimeout(resolve,650));
-      $("caseRevealImage").src=data.reward.imageUrl;
+      $("caseRevealImage").src=data.reward.imageUrl||"";
+      $("caseRevealImage").style.display=data.reward.imageUrl?"block":"none";
       $("caseRevealTitle").textContent=data.reward.title;
       $("caseRevealRarity").textContent=rarity.label;
-      $("caseRevealValue").textContent=stars+" ⭐ · стоимость подарка · шанс выпадения: "+(data.reward.dropChance||"—");
+      $("caseRevealValue").textContent=(stars?stars+" ⭐ · ":"")+data.reward.detail+" · шанс: "+(data.reward.dropChance||"—");
       $("caseReveal").classList.add("show");
       $("caseModalPrize").textContent="🏆 ТВОЙ ВЫИГРЫШ!";
-      $("caseModalStatus").textContent="🎉 Подарок закреплён за тобой и ожидает отправки. Бот доставит его автоматически, когда на балансе будет достаточно Stars.";
-      $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+stars+" ⭐ · ожидает выдачи";
-      $("coinsValue").textContent="₿ "+data.coins;
+      const isGift=data.reward.type==="gift";
+      const statusText=isGift
+        ?"🎁 Подарок сохранён в очереди. Бот отправит его автоматически, когда на балансе будет достаточно Stars."
+        :data.reward.type==="telegram_premium"
+          ?"⭐ Telegram Premium сохранён в очереди выдачи и будет оформлен, когда на балансе бота хватит Stars."
+          :"💎 Подписка NEXUS сохранена в очереди и будет автоматически активирована.";
+      $("caseModalStatus").textContent=statusText;
+      $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+(stars?stars+" ⭐":"подписка")+" · ожидает выдачи";
       button.textContent="КЕЙС ОТКРЫТ";
       await refresh();
     }catch(error){
