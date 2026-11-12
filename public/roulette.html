@@ -938,48 +938,42 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     }
     const base=Array.from({length:48},()=>({...catalog[Math.floor(Math.random()*catalog.length)]}));
     const winner=base[Math.floor(Math.random()*base.length)];
-    const entries=Array.from({length:16},()=>base.map(item=>({...item}))).flat();entries.push({...winner,winner:true});
+    const targetIndex=base.length*3+Math.floor(Math.random()*base.length);
+    const entries=Array.from({length:5},()=>base.map(item=>({...item}))).flat();
+    entries[targetIndex]={...winner,winner:true};
     track.replaceChildren();
     entries.forEach(item=>{
       const tile=document.createElement("div");tile.className="case-select-tile";
-      const img=document.createElement("img");img.src=item.image;img.alt=item.name;img.loading="eager";tile.append(img);
+      const img=document.createElement("img");img.src=item.image;img.alt=item.name;img.loading="eager";img.decoding="async";tile.append(img);
       const label=document.createElement("span");label.textContent=item.name;tile.append(label);track.append(tile);
     });
-    track.style.transition="none";track.style.transform="translateX(0px)";stage.style.display="flex";
+    track.style.transition="none";track.style.transform="translate3d(0,0,0)";stage.style.display="flex";
     void track.offsetWidth;
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9,cycleWidth=base.length*(w+gap);
-    let offset=0,lastTime=0,raf=0;
-    const loopStart=performance.now(),loopDuration=5200,speed=cycleWidth/1250;
-    const loop=now=>{
-      if(!lastTime)lastTime=now;
-      const dt=Math.min(40,now-lastTime);lastTime=now;
-      offset=(offset+speed*dt)%cycleWidth;
-      track.style.transform="translateX("+(-offset)+"px)";
-      if(now-loopStart<loopDuration)raf=requestAnimationFrame(loop);
-    };
-    const duration=$("fastOpen").checked?5200:9200;
-    playCaseSound("spin");scheduleCaseTicks(loopDuration+duration);
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    const tile=track.firstElementChild,w=tile?.getBoundingClientRect().width||116,gap=9,step=w+gap,cycleWidth=base.length*step;
+    const fast=$("fastOpen").checked;
+    const cruiseDuration=fast?3800:4800,brakeDuration=fast?4200:5200;
+    const targetTile=track.children[targetIndex];
+    const finalX=targetIndex*step-(stage.clientWidth-w)/2+4;
+    playCaseSound("spin");scheduleCaseTicks(cruiseDuration+brakeDuration);
     stage.classList.add("case-select-spinning");
-    raf=requestAnimationFrame(loop);
-    await new Promise(resolve=>setTimeout(resolve,loopDuration));
-    cancelAnimationFrame(raf);
-    const finalIndex=entries.length-1;
-    const finalX=finalIndex*(w+gap)-(stage.clientWidth-w)/2+4;
-    track.style.transition="transform "+(duration/1000)+"s cubic-bezier(.06,.78,.08,1)";
-    track.style.transform="translateX("+(-finalX)+"px)";
-    await new Promise(resolve=>setTimeout(resolve,duration+100));
+    track.style.transition="transform "+(cruiseDuration/1000)+"s linear";
+    track.style.transform="translate3d("+(-cycleWidth*2)+"px,0,0)";
+    await new Promise(resolve=>setTimeout(resolve,cruiseDuration+40));
+    track.style.transition="transform "+(brakeDuration/1000)+"s cubic-bezier(.12,.72,.12,1)";
+    track.style.transform="translate3d("+(-finalX)+"px,0,0)";
+    await new Promise(resolve=>setTimeout(resolve,brakeDuration+100));
     stage.classList.remove("case-select-spinning");
-    track.lastElementChild?.classList.add("winner");playCaseSound("stop");caseBurst("normal");
+    targetTile?.classList.add("winner");playCaseSound("stop");caseBurst("normal");
     $("selectedCaseImage").src=winner.image;
     $("selectedCaseImage").alt=winner.name;
     $("selectedCaseName").textContent=winner.name;
     $("selectedCase").classList.add("show");
     stage.style.display="none";
-    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?120:850));
+    await new Promise(resolve=>setTimeout(resolve,fast?180:850));
     $("selectedCase").classList.add("opening");
     playCaseSound("crate");caseBurst("normal");
-    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?350:1250));
+    await new Promise(resolve=>setTimeout(resolve,fast?400:1250));
     $("selectedCase").classList.remove("opening");
     return winner;
   }
@@ -1001,47 +995,39 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
     const source=Array.isArray(reelPool)?reelPool:[];
     if(!source.length)throw new Error("Не удалось загрузить призы для прокрутки кейса.");
-    // Keep a deep repeated randomized strip beyond the visible viewport. The
-    // reel loops over the same strip, then brakes on the server-authoritative winner.
-    const base=Array.from({length:180},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
-    const entries=Array.from({length:12},()=>base.map(item=>({...item}))).flat();entries.push({... (winningEntry||base[0]),winner:true});
+    const base=Array.from({length:48},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
+    const targetIndex=base.length*3+Math.floor(Math.random()*base.length);
+    const entries=Array.from({length:5},()=>base.map(item=>({...item}))).flat();
+    entries[targetIndex]={...(winningEntry||base[0]),winner:true};
     track.replaceChildren();
     entries.forEach(entry=>{
-      const stars=Number(entry.stars||String(entry.detail||"").match(/\d+/)?.[0]||0),rarity=caseRarity(stars,entry.type);
+      const stars=Number(entry.stars||String(entry.detail||"").match(/\\d+/)?.[0]||0),rarity=caseRarity(stars,entry.type);
       const tile=document.createElement("div");tile.className="case-tile case-reel-item rarity-"+rarity.key;
       const art=document.createElement("div");art.className="case-showcase-emoji";art.textContent=entry.emoji||(entry.type==="telegram_premium"?"⭐":entry.type==="nexus_ultra"?"🚀":entry.type==="nexus_plus"?"💎":"🎁");art.setAttribute("aria-label",entry.title||"Подарок Telegram");tile.append(art);
       if(entry.imageUrl){
-        const image=document.createElement("img");image.src=entry.imageUrl;image.alt=entry.title||"Подарок Telegram";image.loading="lazy";image.decoding="async";
+        const image=document.createElement("img");image.src=entry.imageUrl;image.alt=entry.title||"Подарок Telegram";image.loading="eager";image.decoding="async";
         image.onload=()=>{art.style.display="none";};image.onerror=()=>{image.remove();art.style.display="block";};tile.insertBefore(image,art);
       }
       const name=document.createElement("div");name.className="case-name";name.textContent=entry.title||"Подарок Telegram";tile.append(name);
       const tier=document.createElement("div");tier.className="case-rarity";tier.textContent=rarity.label;tile.append(tier);
       const value=document.createElement("small");value.textContent=stars+" ⭐";tile.append(value);track.append(tile);
     });
-    track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
-    void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    track.style.transition="none";track.style.transform="translate3d(0,0,0)";stage.classList.add("rolling");
+    void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(resolve));
     const firstTile=track.firstElementChild,cardWidth=firstTile?.getBoundingClientRect().width||140,tileWidth=cardWidth+8,cycleWidth=base.length*tileWidth;
-    let offset=0,lastTime=0,raf=0;
-    const loopDuration=$("fastOpen").checked?4200:6500,speed=cycleWidth/1400,loopStart=performance.now();
-    const loop=now=>{
-      if(!lastTime)lastTime=now;
-      const dt=Math.min(40,now-lastTime);lastTime=now;
-      offset=(offset+speed*dt)%cycleWidth;
-      track.style.transform="translateX("+(-offset)+"px)";
-      if(now-loopStart<loopDuration)raf=requestAnimationFrame(loop);
-    };
-    const brakeDuration=$("fastOpen").checked?5200:9000;
-    playCaseSound("spin");scheduleCaseTicks(loopDuration+brakeDuration);
-    raf=requestAnimationFrame(loop);
-    await new Promise(resolve=>setTimeout(resolve,loopDuration));
-    cancelAnimationFrame(raf);
-    const finalIndex=entries.length-1;
-    const finalX=finalIndex*tileWidth-(stage.clientWidth-cardWidth)/2+4;
-    track.style.transition="transform "+(brakeDuration/1000)+"s cubic-bezier(.06,.78,.08,1)";
-    track.style.transform="translateX("+(-finalX)+"px)";
+    const fast=$("fastOpen").checked;
+    const cruiseDuration=fast?4200:5200,brakeDuration=fast?4800:6200;
+    const targetTile=track.children[targetIndex];
+    const finalX=targetIndex*tileWidth-(stage.clientWidth-cardWidth)/2+4;
+    playCaseSound("spin");scheduleCaseTicks(cruiseDuration+brakeDuration);
+    track.style.transition="transform "+(cruiseDuration/1000)+"s linear";
+    track.style.transform="translate3d("+(-cycleWidth*2)+"px,0,0)";
+    await new Promise(resolve=>setTimeout(resolve,cruiseDuration+40));
+    track.style.transition="transform "+(brakeDuration/1000)+"s cubic-bezier(.12,.72,.12,1)";
+    track.style.transform="translate3d("+(-finalX)+"px,0,0)";
     await new Promise(resolve=>setTimeout(resolve,brakeDuration+100));
     stage.classList.remove("rolling");
-    const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
+    if(targetTile)targetTile.classList.add("winner");
     playCaseSound("stop");if(winningEntry&&Number(winningEntry.stars||0)>=251)playCaseSound("rare");caseBurst("normal");
   }
   async function startCaseOpening(){
