@@ -324,7 +324,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
 
   bot.command("roulette", async ctx => {
     if (!webAppUrl) return ctx.reply("🎁 Для Mini App настрой NEXUS_WEBAPP_URL или проверь RENDER_EXTERNAL_HOSTNAME.");
-    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. Выигрывай настоящие Telegram-подарки от 15 до 1000 ⭐, секретные призы и джекпот — подарок ровно за 1000 ⭐. За серию дней начисляются дополнительные прокрутки и повышается удача.", {
+    return ctx.reply("🎁 <b>NEXUS GIFT ROULETTE</b>\n\nОдна бесплатная попытка каждый день. Выигрывай настоящие Telegram-подарки от 15 до 1000 ⭐, секретные призы и джекпот. Получай бонусы за задания и приглашения, активируй промокоды, собирай коллекцию и поднимайся в рейтинге. Режим x2 тратит две попытки и удваивает вес подарочных секторов.", {
       parse_mode: "HTML", reply_markup: openKeyboard()
     });
   });
