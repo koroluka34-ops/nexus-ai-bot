@@ -793,7 +793,8 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         const pendingGifts = queue.filter(item => String(item.userId) === String(user.id)).map(item => ({
           spinId: item.spinId,
           label: item.type === "telegram_premium" ? "⭐ Telegram Premium · 12 месяцев" : (item.label || "🎁 Подарок Telegram"),
-          cost: Number(item.cost || 0), createdAt: item.createdAt || 0
+          cost: Number(item.cost || 0), createdAt: item.createdAt || 0,
+          imageUrl: item.giftId ? "/roulette/api/gift-image/" + encodeURIComponent(item.giftId) : ""
         }));
         json(res, 200, {
           ok: true, profile: { userId: String(user.id), name: myStats.name || user.firstName || "Игрок", photoUrl: user.photoUrl || "", spins: mySpinCount, wins: Math.max(0, Number(myStats.wins) || 0), losses: Math.max(0, Number(myStats.losses) || 0), prizeValue: Math.max(0, Number(myStats.cost) || 0), winStreak: currentWinStreak, vip: vipTier.key, vipLabel: vipTier.label, vipCurrentMin: vipTier.min, vipNext: nextVipTier ? { label: nextVipTier.label, min: nextVipTier.min } : null }, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
@@ -871,7 +872,11 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         } finally { locks.delete("inventory:" + user.id); }
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/pending-upgrade") {
-        if(queueWorkerRunning||locks.has("pending-upgrade")){json(res,409,{ok:false,error:"Очередь подарков сейчас обрабатывается. Попробуй через несколько секунд."});return true;}
+        if(locks.has("pending-upgrade")){json(res,409,{ok:false,error:"Улучшение уже выполняется. Не нажимай кнопку повторно."});return true;}
+        const workerWaitUntil=Date.now()+7000;
+        while(queueWorkerRunning&&Date.now()<workerWaitUntil) await new Promise(resolve=>setTimeout(resolve,150));
+        if(queueWorkerRunning){json(res,409,{ok:false,error:"Подарок сейчас отправляется Telegram. Обнови страницу и проверь статус — повторно улучшать его нельзя."});return true;}
+        // Acquire synchronously after the worker check so a new worker run sees the lock.
         locks.add("pending-upgrade");
         try{
           const body=await readBody(req),spinId=String(body.spinId||"");
