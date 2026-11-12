@@ -421,6 +421,30 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
     }
   });
 
+  bot.command("use", async ctx => {
+    if (typeof isAdmin !== "function" || !await isAdmin(ctx.from.id)) return ctx.reply("⛔ Команда доступна только администраторам NEXUS.");
+    const parts = String(ctx.match || "").trim().split(/\s+/).filter(Boolean);
+    const replied = ctx.message.reply_to_message?.from;
+    let targetId = replied ? String(replied.id) : "";
+    let amount;
+    if (replied) amount = Number(parts[0]);
+    else if (parts[0]?.startsWith("@")) {
+      targetId = typeof resolveUsername === "function" ? await resolveUsername(parts[0]) : "";
+      amount = Number(parts[1]);
+      if (!targetId) return ctx.reply("Не удалось найти " + parts[0] + ". Пусть пользователь сначала напишет боту /start, или ответь на его сообщение: /use КОЛИЧЕСТВО.");
+    } else { targetId = parts[0] || ""; amount = Number(parts[1]); }
+    if (!/^\d{1,20}$/.test(targetId) || !Number.isSafeInteger(Number(targetId)) || !Number.isSafeInteger(amount) || amount < 1 || amount > 100000000) {
+      return ctx.reply("Форматы выдачи биткоинов:\nОтветом на сообщение: /use 100\nПо Telegram ID: /use 123456789 100\nПо @username: /use @username 100");
+    }
+    try {
+      const state = await readState(targetId);
+      state.coins = Math.min(100000000, (state.coins || 0) + amount);
+      await writeState(targetId, state);
+      await ctx.reply("✅ Выдано " + amount + " ₿ пользователю " + targetId + ".\n🪙 Новый баланс: " + state.coins + " ₿");
+      await bot.api.sendMessage(Number(targetId), "🪙 Администратор NEXUS начислил тебе +" + amount + " ₿.\nТвой баланс: " + state.coins + " ₿").catch(() => {});
+    } catch (error) { return ctx.reply("❌ Не удалось выдать биткоины: " + String(error.message || error).slice(0, 220)); }
+  });
+
   bot.command("roulettecode", async ctx => {
     const adminId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
     if (!adminId || String(ctx.from.id) !== adminId) return ctx.reply("⛔ Только администратор может создавать промокоды.");
@@ -784,14 +808,14 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const [state, giftResponse, botBalance] = await Promise.all([
             readState(user.id), telegramApi("getAvailableGifts"), getStarBalance()
           ]);
-          const cost = 20;
-          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Для открытия кейса нужно 20 ₿." }); return true; }
+          const cost = 100;
+          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Для открытия кейса нужно 100 ₿." }); return true; }
           const available = (Array.isArray(giftResponse?.gifts) ? giftResponse.gifts : [])
             .filter(g => g && typeof g.id === "string" && Number(g.star_count) >= 15 && Number(g.star_count) <= 1000)
             .filter(g => g.remaining_count === undefined || Number(g.remaining_count) > 0)
             .filter(g => Number(g.star_count) <= botBalance);
           if (!available.length) {
-            json(res, 503, { ok: false, error: "Сейчас нет Telegram-подарков, которые бот может отправить. Попробуй позже — твои 20 ₿ не списаны." });
+            json(res, 503, { ok: false, error: "Сейчас нет Telegram-подарков, которые бот может отправить. Попробуй позже — твои 100 ₿ не списаны." });
             return true;
           }
           const pickFrom = (min, max) => available.filter(g => Number(g.star_count) >= min && Number(g.star_count) <= max);
