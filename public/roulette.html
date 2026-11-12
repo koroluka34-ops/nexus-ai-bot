@@ -160,7 +160,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   const $=id=>document.getElementById(id);
   const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),pointer=document.querySelector(".pointer"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
-  let busy=false,currentPrizes=[];
+  let busy=false,currentPrizes=[],wheelRotation=0;
   async function api(path,method="GET",body=null){
     const options={method,headers:{"X-Telegram-Init-Data":initData},cache:"no-store"};
     if(method==="POST"){options.headers["Content-Type"]="application/json";options.body=JSON.stringify(body||{});}
@@ -214,6 +214,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       peg.style.transform="rotate("+(index*step)+"deg) translateY(-"+(diameter*.47)+"px)";
       wheel.append(peg);
     });
+    // Keep rebuilt labels upright if the wheel is already stopped at a rotated angle.
+    keepWheelLabelsUpright(wheelRotation);
   }
   function keepWheelLabelsUpright(rotation){
     wheel.querySelectorAll(".slice-label").forEach(label=>{
@@ -242,11 +244,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     return new Promise(resolve=>{
       const start=performance.now();let lastPeg=0;
       wheel.style.transition="none";wheel.style.transform="rotate(0deg)";
+      wheelRotation=0;
       keepWheelLabelsUpright(0);
       const frame=now=>{
         const t=Math.min(1,(now-start)/duration);
         const eased=1-Math.pow(1-t,4);
         const angle=targetAngle*eased;
+        wheelRotation=angle;
         wheel.style.transform="rotate("+angle+"deg)";
         keepWheelLabelsUpright(angle);
         const passed=Math.floor((angle+0.0001)/step);
@@ -258,6 +262,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
         }
         if(t<1)requestAnimationFrame(frame);
         else{
+          wheelRotation=targetAngle;
           wheel.style.transform="rotate("+targetAngle+"deg)";
           keepWheelLabelsUpright(targetAngle);
           pointer?.classList.remove("hit");
