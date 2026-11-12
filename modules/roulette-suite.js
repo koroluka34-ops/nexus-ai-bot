@@ -917,6 +917,84 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           json(res, 200, { ok: true, label, stars, message: "Контракт собран. Награда добавлена в очередь отправки." }); return true;
         } finally { locks.delete("inventory:" + user.id); }
       }
+      if (url.pathname === "/roulette/api/market" && req.method === "GET") {
+        const market = await readGlobal("nexusMarket", { listings: [], deals: [] });
+        const queue = await readPendingQueue();
+        const own = queue.filter(q => String(q.userId) === String(user.id) && !q.claimedAt && !q.listingId && !q.tradeLock && q.giftId);
+        const safe = item => ({ spinId:item.spinId, label:item.label || "🎁 Telegram-подарок", cost:Number(item.cost||0), imageUrl:item.giftId ? "/roulette/api/gift-image/"+encodeURIComponent(item.giftId) : "" });
+        json(res,200,{ok:true, gifts:own.map(safe), listings:(market.listings||[]).filter(x=>x.status==="open"&&String(x.ownerId)!==String(user.id)).map(x=>({...x})), deals:(market.deals||[]).filter(x=>String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)).map(x=>({...x}))}); return true;
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/market/list") {
+        const body=await readBody(req), ids=Array.isArray(body.spinIds)?[...new Set(body.spinIds.map(String))]:[];
+        if(!ids.length||ids.length>100){json(res,400,{ok:false,error:"Выбери от 1 до 100 подарков."});return true;}
+        if(locks.has("market-global")){json(res,409,{ok:false,error:"Обмены сейчас обновляются. Повтори через пару секунд."});return true;}
+        locks.add("market-global");
+        try{
+          const [queue,state,market]=await Promise.all([readPendingQueue(),readState(user.id),readGlobal("nexusMarket",{listings:[],deals:[]})]);
+          const items=ids.map(id=>queue.find(q=>q.spinId===id&&String(q.userId)===String(user.id)&&q.giftId&&!q.claimedAt&&!q.listingId&&!q.tradeLock));
+          if(items.some(x=>!x)){json(res,409,{ok:false,error:"Один из подарков уже забран или занят другой сделкой."});return true;}
+          const listingId=crypto.randomUUID(),listing={listingId,ownerId:String(user.id),ownerName:String(user.firstName||"Игрок").slice(0,40),spinIds:ids,items:items.map(q=>({label:q.label||"🎁 Подарок",cost:Number(q.cost||0),giftId:q.giftId})),note:String(body.note||"").slice(0,180),status:"open",createdAt:Date.now()};
+          items.forEach(q=>q.listingId=listingId);market.listings=[...(market.listings||[]),listing].slice(-300);
+          await writePendingQueue(queue);await writeGlobal("nexusMarket",market);
+          json(res,200,{ok:true,message:"Объявление опубликовано.",listingId});return true;
+        }finally{locks.delete("market-global");}
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/market/offer") {
+        const body=await readBody(req),listingId=String(body.listingId||""),ids=Array.isArray(body.spinIds)?[...new Set(body.spinIds.map(String))]:[];
+        if(!listingId||!ids.length||ids.length>100){json(res,400,{ok:false,error:"Выбери свои подарки для предложения."});return true;}
+        if(locks.has("market-global")){json(res,409,{ok:false,error:"Обмены сейчас обновляются. Повтори позже."});return true;}
+        locks.add("market-global");
+        try{
+          const [queue,market]=await Promise.all([readPendingQueue(),readGlobal("nexusMarket",{listings:[],deals:[]})]);
+          const listing=(market.listings||[]).find(x=>x.listingId===listingId&&x.status==="open");
+          if(!listing||String(listing.ownerId)===String(user.id)){json(res,404,{ok:false,error:"Объявление уже закрыто или недоступно."});return true;}
+          const items=ids.map(id=>queue.find(q=>q.spinId===id&&String(q.userId)===String(user.id)&&q.giftId&&!q.claimedAt&&!q.listingId&&!q.tradeLock));
+          if(items.some(x=>!x)){json(res,409,{ok:false,error:"Один из твоих подарков уже занят или недоступен."});return true;}
+          const dealId=crypto.randomUUID(),deal={dealId,listingId,ownerId:String(listing.ownerId),ownerName:listing.ownerName,partnerId:String(user.id),partnerName:String(user.firstName||"Игрок").slice(0,40),ownerSpinIds:[...listing.spinIds],partnerSpinIds:ids,offerItems:items.map(q=>({label:q.label||"🎁 Подарок",cost:Number(q.cost||0),giftId:q.giftId})),messages:[{from:String(user.id),name:String(user.firstName||"Игрок").slice(0,40),text:String(body.message||"Предлагаю обмен!").slice(0,500),at:Date.now()}],status:"pending",createdAt:Date.now(),updatedAt:Date.now()};
+          items.forEach(q=>q.tradeLock=dealId);market.deals=[...(market.deals||[]),deal].slice(-500);
+          await writePendingQueue(queue);await writeGlobal("nexusMarket",market);
+          json(res,200,{ok:true,message:"Предложение отправлено. Открой сделку, чтобы общаться." ,dealId});return true;
+        }finally{locks.delete("market-global");}
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/market/message") {
+        const body=await readBody(req),dealId=String(body.dealId||""),message=String(body.message||"").trim().slice(0,500);
+        if(!message){json(res,400,{ok:false,error:"Напиши сообщение."});return true;}
+        const market=await readGlobal("nexusMarket",{listings:[],deals:[]}),deal=(market.deals||[]).find(x=>x.dealId===dealId&&(String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)));
+        if(!deal||!["pending","countered"].includes(deal.status)){json(res,404,{ok:false,error:"Чат этой сделки закрыт."});return true;}
+        deal.messages=Array.isArray(deal.messages)?deal.messages:[];deal.messages.push({from:String(user.id),name:String(user.firstName||"Игрок").slice(0,40),text:message,at:Date.now()});deal.messages=deal.messages.slice(-150);deal.updatedAt=Date.now();await writeGlobal("nexusMarket",market);
+        json(res,200,{ok:true});return true;
+      }
+      if (req.method === "POST" && url.pathname === "/roulette/api/market/decision") {
+        const body=await readBody(req),dealId=String(body.dealId||""),decision=String(body.decision||"");
+        if(!["accept","decline"].includes(decision)){json(res,400,{ok:false,error:"Неизвестное действие."});return true;}
+        if(locks.has("market-global")){json(res,409,{ok:false,error:"Обмены обновляются. Повтори позже."});return true;}locks.add("market-global");
+        try{
+          const [market,queue]=await Promise.all([readGlobal("nexusMarket",{listings:[],deals:[]}),readPendingQueue()]);
+          const deal=(market.deals||[]).find(x=>x.dealId===dealId&&(String(x.ownerId)===String(user.id)||String(x.partnerId)===String(user.id)));
+          if(!deal||!["pending","countered"].includes(deal.status)){json(res,404,{ok:false,error:"Предложение уже обработано."});return true;}
+          if(decision==="decline"){
+            queue.forEach(q=>{if(q.tradeLock===dealId)delete q.tradeLock;});
+            deal.status="declined";deal.updatedAt=Date.now();
+            const listing=(market.listings||[]).find(x=>x.listingId===deal.listingId);if(listing&&String(user.id)===String(listing.ownerId))listing.status="open";
+            await writePendingQueue(queue);await writeGlobal("nexusMarket",market);json(res,200,{ok:true,message:"Предложение отклонено."});return true;
+          }
+          if(String(user.id)!==String(deal.ownerId)){json(res,403,{ok:false,error:"Подтвердить обмен может владелец объявления."});return true;}
+          const ids=[...(deal.ownerSpinIds||[]),...(deal.partnerSpinIds||[])],selected=ids.map(id=>queue.find(q=>q.spinId===id));
+          if(selected.some(x=>!x||x.claimedAt)){json(res,409,{ok:false,error:"Один из подарков уже недоступен. Сделка отменена."});return true;}
+          const ownerItems=selected.filter(q=>String(q.userId)===String(deal.ownerId)),partnerItems=selected.filter(q=>String(q.userId)===String(deal.partnerId));
+          if(ownerItems.length!==(deal.ownerSpinIds||[]).length||partnerItems.length!==(deal.partnerSpinIds||[]).length){json(res,409,{ok:false,error:"Состав сделки изменился. Обнови страницу."});return true;}
+          const transfer=(items,toId,fromId)=>items.forEach(q=>{q.userId=String(toId);delete q.listingId;delete q.tradeLock;q.transferredAt=Date.now();});
+          transfer(ownerItems,deal.partnerId,deal.ownerId);transfer(partnerItems,deal.ownerId,deal.partnerId);
+          for(const [fromId,items,toId] of [[deal.ownerId,ownerItems,deal.partnerId],[deal.partnerId,partnerItems,deal.ownerId]]){
+            const st=await readState(fromId),to=await readState(toId);
+            for(const q of items){const row=st.history.find(x=>x.spinId===q.spinId);if(row){row.status="traded";row.deliveryMessage="Передано по обмену NEXUS.";}to.history.push({spinId:q.spinId,day:kyivDay(),prize:"player_trade",label:q.label||"🎁 Подарок по обмену",giftId:q.giftId,cost:Number(q.cost||0),status:"processing",at:Date.now(),source:"trade"});}
+            st.history=st.history.slice(-100);to.history=to.history.slice(-100);await writeState(fromId,st);await writeState(toId,to);
+          }
+          deal.status="completed";deal.completedAt=Date.now();deal.updatedAt=Date.now();
+          const listing=(market.listings||[]).find(x=>x.listingId===deal.listingId);if(listing)listing.status="completed";
+          await writePendingQueue(queue);await writeGlobal("nexusMarket",market);json(res,200,{ok:true,message:"Обмен завершён! Подарки появились в инвентаре обоих игроков."});return true;
+        }finally{locks.delete("market-global");}
+      }
       if (req.method === "POST" && url.pathname === "/roulette/api/pending-upgrade") {
         if(locks.has("pending-upgrade")){json(res,409,{ok:false,error:"Улучшение уже выполняется. Не нажимай кнопку повторно."});return true;}
         const workerWaitUntil=Date.now()+7000;
@@ -956,7 +1034,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const available = (catalog?.gifts || []).filter(g => g && typeof g.id === "string" && Number(g.star_count) >= sourceCost*2 && Number(g.star_count) <= 1000 && (g.remaining_count === undefined || Number(g.remaining_count)>0));
           if (!available.length) { json(res, 503, { ok: false, error: "Нет доступного подарка минимум в 2 раза дороже. Твой подарок сохранён." }); return true; }
           source.status = "upgrade_used"; source.deliveryMessage = "Использован в апгрейде.";
-          const success = crypto.randomInt(100) < 35;
+          const success = crypto.randomInt(100) < 50;
           let label = "Апгрейд не удался · подарок использован";
           if (success) {
             const gift = available[crypto.randomInt(0, available.length)], stars = Number(gift.star_count), newId = crypto.randomUUID();
@@ -970,7 +1048,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           try { await writeState(user.id, state); if (success) await writePendingQueue(queue); }
           catch (error) { await writeState(user.id, originalState).catch(()=>{}); throw error; }
           if (success) processPendingGiftQueue().catch(()=>{});
-          json(res, 200, { ok: true, success, label, chance: "35%", message: success ? "Удача! Новый подарок сохранён в очереди отправки." : "Не повезло. Подарок был использован, апгрейд не прошёл." }); return true;
+          json(res, 200, { ok: true, success, label, chance: "50%", message: success ? "Удача! Новый подарок сохранён в очереди отправки." : "Не повезло. Подарок был использован, апгрейд не прошёл." }); return true;
         } finally { locks.delete("inventory:" + user.id); }
       }
       if (req.method === "POST" && url.pathname === "/roulette/api/redeem-code") {
