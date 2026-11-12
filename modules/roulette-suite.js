@@ -256,24 +256,38 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
   const webAppUrl = makeWebAppUrl();
   const referralLocks = new Set();
   async function registerReferral(userId, payload) {
-    const match = /^ref_(\d{1,20})$/.exec(String(payload || ""));
-    if (!match || String(match[1]) === String(userId) || !kvReady()) return { ok: false };
-    const inviterId = String(match[1]), inviteeId = String(userId);
+    const match = /^ref_(\\d{1,20})$/.exec(String(payload || ""));
+    if (!kvReady()) return { ok: false };
+    const inviteeId = String(userId);
     if (referralLocks.has(inviteeId)) return { ok: false };
     referralLocks.add(inviteeId);
     try {
+      const startedUsers = await readGlobal("startedUsers", {});
+      if (startedUsers[inviteeId]) return { ok: false, duplicate: true };
       const referrals = await readGlobal("referrals", {});
-      if (referrals[inviteeId]) return { ok: false, duplicate: true };
-      const inviter = await readState(inviterId), invitee = await readState(inviteeId);
+      const invitee = await readState(inviteeId);
+      const hasPriorRouletteActivity = Boolean(invitee.lastSpinDay || invitee.history.length || invitee.referralCount || invitee.bonusSpins || invitee.coins);
+      startedUsers[inviteeId] = { at: Date.now() };
+      if (!match || String(match[1]) === inviteeId || referrals[inviteeId] || hasPriorRouletteActivity) {
+        await writeGlobal("startedUsers", startedUsers);
+        return { ok: false, duplicate: Boolean(referrals[inviteeId] || hasPriorRouletteActivity) };
+      }
+      const inviterId = String(match[1]);
+      const inviter = await readState(inviterId);
       referrals[inviteeId] = { inviterId, at: Date.now() };
       inviter.referralCount = Math.min(100000, (inviter.referralCount || 0) + 1);
       inviter.bonusSpins = Math.min(100000, inviter.bonusSpins + 2);
       invitee.bonusSpins = Math.min(100000, invitee.bonusSpins + 1);
-      await writeState(inviterId, inviter); await writeState(inviteeId, invitee); await writeGlobal("referrals", referrals);
-      await bot.api.sendMessage(Number(inviterId), "🎉 По твоей ссылке пришёл новый игрок! Тебе начислено +2 бонусные прокрутки.").catch(() => {});
+      await writeState(inviterId, inviter);
+      await writeState(inviteeId, invitee);
+      await writeGlobal("referrals", referrals);
+      await writeGlobal("startedUsers", startedUsers);
+      await bot.api.sendMessage(Number(inviterId), "🎉 Новый игрок впервые нажал START по твоей ссылке! Тебе начислено +2 бонусные прокрутки.").catch(() => {});
       return { ok: true };
-    } catch (error) { console.error("NEXUS referral:", String(error.message || error).slice(0, 180)); return { ok: false }; }
-    finally { referralLocks.delete(inviteeId); }
+    } catch (error) {
+      console.error("NEXUS referral:", String(error.message || error).slice(0, 180));
+      return { ok: false };
+    } finally { referralLocks.delete(inviteeId); }
   }
   let queueWorkerRunning = false;
   async function processPendingGiftQueue() {
