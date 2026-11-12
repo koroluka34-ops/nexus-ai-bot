@@ -50,6 +50,11 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .disclaimer{font-size:10px;line-height:1.55;color:#8292ae;text-align:center;padding:0 8px;margin:0}.jackpot-flash{animation:jackpotPulse 1s ease-in-out 4}@keyframes jackpotPulse{0%,100%{box-shadow:0 0 0 1px #f7d78a55,0 0 12px #f7d78a33}50%{box-shadow:0 0 0 5px #f7d78a99,0 0 55px #f7d78a}}.field{display:flex;gap:7px;margin-top:10px}.field input{min-width:0;flex:1;background:#0a1225;border:1px solid #34415e;border-radius:12px;padding:11px;color:white}.field button{border:1px solid #f5d78b;border-radius:12px;padding:10px;background:#d99a32;color:#171528;font-weight:900}.quest{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #2d3d5e;font-size:11px}.quest button{background:#243b66;color:white;border:1px solid #516b9c;border-radius:10px;padding:8px;font-weight:800}.mode{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#f7d78a;margin:10px 0}
 @media(min-width:420px){body{padding-top:22px}.panel{padding:19px}.outer{width:310px}}
 
+
+@keyframes screenIn{from{opacity:0}to{opacity:1}}
+@keyframes cardPop{0%{opacity:0;transform:translateY(28px) scale(.82)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes prizeFloat{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}
+@keyframes confettiFall{to{transform:translate3d(35px,110vh,0) rotate(900deg);opacity:0}}
 /* NEXUS celebration and personalization */
 .win-screen{position:fixed;inset:0;z-index:99;display:none;place-items:center;padding:22px;background:#050817ef;backdrop-filter:blur(12px);overflow:hidden}
 .win-screen.show{display:grid;animation:screenIn .35s ease-out}
@@ -122,6 +127,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       <div class="prize no-prize"><b>🍀 Без приза</b><span>Попробуй завтра</span></div>
     </div>
     <p class="hint">Здесь показаны настоящие подарки Telegram. Подарок за 1000 ⭐ — отдельный джекпот.</p>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🎉 Свежие выигрыши</strong><span>Публичная лента</span></div>
+    <div id="recentWinners" class="prizes"><div class="prize"><b>Первые победы появятся здесь</b></div></div>
   </section>
   <section class="panel">
     <div class="section-head"><strong>🏅 Достижения</strong><span>Твои этапы</span></div>
@@ -304,6 +313,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   function renderExtraFeatures(data){
     const grid=$("achievementGrid");grid.replaceChildren();
     (data.achievements||[]).forEach(item=>{const card=document.createElement("div");card.className="achievement"+(item.done?" done":"");const b=document.createElement("b");b.textContent=(item.done?"✅ ":"🔒 ")+item.icon+" "+item.title;const span=document.createElement("span");span.textContent=item.done?"Получено":item.progress+"/"+item.target+" выполнено";card.append(b,span);grid.append(card);});
+
+    const winners=$("recentWinners");winners.replaceChildren();
+    (data.recentWinners||[]).forEach(item=>{const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎉 "+item.name+" — "+item.label;const span=document.createElement("span");span.textContent=(item.cost||0)+" ⭐ · "+(item.at?new Date(item.at).toLocaleString("ru-RU"):"недавно");card.append(b,span);winners.append(card);});
+    if(!winners.children.length){const empty=document.createElement("div");empty.className="prize";empty.textContent="Пока нет подтверждённых выигрышей.";winners.append(empty);}
     $("dailyTheme").textContent="✨ "+(data.dailyTheme||"Тема дня");
     $("luckySector").textContent="🎯 "+(data.luckySector||"Счастливый сектор появится во время события.");
     const days=$("calendarDays");days.replaceChildren();const labels=["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"];const now=new Date();const monday=(now.getDay()+6)%7;
