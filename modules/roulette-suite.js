@@ -593,7 +593,19 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         json(res, 200, {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
           lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Array.isArray(winners) ? winners.slice(-10).reverse() : [],
-          giftsAvailable: catalog.gifts.length, pendingGifts, prizes: catalog.prizes.map(publicPrize),
+          giftsAvailable: catalog.gifts.length, pendingGifts,
+          giftOptions: (() => {
+            const randomCount = catalog.gifts.filter(g => g.cost >= 15 && g.cost <= 999).length;
+            const randomPrize = catalog.prizes.find(p => p.type === "gift_random");
+            const randomChance = Number(String(randomPrize?.probability || "38").replace(",", ".")) || 0;
+            return catalog.gifts.map(g => ({
+              ...publicPrize(g),
+              probability: g.cost === 1000
+                ? "0,01% · джекпот"
+                : (randomCount ? (randomChance / randomCount).toLocaleString("ru-RU", { maximumFractionDigits: 4 }) + "%" : "0%")
+            }));
+          })(),
+          prizes: catalog.prizes.map(publicPrize),
           unavailableReason: catalog.gifts.length ? "" : "Нет доступных подарков стоимостью 15–1000 ⭐ или не хватает Stars на балансе бота.",
           lastResult: state.history.at(-1) || null
         });
