@@ -324,11 +324,17 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function celebrateWin(prize,message,jackpot){
     const screen=$("winScreen"),art=$("winArt"),emoji=$("winEmoji");
-    $("winTitle").textContent=jackpot?"💎 ДЖЕКПОТ!":prize?.type==="none"?"ПОПРОБУЕМ ЕЩЁ?":"ТЫ ВЫИГРАЛ!";
-    $("winMessage").textContent=message||"Твой приз уже в истории рулетки.";
-    emoji.style.display=prize?.imageUrl?"none":"block";
-    if(prize?.imageUrl){art.src=prize.imageUrl;art.style.display="block";}else art.style.display="none";
+    $("winTitle").textContent="🧧 ОТКРЫВАЕМ КОНВЕРТ…";
+    $("winMessage").textContent="Сейчас узнаем, что тебе выпало!";
+    emoji.textContent="🧧";emoji.style.display="block";
+    art.style.display="none";
     screen.classList.add("show");
+    setTimeout(()=>{
+      $("winTitle").textContent=jackpot?"💎 ДЖЕКПОТ!":prize?.type==="none"?"ПОПРОБУЕМ ЕЩЁ?":"ТЫ ВЫИГРАЛ!";
+      $("winMessage").textContent=message||"Твой приз уже в истории рулетки.";
+      emoji.textContent=prize?.type==="none"?"🍀":"🎁";emoji.style.display=prize?.imageUrl?"none":"block";
+      if(prize?.imageUrl){art.src=prize.imageUrl;art.style.display="block";}
+    },950);
     for(let i=0;i<46;i++){const bit=document.createElement("i");bit.className="confetti";bit.style.setProperty("--x",Math.random()*100+"%");bit.style.setProperty("--hue",Math.floor(Math.random()*360));bit.style.setProperty("--dur",(2+Math.random()*2)+"s");bit.style.setProperty("--rot",Math.floor(Math.random()*360)+"deg");screen.append(bit);setTimeout(()=>bit.remove(),4200);}
     if(jackpot||prize?.type!=="none")playJackpotFanfare();
   }
