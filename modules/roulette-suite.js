@@ -712,9 +712,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           inviteQuestAvailable: !state.questClaims.inviteFriend,
           dailyQuestClaimed: state.questClaims.dailySpin === kyivDay(),
           timedQuest: (() => {
-            const cycle = Math.floor(Date.now() / 300000), start = cycle * 300000;
-            return { cycle, startsAt: start, endsAt: start + 300000, target: 3,
-              progress: state.history.filter(item => Number(item.at) >= start && Number(item.at) < start + 300000).length,
+            const cycle = Math.floor(Date.now() / 3600000), start = cycle * 3600000;
+            return { cycle, startsAt: start, endsAt: start + 3600000, target: 3,
+              progress: state.history.filter(item => Number(item.at) >= start && Number(item.at) < start + 3600000).length,
               claimed: state.questClaims.timedSpinCycle === cycle };
           })(),
           giftsAvailable: catalog.gifts.length, pendingGifts,
@@ -761,10 +761,10 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           if (state.questClaims.inviteFriend) { json(res, 409, { ok: false, error: "Награда за приглашение уже получена." }); return true; }
           state.questClaims.inviteFriend = true; state.bonusSpins = Math.min(100000, state.bonusSpins + 3);
         } else if (quest === "timed_spin") {
-          const cycle = Math.floor(Date.now() / 300000), start = cycle * 300000, end = start + 300000;
+          const cycle = Math.floor(Date.now() / 3600000), start = cycle * 3600000, end = start + 3600000;
           const progress = state.history.filter(item => Number(item.at) >= start && Number(item.at) < end).length;
-          if (state.questClaims.timedSpinCycle === cycle) { json(res, 409, { ok: false, error: "Награда за это пятиминутное задание уже получена." }); return true; }
-          if (progress < 3) { json(res, 409, { ok: false, error: "Нужно сделать 3 прокрутки за это пятиминутное задание. Сейчас: " + progress + "/3." }); return true; }
+          if (state.questClaims.timedSpinCycle === cycle) { json(res, 409, { ok: false, error: "Награда за это часовое задание уже получена." }); return true; }
+          if (progress < 3) { json(res, 409, { ok: false, error: "Нужно сделать 3 прокрутки за это часовое задание. Сейчас: " + progress + "/3." }); return true; }
           state.questClaims.timedSpinCycle = cycle; state.bonusSpins = Math.min(100000, state.bonusSpins + 2);
         } else if (quest.startsWith("daily_")) {
           const dailyId = quest.slice(6), tasks = ensureDailyQuests(state, user.id);
@@ -782,15 +782,15 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         locks.add("case:" + user.id);
         try {
           const state = await readState(user.id), cost = 20;
-          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Нужно 20 NEXUS Coins для открытия кейса." }); return true; }
+          if ((state.coins || 0) < cost) { json(res, 409, { ok: false, error: "Нужно 20 ₿ для открытия кейса." }); return true; }
           state.coins -= cost;
           const roll = crypto.randomInt(100);
           let reward;
-          if (roll < 42) { state.coins += 8; reward = { title: "🪙 Возврат монет", detail: "+8 NEXUS Coins", coins: 8, spins: 0 }; }
-          else if (roll < 72) { state.bonusSpins = Math.min(100000, state.bonusSpins + 1); reward = { title: "🎰 Бонусная прокрутка", detail: "+1 прокрутка", coins: 0, spins: 1 }; }
-          else if (roll < 90) { state.coins += 18; reward = { title: "💰 Большой возврат", detail: "+18 NEXUS Coins", coins: 18, spins: 0 }; }
-          else if (roll < 99) { state.bonusSpins = Math.min(100000, state.bonusSpins + 3); reward = { title: "🎁 Пакет прокруток", detail: "+3 прокрутки", coins: 0, spins: 3 }; }
-          else { state.bonusSpins = Math.min(100000, state.bonusSpins + 10); reward = { title: "👑 МЕГА-ДРОП", detail: "+10 прокруток", coins: 0, spins: 10 }; }
+          if (roll < 40) { state.coins += 22; reward = { title: "🪙 Маленький выигрыш", detail: "+22 ₿ · чистая прибыль 2 ₿", coins: 22, spins: 0 }; }
+          else if (roll < 70) { state.coins += 25; reward = { title: "💰 Хороший выигрыш", detail: "+25 ₿ · чистая прибыль 5 ₿", coins: 25, spins: 0 }; }
+          else if (roll < 90) { state.coins += 35; reward = { title: "💎 Крупный выигрыш", detail: "+35 ₿ · чистая прибыль 15 ₿", coins: 35, spins: 0 }; }
+          else if (roll < 98) { state.bonusSpins = Math.min(100000, state.bonusSpins + 2); reward = { title: "🎁 Две бонусные прокрутки", detail: "+2 прокрутки рулетки", coins: 0, spins: 2 }; }
+          else { state.bonusSpins = Math.min(100000, state.bonusSpins + 10); reward = { title: "👑 МЕГА-ДРОП", detail: "+10 прокруток рулетки", coins: 0, spins: 10 }; }
           state.caseHistory = Array.isArray(state.caseHistory) ? state.caseHistory.slice(-19) : [];
           state.caseHistory.push({ at: Date.now(), reward: reward.title, detail: reward.detail });
           await writeState(user.id, state);
