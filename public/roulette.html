@@ -23,15 +23,17 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .stats{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:#aebdd6}
 .stats strong{color:#fff;font-size:13px}
 .balance{padding:7px 10px;border-radius:12px;background:#0a1225;border:1px solid #34415e;color:#f7d77e;font-weight:850;white-space:nowrap}
-.wheel-wrap{display:flex;flex-direction:column;align-items:center;padding:17px 0 13px}
-.pointer{width:0;height:0;position:relative;border-left:13px solid transparent;border-right:13px solid transparent;border-top:0;border-bottom:25px solid #fff;filter:drop-shadow(0 3px 5px #000b);margin-bottom:-7px;z-index:4;transform:rotate(180deg);transform-origin:50% 0}
-.pointer.hit{animation:pointerHit .16s cubic-bezier(.2,.8,.3,1)}
-@keyframes pointerHit{0%{transform:rotate(180deg)}38%{transform:rotate(207deg) translateY(2px)}70%{transform:rotate(171deg)}100%{transform:rotate(180deg)}}
+.wheel-wrap{position:relative;display:flex;flex-direction:column;align-items:center;padding:17px 0 13px}
+.pointer{position:absolute;top:0;left:50%;width:24px;height:38px;margin:0;z-index:5;transform:translateX(-50%);transform-origin:50% 6px;filter:drop-shadow(0 3px 5px #000b);pointer-events:none}
+.pointer:before{content:"";position:absolute;left:3px;top:7px;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:29px solid #fff}
+.pointer:after{content:"";position:absolute;left:6px;top:0;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0 18%,#dbe5f5 45%,#65748e 100%);border:1px solid #fff;box-shadow:0 1px 4px #000b}
+.pointer.hit{animation:pointerHit .19s cubic-bezier(.18,.72,.25,1)}
+@keyframes pointerHit{0%{transform:translateX(-50%) rotate(0)}30%{transform:translateX(-50%) rotate(23deg)}58%{transform:translateX(-50%) rotate(-5deg)}78%{transform:translateX(-50%) rotate(4deg)}100%{transform:translateX(-50%) rotate(0)}}
 .wheel-peg{position:absolute;z-index:2;left:50%;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff9d7 0 18%,#e8bd60 42%,#8b571a 100%);box-shadow:0 0 4px #ffe6a9,0 1px 2px #000b;pointer-events:none}
 .outer{width:min(76vw,310px);aspect-ratio:1;padding:9px;border-radius:50%;background:conic-gradient(from 30deg,#9a5a14,#ffedaa,#c68a34,#fff1b9,#a65e18,#f4d17d);box-shadow:0 0 0 1px #ffe7a355,0 13px 30px #0009,0 0 38px #eab64b26}
 .wheel{width:100%;height:100%;position:relative;overflow:hidden;border-radius:50%;border:5px solid #10182c;background:conic-gradient(from -90deg,#284c9a 0 50%,#172b59 50% 100%);transition:transform 5s cubic-bezier(.12,.72,.12,1);box-shadow:inset 0 0 30px #02061799}
 .wheel:after{content:"N";position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#fff,#aab8d1);color:#101a34;font-size:25px;font-weight:1000;border:5px solid #10182c;box-shadow:0 5px 15px #000a}
-.slice-label{position:absolute;left:50%;top:50%;width:76px;margin-left:-38px;margin-top:-24px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:9px;font-weight:950;line-height:1.05;color:#fff;text-shadow:0 2px 5px #000,0 0 7px #000;transform-origin:50% 50%;pointer-events:none;z-index:2}.slice-label img{display:block;width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 3px 5px #000b)}.slice-emoji{font-size:30px;line-height:38px;filter:drop-shadow(0 3px 5px #000b)}.slice-text{max-width:76px;font-size:8px;letter-spacing:.02em}
+.slice-label{position:absolute;left:50%;top:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;font-size:8px;font-weight:950;line-height:1.05;color:#fff;text-shadow:0 2px 5px #000,0 0 7px #000;transform-origin:50% 50%;pointer-events:none;z-index:2;overflow:visible}.slice-label img{display:block;flex:0 0 auto;width:var(--art-size);height:var(--art-size);object-fit:contain;object-position:center;filter:drop-shadow(0 3px 5px #000b)}.slice-emoji{display:block;font-size:calc(var(--art-size)*.78);line-height:var(--art-size);height:var(--art-size);text-align:center;filter:drop-shadow(0 3px 5px #000b)}.slice-text{display:block;width:100%;max-width:100%;font-size:var(--label-font);line-height:1.05;letter-spacing:0;text-align:center;overflow-wrap:anywhere}
 .spin{width:100%;border:1px solid #f5d78b;border-radius:15px;padding:16px 18px;background:linear-gradient(100deg,#d99a32,#f4d47e 52%,#bd7b24);color:#171528;font-size:15px;font-weight:1000;letter-spacing:.04em;box-shadow:0 8px 25px #d69a3650}
 .spin:disabled{opacity:.48;filter:grayscale(.6);box-shadow:none}
 .hint{text-align:center;font-size:11px;color:#9cacc8;line-height:1.5;margin:10px 4px 0}
@@ -180,22 +182,38 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function drawWheel(prizes){
     currentPrizes=Array.isArray(prizes)&&prizes.length?prizes:[{id:"gift_preview",short:"Подарок",label:"Подарок Telegram",type:"gift"},{id:"no_prize",short:"Попробуй завтра",label:"Без приза",type:"none"}];
-    const step=360/currentPrizes.length;
+    const count=currentPrizes.length,step=360/count,diameter=wheel.clientWidth||280;
+    const radius=diameter*.325;
     wheel.style.background="conic-gradient(from -90deg,"+currentPrizes.map((_,i)=>colors[i%colors.length]+" "+(i*step)+"deg "+((i+1)*step)+"deg").join(",")+")";
     wheel.querySelectorAll(".slice-label,.wheel-peg").forEach(node=>node.remove());
     currentPrizes.forEach((prize,index)=>{
-      const label=document.createElement("span");label.className="slice-label";
       const angle=index*step+step/2;
-      label.style.transform="rotate("+angle+"deg) translateY(-"+(wheel.clientWidth*.34)+"px) rotate(-"+angle+"deg)";
+      const width=Math.max(30,Math.min(76,2*radius*Math.sin(step*Math.PI/360)*.82));
+      const artSize=Math.max(17,Math.min(38,width*.62));
+      const fontSize=Math.max(5.5,Math.min(8,width*.115));
+      const label=document.createElement("span");label.className="slice-label";
+      label.dataset.angle=String(angle);label.dataset.radius=String(radius);
+      label.style.width=width+"px";label.style.marginLeft=(-width/2)+"px";
+      label.style.marginTop=(-(artSize+19)/2)+"px";
+      label.style.setProperty("--art-size",artSize+"px");label.style.setProperty("--label-font",fontSize+"px");
+      label.style.transform="rotate("+angle+"deg) translateY(-"+radius+"px) rotate(-"+angle+"deg)";
       if(prize.imageUrl){
-        const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
+        const img=document.createElement("img");img.src=prize.imageUrl;img.alt="";img.draggable=false;
+        img.onerror=()=>{img.replaceWith(makePrizeEmoji(prize));};label.append(img);
       }else label.append(makePrizeEmoji(prize));
       const text=document.createElement("span");text.className="slice-text";
       text.textContent=prize.type==="telegram_premium"?"TELEGRAM PREMIUM":prize.type==="nexus_plus"?"NEXUS PREMIUM":prize.type==="nexus_ultra"?"NEXUS ULTRA":prize.type==="jackpot"?"1000 ⭐ JACKPOT":prize.type==="secret"?"???":prize.type==="gift_random"?"15–1000 ⭐":prize.type==="none"?"БЕЗ ПРИЗА":(prize.cost||"")+" ⭐";
       label.append(text);wheel.append(label);
       const peg=document.createElement("i");peg.className="wheel-peg";
-      peg.style.transform="rotate("+((index+.5)*step)+"deg) translateY(-"+(wheel.clientWidth*.465)+"px)";
+      peg.style.transform="rotate("+(index*step)+"deg) translateY(-"+(diameter*.47)+"px)";
       wheel.append(peg);
+    });
+  }
+  function keepWheelLabelsUpright(rotation){
+    wheel.querySelectorAll(".slice-label").forEach(label=>{
+      const angle=Number(label.dataset.angle)||0;
+      const radius=Number(label.dataset.radius)||0;
+      label.style.transform="rotate("+angle+"deg) translateY(-"+radius+"px) rotate("+(-angle-rotation)+"deg)";
     });
   }
   function pointerHit(){
@@ -218,22 +236,26 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   function animateWheelTo(targetAngle,step,duration=7600){
     return new Promise(resolve=>{
-      const start=performance.now();let lastPeg=-1;
+      const start=performance.now();let lastPeg=0;
       wheel.style.transition="none";wheel.style.transform="rotate(0deg)";
+      keepWheelLabelsUpright(0);
       const frame=now=>{
         const t=Math.min(1,(now-start)/duration);
         const eased=1-Math.pow(1-t,4);
         const angle=targetAngle*eased;
         wheel.style.transform="rotate("+angle+"deg)";
-        const passed=Math.floor(angle/step);
+        keepWheelLabelsUpright(angle);
+        const passed=Math.floor((angle+0.0001)/step);
         if(passed>lastPeg){
-          const count=Math.min(passed-lastPeg,36);
-          for(let n=0;n<count;n++){pointerHit();playWheelTick();}
+          const hits=passed-lastPeg;
+          for(let n=0;n<hits;n++)playWheelTick();
+          pointerHit();
           lastPeg=passed;
         }
         if(t<1)requestAnimationFrame(frame);
         else{
           wheel.style.transform="rotate("+targetAngle+"deg)";
+          keepWheelLabelsUpright(targetAngle);
           pointer?.classList.remove("hit");
           resolve();
         }
