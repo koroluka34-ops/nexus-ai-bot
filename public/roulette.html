@@ -160,7 +160,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .selected-case.opening{animation:csCaseFlash .95s ease-out both}
 @keyframes csCaseOpen{0%{transform:scale(1) rotate(0);filter:brightness(1) drop-shadow(0 8px 12px #000)}35%{transform:scale(1.1) rotate(-5deg);filter:brightness(1.8) drop-shadow(0 0 25px #ffe29a)}70%{transform:scale(.92) rotate(4deg);filter:brightness(2.2) drop-shadow(0 0 35px #fff)}100%{transform:scale(.78) rotate(0);opacity:.25}}
 @keyframes csCaseFlash{0%{box-shadow:0 0 0 #ffe29a00}45%{box-shadow:0 0 65px #ffe29aaa}100%{box-shadow:0 0 18px #d8a64a33}}
-</style>
+.inventory-actions{margin-top:10px}.inventory-actions .spin{padding:12px;font-size:12px}.inventory-card{position:relative;min-width:0;padding:10px;border:1px solid #34446b;border-radius:14px;background:linear-gradient(145deg,#101a31,#0a1224)}.inventory-card img{display:block;width:68px;height:68px;object-fit:contain;margin:0 auto 7px}.inventory-card b{display:block;font-size:10px;line-height:1.35;overflow-wrap:anywhere}.inventory-card span{display:block;margin-top:5px;color:#a8b7d1;font-size:10px}.inventory-card label{display:flex;align-items:center;gap:5px;margin:7px 0;font-size:10px;color:#f6d78b}.inventory-card button{width:100%;border:1px solid #a77d3e;border-radius:9px;background:#47351c;color:#ffe5a6;padding:8px 5px;font-size:9px;font-weight:900}.inventory-card input{accent-color:#f5c66a}.history-list{display:flex;flex-direction:column;gap:7px}.history-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid #293958;border-radius:11px;background:#0b1428;font-size:10px}.history-row b{display:block;line-height:1.35}.history-row span{color:#9eafcb;white-space:nowrap}.best-win{margin-top:10px;padding:12px;border:1px solid #a77d3e;border-radius:12px;background:#3a2a19;color:#ffe5a6;font-size:11px;line-height:1.5}.case-tools{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:8px 0}.case-tools label{display:flex;align-items:center;gap:6px;color:#c5cee0;font-size:11px}.case-tools input{accent-color:#f5c66a}.case-repeat{display:none;width:100%;margin-top:10px;border:1px solid #f5d78b;border-radius:13px;padding:13px;background:linear-gradient(100deg,#d99a32,#f4d47e);color:#171528;font-weight:1000}.case-repeat.show{display:block}.history-status{color:#f4d47e!important}</style>
 </head>
 <body>
 <main>
@@ -250,17 +250,34 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="win-card"><div style="font-size:12px;letter-spacing:.2em;color:#f7d78a;font-weight:950">NEXUS · ПОЗДРАВЛЯЕМ</div><div id="winEmoji" style="font-size:48px;margin:12px">🎁</div><img id="winArt" class="win-art" alt="Выигранный подарок" style="display:none"><h2 id="winTitle">ТЫ ВЫИГРАЛ!</h2><p id="winMessage"></p><button class="win-close" id="winClose">ЗАБРАТЬ ПОБЕДУ ✨</button></div>
   </div>
   <p class="disclaimer">В рулетке прокручивается кейс NEXUS. После открытия показывается выбранный приз: настоящий Telegram-подарок или Premium-награда. Выдача выполняется ботом через Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
+  <section class="panel" id="vaultPanel">
+    <div class="section-head"><strong>🎒 Инвентарь NEXUS</strong><span id="inventoryCount">0 подарков</span></div>
+    <p class="hint">Отмечай 5 подарков для контракта обмена или улучши один подарок. Используются только уже доставленные Telegram-подарки.</p>
+    <div id="inventoryList" class="prizes"><div class="prize"><b>Инвентарь загружается…</b></div></div>
+    <div class="inventory-actions">
+      <button class="spin" id="contractButton" disabled>🔄 КОНТРАКТ · 5 ПОДАРКОВ</button>
+      <p class="hint" id="contractStatus">5 подарков → один новый подарок стоимостью от 1,5× средней стоимости выбранных.</p>
+    </div>
+    <div class="section-head" style="margin-top:18px"><strong>📜 История открытий</strong><span id="historyCount">0 записей</span></div>
+    <div id="historyList" class="history-list"><p class="hint">История появится после первых прокруток.</p></div>
+    <div class="best-win" id="bestWin">🏆 Самый дорогой выигрыш появится здесь.</div>
+  </section>
 </main>
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
     <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
     <p class="case-modal-hint">Сначала выпадет настоящий кейс CS2. Он появится на экране и откроется, после чего прокрутится лента наград.</p>
+    <div class="case-tools">
+      <label><input type="checkbox" id="caseSound" checked> 🔊 Звуки открытия</label>
+      <label><input type="checkbox" id="fastOpen"> ⚡ Быстрая анимация</label>
+    </div>
     <div class="case-select-stage" id="caseSelectStage"><div class="case-select-pointer"></div><div class="case-select-track" id="caseSelectTrack"></div></div>
     <div class="selected-case" id="selectedCase"><img id="selectedCaseImage" alt="Выбранный кейс CS2"><div><b id="selectedCaseName"></b><small>КЕЙС ВЫБРАН · ОТКРЫВАЕМ…</small></div></div>
     <div class="case-stage" id="caseStage" aria-live="polite" style="display:none"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
     <div class="case-reveal" id="caseReveal"><img id="caseRevealImage" alt="Выигранный Telegram-подарок"><div class="case-reveal-rarity" id="caseRevealRarity"></div><h3 id="caseRevealTitle"></h3><div class="case-reveal-value" id="caseRevealValue"></div></div>
     <button class="spin" id="caseOpenConfirm">КУПИТЬ КЕЙС · 100 ₿</button>
+    <button class="case-repeat" id="caseRepeat">🔁 ОТКРЫТЬ ЕЩЁ ОДИН КЕЙС · 100 ₿</button>
     <p class="hint" id="caseModalStatus">Нажми кнопку, чтобы открыть кейс.</p>
   </div>
 </div>
@@ -270,7 +287,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   try{tg?.setHeaderColor?.("#080b18");tg?.setBackgroundColor?.("#080b18");}catch{}
   const initData=tg?.initData||"";
   const $=id=>document.getElementById(id);
-  const pageGroups=[[0,1,10],[2,3,4,5],[6,7,8,9,11,12,13]];
+  const pageGroups=[[0,1,10],[2,3,4,5],[6,7,8,9,11,12,13,14]];
   const allPanels=[...document.querySelectorAll("main > section.panel")];
   const pageHost=document.createElement("div");pageHost.id="pageHost";
   const firstPanel=allPanels[0];
@@ -404,6 +421,31 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const box=$("collectionList");box.replaceChildren();
     if(!items.length){const card=document.createElement("div");card.className="prize";const b=document.createElement("b");b.textContent="🎁 Здесь будут твои выигранные подарки";const meta=document.createElement("span");meta.textContent="Все доставленные призы сохраняются в коллекции.";card.append(b,meta);box.append(card);return;}
     items.forEach(item=>{const card=document.createElement("div");card.className="prize";if(item.imageUrl){const img=document.createElement("img");img.className="gift-art";img.src=item.imageUrl;img.alt=item.label||"Telegram Gift";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}const b=document.createElement("b");b.textContent=item.label||"🎁 Выигранный приз";const meta=document.createElement("span");meta.textContent=item.day||"NEXUS Gift Roulette";card.append(b,meta);box.append(card);});
+  }
+  let inventoryItems=[],selectedInventory=new Set();
+  function renderInventory(items){
+    inventoryItems=Array.isArray(items)?items:[];
+    const box=$("inventoryList");box.replaceChildren();$("inventoryCount").textContent=inventoryItems.length+" подарков";
+    if(!inventoryItems.length){const empty=document.createElement("div");empty.className="prize";empty.innerHTML="<b>🎒 Инвентарь пока пуст</b><span>Подарки появятся после успешной доставки.</span>";box.append(empty);}
+    inventoryItems.forEach(item=>{
+      const card=document.createElement("div");card.className="inventory-card";
+      if(item.imageUrl){const img=document.createElement("img");img.src=item.imageUrl;img.alt=item.label||"Подарок";img.onerror=()=>img.style.display="none";card.append(img);}
+      const title=document.createElement("b");title.textContent=item.label||"Telegram Gift";
+      const value=document.createElement("span");value.textContent=Number(item.cost||0)+" ⭐";
+      const checkLabel=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=selectedInventory.has(item.spinId);check.addEventListener("change",()=>{if(check.checked){if(selectedInventory.size>=5){check.checked=false;return;}selectedInventory.add(item.spinId);}else selectedInventory.delete(item.spinId);$("contractButton").disabled=selectedInventory.size!==5;});checkLabel.append(check,document.createTextNode("В контракт")); 
+      const upgrade=document.createElement("button");upgrade.textContent="⬆️ АПГРЕЙД · 35%";upgrade.addEventListener("click",async()=>{if(!confirm("Использовать этот подарок для апгрейда? Шанс успеха — 35%. При неудаче подарок сгорит."))return;upgrade.disabled=true;try{const result=await api("/roulette/api/upgrade","POST",{spinId:item.spinId});$("contractStatus").textContent=result.message+" "+result.label;selectedInventory.clear();await refresh();}catch(error){upgrade.disabled=false;$("contractStatus").textContent=error.message;}}); 
+      card.append(title,value,checkLabel,upgrade);box.append(card);
+    });
+    $("contractButton").disabled=selectedInventory.size!==5;
+  }
+  function renderHistory(items){
+    const box=$("historyList");box.replaceChildren();$("historyCount").textContent=items.length+" записей";
+    if(!items.length){const p=document.createElement("p");p.className="hint";p.textContent="История пока пуста.";box.append(p);return;}
+    items.forEach(item=>{const row=document.createElement("div");row.className="history-row";const left=document.createElement("div"),title=document.createElement("b"),meta=document.createElement("span");title.textContent=item.label||"Прокрутка";meta.textContent=new Date(item.at||Date.now()).toLocaleString("ru-RU")+" · "+(item.source==="case"?"CS2-кейс":item.source==="contract"?"Контракт":item.source==="upgrade"?"Апгрейд":"Рулетка");left.append(title,meta);const status=document.createElement("span");status.className="history-status";status.textContent=item.status==="delivered"?"✓ Получено":item.status==="processing"?"⏳ Ожидает":item.status==="contracted"?"Обменян":item.status==="upgrade_used"?"Улучшен":item.status==="upgrade_failed"?"Неудача":"—";row.append(left,status);box.append(row);});
+  }
+  function renderBestWin(item){
+    const box=$("bestWin");if(!item){box.textContent="🏆 Самый дорогой выигрыш появится здесь.";return;}
+    box.textContent="🏆 ТВОЙ ЛУЧШИЙ ВЫИГРЫШ · "+(item.label||"Подарок")+" · "+Number(item.cost||0)+" ⭐";
   }
   function renderPendingGifts(items){
     const panel=$("pendingPanel"),box=$("pendingGifts");box.replaceChildren();
@@ -574,7 +616,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("inviteQuestRow").style.display=data.inviteQuestAvailable===false?"none":"flex";
       $("inviteQuestText").textContent="👥 Пригласи 3 новых друзей — +3 попытки ("+Math.min(data.referralCount||0,3)+"/3)";
       $("inviteQuest").disabled=(data.referralCount||0)<3;$("inviteQuest").textContent=(data.referralCount||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
-      renderCollection(data.collection||[]);
+      renderCollection(data.collection||[]);renderInventory(data.inventory||[]);renderHistory(data.history||[]);renderBestWin(data.bestWin);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
       const needed=$("x2Mode").checked?2:1;spinButton.disabled=!data.canSpin||(data.totalSpinsAvailable||0)<needed;spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";
       balanceNote.textContent=data.giftsAvailable?"Сейчас доступно "+data.giftsAvailable+" вариантов настоящих подарков по цене 15–1000 ⭐. Мишка выбирает один случайно.":"Пока нет подарков, доступных для покупки с текущего баланса.";
@@ -616,6 +658,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(n>=101)return {key:"epic",label:"ЭПИЧЕСКИЙ"};
     if(n>=51)return {key:"rare",label:"РЕДКИЙ"};
     return {key:"common",label:"ОБЫЧНЫЙ"};
+  }
+  function playCaseSound(kind){
+    if(!$("caseSound")?.checked)return;
+    try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C(),now=c.currentTime;
+      const notes=kind==="win"?[523,659,784,1047]:kind==="tick"?[760]:[180,260,360];
+      notes.forEach((hz,i)=>{const o=c.createOscillator(),g=c.createGain();o.type=kind==="tick"?"square":"triangle";o.frequency.setValueAtTime(hz,now+i*.075);g.gain.setValueAtTime(.0001,now+i*.075);g.gain.exponentialRampToValueAtTime(kind==="tick"?.035:.11,now+i*.075+.012);g.gain.exponentialRampToValueAtTime(.0001,now+i*.075+.16);o.connect(g);g.connect(c.destination);o.start(now+i*.075);o.stop(now+i*.075+.17);});setTimeout(()=>c.close().catch(()=>{}),1200);
+    }catch{}
   }
   let csCaseCatalog=[];
   async function loadCsCaseCatalog(){
@@ -673,9 +722,9 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     $("selectedCaseName").textContent=winner.name;
     $("selectedCase").classList.add("show");
     stage.style.display="none";
-    await new Promise(resolve=>setTimeout(resolve,850));
+    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?120:850));
     $("selectedCase").classList.add("opening");
-    await new Promise(resolve=>setTimeout(resolve,950));
+    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?120:950));
     $("selectedCase").classList.remove("opening");
     return winner;
   }
@@ -686,7 +735,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     $("caseReveal").classList.remove("show");$("caseRevealImage").removeAttribute("src");
     $("selectedCase").classList.remove("show","opening");
     $("caseSelectStage").style.display="flex";$("caseStage").style.display="none";
-    $("caseOpenConfirm").style.display="none";
+    $("caseOpenConfirm").style.display="none";$("caseRepeat").classList.remove("show");
     loadCsCaseCatalog();
   }
   function closeCaseModal(){
@@ -710,13 +759,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
     void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     const firstTile=track.firstElementChild,tileWidth=(firstTile?.getBoundingClientRect().width||140)+8,center=(stage.clientWidth-(firstTile?.getBoundingClientRect().width||140))/2,finalX=center-4-(entries.length-1)*tileWidth;
-    track.style.transition="transform 6.8s cubic-bezier(.08,.72,.08,1)";track.style.transform="translateX("+finalX+"px)";
-    await new Promise(resolve=>setTimeout(resolve,6950));stage.classList.remove("rolling");
+    track.style.transition="transform "+($("fastOpen").checked?"1.2s":"6.8s")+" cubic-bezier(.08,.72,.08,1)";track.style.transform="translateX("+finalX+"px)";
+    await new Promise(resolve=>setTimeout(resolve,$("fastOpen").checked?1300:6950));stage.classList.remove("rolling");
     const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
   }
   async function startCaseOpening(){
     const button=$("caseOpenConfirm");if(caseOpening)return;
-    caseOpening=true;button.disabled=true;button.textContent="🎰 ВЫБИРАЕМ КЕЙС…";
+    playCaseSound("open");caseOpening=true;$("caseRepeat").classList.remove("show");button.disabled=true;button.textContent="🎰 ВЫБИРАЕМ КЕЙС…";
     $("caseClose").disabled=true;$("caseModal").classList.add("case-open-lock");
     $("caseModalStatus").textContent="Списываем 100 ₿ и запускаем прокрутку кейсов CS2…";
     $("caseReveal").classList.remove("show");
@@ -739,8 +788,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("caseRevealTitle").textContent=data.reward.title;
       $("caseRevealRarity").textContent=rarity.label;
       $("caseRevealValue").textContent=(stars?stars+" ⭐ · ":"")+data.reward.detail+" · шанс: "+(data.reward.dropChance||"—");
-      $("caseReveal").classList.add("show");
-      $("caseModalPrize").textContent="🏆 ТВОЙ ВЫИГРЫШ!";
+      $("caseReveal").classList.add("show");$("caseRepeat").classList.add("show");
+      $("caseModalPrize").textContent="🏆 ТВОЙ ВЫИГРЫШ!";playCaseSound("win");
       const isGift=data.reward.type==="gift";
       const statusText=isGift
         ?"🎁 Подарок сохранён в очереди. Бот отправит его автоматически, когда на балансе будет достаточно Stars."
@@ -758,6 +807,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
     }
   }
+  $("contractButton").addEventListener("click",async()=>{
+    if(selectedInventory.size!==5)return;
+    const button=$("contractButton");button.disabled=true;button.textContent="🔄 СОБИРАЕМ КОНТРАКТ…";
+    try{const result=await api("/roulette/api/contract","POST",{spinIds:[...selectedInventory]});$("contractStatus").textContent="🎉 "+result.message+" "+result.label;selectedInventory.clear();await refresh();}
+    catch(error){$("contractStatus").textContent=error.message;}
+    finally{button.textContent="🔄 КОНТРАКТ · 5 ПОДАРКОВ";button.disabled=selectedInventory.size!==5;}
+  });
+  $("caseRepeat").addEventListener("click",()=>{if(caseOpening)return;$("caseRepeat").classList.remove("show");$("caseReveal").classList.remove("show");$("caseSelectStage").style.display="flex";$("caseStage").style.display="none";$("caseModalPrize").textContent="🎁 ГОТОВИМ СЛЕДУЮЩИЙ КЕЙС";startCaseOpening();});
   $("caseButton").addEventListener("click",()=>{if(caseOpening)return;openCaseModal();startCaseOpening();});
   $("caseClose").addEventListener("click",closeCaseModal);
   $("caseModal").addEventListener("click",event=>{if(event.target===$("caseModal"))closeCaseModal();});
