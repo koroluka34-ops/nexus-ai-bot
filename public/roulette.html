@@ -101,7 +101,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   <section class="panel">
     <div class="section-head"><strong>🎯 Задания</strong><span>Дополнительные попытки</span></div>
     <div class="quest"><span>🎰 Используй сегодняшнюю прокрутку — +1 попытка</span><button id="dailyQuest">ЗАБРАТЬ</button></div>
-    <div class="quest"><span>👥 Пригласи друга — +2 попытки</span><button id="inviteQuest">ЗАБРАТЬ</button></div>
+    <div class="quest" id="timedQuestRow"><span id="timedQuestText">⏱ Сделай 3 прокрутки за 5 минут — +2 попытки</span><button id="timedQuest">ЗАБРАТЬ</button></div>
+    <div class="quest" id="inviteQuestRow"><span id="inviteQuestText">👥 Пригласи 3 новых друзей — +3 попытки</span><button id="inviteQuest">ЗАБРАТЬ</button></div>
     <p class="hint" id="questStatus">Выполняй задания и забирай бонусы.</p>
   </section>
   <section class="panel">
@@ -388,6 +389,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(remaining===0&&!countdownRefreshDone){countdownRefreshDone=true;refresh().finally(()=>{rouletteResetAt=nextKyivMidnight();countdownRefreshDone=false;});}
   }
   setInterval(updateRouletteCountdown,1000);
+  setInterval(()=>{if(!busy)refresh();},20000);
   updateRouletteCountdown();
 
   function renderExtraFeatures(data){
@@ -431,6 +433,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"")+(data.luckBoost?.active?" · 🍀 ПРЕМИУМ-ШАНС УСИЛЕН!":"");
       renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
+      $("dailyQuest").disabled=!!data.dailyQuestClaimed;$("dailyQuest").textContent=data.dailyQuestClaimed?"ПОЛУЧЕНО":"ЗАБРАТЬ";
+      const tq=data.timedQuest||{progress:0,target:3,endsAt:Date.now()+300000,claimed:false};
+      $("timedQuestText").textContent="⏱ Сделай 3 прокрутки за 5 минут — +2 попытки ("+Math.min(tq.progress||0,3)+"/3)";
+      $("timedQuest").disabled=!!tq.claimed||(tq.progress||0)<3;$("timedQuest").textContent=tq.claimed?"ПОЛУЧЕНО":(tq.progress||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
+      $("inviteQuestRow").style.display=data.inviteQuestAvailable===false?"none":"flex";
+      $("inviteQuestText").textContent="👥 Пригласи 3 новых друзей — +3 попытки ("+Math.min(data.referralCount||0,3)+"/3)";
+      $("inviteQuest").disabled=(data.referralCount||0)<3;$("inviteQuest").textContent=(data.referralCount||0)>=3?"ЗАБРАТЬ":"В ПРОЦЕССЕ";
       renderCollection(data.collection||[]);
       spinStatus.textContent=data.canSpin?(data.freeSpinAvailable?"Бесплатная + бонусные":"Бонусные: "+data.bonusSpins):"На сегодня закончились";
       const needed=$("x2Mode").checked?2:1;spinButton.disabled=!data.canSpin||(data.totalSpinsAvailable||0)<needed;spinButton.textContent=spinButton.disabled?"НЕДОСТАТОЧНО ПОПЫТОК":$("x2Mode").checked?"⚡ КРУТИТЬ x2":"🎁 КРУТИТЬ КОЛЕСО";
@@ -454,12 +463,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     finally{$("promoButton").disabled=false;}
   });
   async function claimQuest(quest){
-    const button=$(quest==="daily_spin"?"dailyQuest":"inviteQuest");button.disabled=true;
+    const button=$(quest==="daily_spin"?"dailyQuest":quest==="invite_friend"?"inviteQuest":"timedQuest");button.disabled=true;
     try{const data=await api("/roulette/api/quest/claim","POST",{quest});$("questStatus").textContent="✅ Награда получена! Бонусных прокруток: "+data.bonusSpins;await refresh();}
-    catch(error){$("questStatus").textContent="ℹ️ "+error.message;}
-    finally{button.disabled=false;}
+    catch(error){$("questStatus").textContent="ℹ️ "+error.message;await refresh();}
+    finally{if(button.isConnected)button.disabled=false;}
   }
   $("dailyQuest").addEventListener("click",()=>claimQuest("daily_spin"));
+  $("timedQuest").addEventListener("click",()=>claimQuest("timed_spin"));
   $("inviteQuest").addEventListener("click",()=>claimQuest("invite_friend"));
   $("copyReferral").addEventListener("click",async()=>{
     const link=$("referralLink").value;if(!link){$("questStatus").textContent="Ссылка ещё загружается.";return;}
