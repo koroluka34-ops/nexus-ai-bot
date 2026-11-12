@@ -611,7 +611,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     });
     track.style.transition="none";track.style.transform="translateX(0px)";stage.classList.add("rolling");
     void track.offsetWidth;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const tileWidth=148,center=(stage.clientWidth-136)/2,finalX=center-4-(entries.length-1)*tileWidth;
+    const firstTile=track.firstElementChild,tileWidth=(firstTile?.getBoundingClientRect().width||140)+8,center=(stage.clientWidth-(firstTile?.getBoundingClientRect().width||140))/2,finalX=center-4-(entries.length-1)*tileWidth;
     track.style.transition="transform 6.8s cubic-bezier(.08,.72,.08,1)";track.style.transform="translateX("+finalX+"px)";
     await new Promise(resolve=>setTimeout(resolve,6950));stage.classList.remove("rolling");
     const winner=track.lastElementChild;if(winner)winner.classList.add("winner");
