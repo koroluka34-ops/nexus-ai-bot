@@ -938,7 +938,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     }
     const base=Array.from({length:48},()=>({...catalog[Math.floor(Math.random()*catalog.length)]}));
     const winner=base[Math.floor(Math.random()*base.length)];
-    const entries=[...base,...base,...base.slice(0,-1),{...winner,winner:true}];
+    const entries=Array.from({length:16},()=>base.map(item=>({...item}))).flat();entries.push({...winner,winner:true});
     track.replaceChildren();
     entries.forEach(item=>{
       const tile=document.createElement("div");tile.className="case-select-tile";
@@ -1001,10 +1001,10 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     const stage=$("caseStage"),track=$("caseTrack");if(!stage||!track)return;
     const source=Array.isArray(reelPool)?reelPool:[];
     if(!source.length)throw new Error("Не удалось загрузить призы для прокрутки кейса.");
-    // Loop seamlessly through a repeated randomized strip, then brake on the
-    // server-authoritative weighted winner.
+    // Keep a deep repeated randomized strip beyond the visible viewport. The
+    // reel loops over the same strip, then brakes on the server-authoritative winner.
     const base=Array.from({length:180},()=>({...source[Math.floor(Math.random()*source.length)],winner:false}));
-    const entries=[...base,...base,...base.slice(0,-1),{...(winningEntry||base[0]),winner:true}];
+    const entries=Array.from({length:12},()=>base.map(item=>({...item}))).flat();entries.push({... (winningEntry||base[0]),winner:true});
     track.replaceChildren();
     entries.forEach(entry=>{
       const stars=Number(entry.stars||String(entry.detail||"").match(/\d+/)?.[0]||0),rarity=caseRarity(stars,entry.type);
