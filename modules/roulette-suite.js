@@ -824,7 +824,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             spinId, userId: String(user.id), type: "case_gift", giftId: gift.id,
             cost: Number(gift.star_count), label: row.label, createdAt: Date.now(), source: "case"
           };
-          const reelPool = Array.from({ length: 19 }, () => {
+          const reelPool = Array.from({ length: 59 }, () => {
             const item = available[crypto.randomInt(0, available.length)];
             return {
               title: (item.sticker?.emoji || "🎁") + " Telegram-подарок",
