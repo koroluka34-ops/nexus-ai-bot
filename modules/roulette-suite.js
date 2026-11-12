@@ -182,17 +182,22 @@ async function getGiftCatalog(bot) {
   const settings = await readGlobal("settings", { giftPercent: 38 });
   const giftPercent = Math.max(1, Math.min(90, Number(settings.giftPercent) || 38));
   const giftWeight = Math.round(giftPercent * 10000);
-  const noPrizeWeight = 1000000 - giftWeight - PLUS_WEIGHT - ULTRA_WEIGHT - TELEGRAM_PREMIUM_WEIGHT - JACKPOT_WEIGHT - SECRET_WEIGHT;
+  const premiumLuck = await readGlobal("premiumLuck", { misses: 0, boostUntil: 0 });
+  const luckBoostActive = Number(premiumLuck.boostUntil || 0) > Date.now();
+  const telegramPremiumWeight = luckBoostActive ? 1000 : TELEGRAM_PREMIUM_WEIGHT;
+  const plusWeight = luckBoostActive ? 10000 : PLUS_WEIGHT;
+  const ultraWeight = luckBoostActive ? 5000 : ULTRA_WEIGHT;
+  const noPrizeWeight = 1000000 - giftWeight - plusWeight - ultraWeight - telegramPremiumWeight - JACKPOT_WEIGHT - SECRET_WEIGHT;
   const prizes = [
-    { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: "0,01%", type: "telegram_premium", cost: 2500, available: true, weight: TELEGRAM_PREMIUM_WEIGHT },
+    { id: "telegram_premium_12m", label: "⭐ Telegram Premium · 12 месяцев", short: "Telegram Premium", probability: (telegramPremiumWeight / 10000).toLocaleString("ru-RU") + "%", type: "telegram_premium", cost: 2500, available: true, weight: telegramPremiumWeight },
     { id: "jackpot_1000", label: "💎 ДЖЕКПОТ · Telegram-подарок за 1000 ⭐", short: "ДЖЕКПОТ · 1000 ⭐", probability: "0,01%", type: "jackpot", cost: 1000, available: true, weight: JACKPOT_WEIGHT },
     { id: "secret_gift", label: "🎁 Секретный подарок", short: "Секретный приз", probability: "0,01%", type: "secret", cost: 0, available: true, weight: SECRET_WEIGHT },
-    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: "0,5%", type: "nexus_plus", cost: 0, weight: PLUS_WEIGHT },
-    { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: "0,20%", type: "nexus_ultra", cost: 0, weight: ULTRA_WEIGHT },
+    { id: "nexus_plus", label: "💎 NEXUS Premium · 30 дней", short: "NEXUS Premium", probability: (plusWeight / 10000).toLocaleString("ru-RU") + "%", type: "nexus_plus", cost: 0, weight: plusWeight },
+    { id: "nexus_ultra", label: "🚀 NEXUS Ultra · 30 дней", short: "NEXUS Ultra", probability: (ultraWeight / 10000).toLocaleString("ru-RU") + "%", type: "nexus_ultra", cost: 0, weight: ultraWeight },
     { id: "telegram_gift_random", label: "🧸 Случайный подарок Telegram · 15–1000 ⭐", short: "Мишка · 15–1000 ⭐", probability: giftPercent.toLocaleString("ru-RU") + "%", type: "gift_random", cost: 0, available: true, weight: giftWeight },
     { id: "no_prize", label: "Сегодня без приза. Попробуй завтра!", short: "Без приза", probability: (noPrizeWeight / 10000).toLocaleString("ru-RU") + "%", type: "none", cost: 0, weight: noPrizeWeight }
   ];
-  return { balance, gifts: available, prizes };
+  return { balance, gifts: available, prizes, luckBoost: { active: luckBoostActive, until: luckBoostActive ? Number(premiumLuck.boostUntil) : 0, misses: Number(premiumLuck.misses || 0) } };
 }
 function choosePrize(prizes) {
   const total = prizes.reduce((sum, prize) => sum + (Number(prize.weight) || 0), 0);
@@ -645,6 +650,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           ok: true, canSpin, freeSpinAvailable, totalSpinsAvailable: state.bonusSpins + (freeSpinAvailable ? 1 : 0),
           lastSpinDay: state.lastSpinDay, bonusSpins: state.bonusSpins, balance: catalog.balance, streak: state.streak || 0, luckMultiplier: (state.streak >= 30 ? 5 : state.streak >= 7 ? 3 : state.streak >= 3 ? 2 : 1) * (event.active ? 2 : 1), event, collection, leaderboard: Object.values(playerStats).sort((a, b) => (Number(b.wins) - Number(a.wins)) || (Number(b.cost) - Number(a.cost))).slice(0, 10),
           recentWinners: winners.slice(-12).reverse().map(item => ({ name: item.name || "Игрок", label: item.label || "Подарок", cost: Number(item.cost || 0), at: item.at || 0 })),
+          luckBoost: catalog.luckBoost,
           achievements: [
             { id: "first_spin", title: "Первый запуск", icon: "🎰", done: state.history.length >= 1, progress: Math.min(state.history.length, 1), target: 1 },
             { id: "collector", title: "Коллекционер", icon: "🎁", done: state.history.filter(item => item.status === "delivered" && item.cost > 0).length >= 3, progress: Math.min(state.history.filter(item => item.status === "delivered" && item.cost > 0).length, 3), target: 3 },
@@ -743,6 +749,25 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const luckMultiplier = streakMultiplier * (event.active ? 2 : 1) * (x2Mode ? 2 : 1);
           if (luckMultiplier > 1) prizeList = prizeList.map(item => ({ ...item, weight: item.weight * (["gift_random", "secret", "jackpot"].includes(item.type) ? luckMultiplier : 1) }));
           let prize = choosePrize(prizeList);
+          // Track the shared premium dry spell. After 200 non-premium spins,
+          // activate a 3-minute boost; a premium win resets it to normal odds.
+          const premiumLuck = await readGlobal("premiumLuck", { misses: 0, boostUntil: 0 });
+          const nowForLuck = Date.now();
+          if (Number(premiumLuck.boostUntil || 0) <= nowForLuck) premiumLuck.boostUntil = 0;
+          const premiumWin = ["telegram_premium", "nexus_plus", "nexus_ultra"].includes(prize.type);
+          if (premiumWin) {
+            premiumLuck.misses = 0;
+            premiumLuck.boostUntil = 0;
+          } else if (premiumLuck.boostUntil) {
+            // Keep the active window; the catalog automatically restores base odds on expiry.
+          } else {
+            premiumLuck.misses = Math.max(0, Number(premiumLuck.misses || 0)) + 1;
+            if (premiumLuck.misses >= 200) {
+              premiumLuck.misses = 0;
+              premiumLuck.boostUntil = nowForLuck + 3 * 60 * 1000;
+            }
+          }
+          await writeGlobal("premiumLuck", premiumLuck);
           // A single teddy-bear wheel sector resolves to a random real Telegram gift.
           if (["gift_random", "secret", "jackpot"].includes(prize.type)) {
             const sourceType = prize.type;
