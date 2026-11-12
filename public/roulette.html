@@ -433,7 +433,7 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
   const firstPanel=allPanels[0];
   firstPanel.before(pageHost);
   const pages=pageGroups.map((group,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);const intro=document.createElement("div");intro.className="page-intro";intro.innerHTML='<div class="page-intro-kicker">NEXUS EXPERIENCE · 0'+(index+1)+'</div><div class="page-intro-title">'+group.title+'</div><p>'+group.subtitle+'</p>';page.append(intro);pageHost.append(page);group.indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});return page;});
-  const exchangePanel=document.createElement("section");exchangePanel.className="panel exchange-panel";exchangePanel.innerHTML='<div class="section-head"><strong>🔄 Контракт обмена</strong><span>5 → 1</span></div><p class="hint">Выбери ровно 5 доставленных Telegram-подарков на странице «Склад». NEXUS подберёт доступный подарок стоимостью не менее 1,5× средней стоимости выбранных.</p><div class="exchange-steps"><div><b>01</b><span>Отметь 5 подарков</span></div><div><b>02</b><span>Проверь условия</span></div><div><b>03</b><span>Получи новый подарок</span></div></div><div class="exchange-slot" id="exchangeSelectionHint">🎁 Выбрано: 0 / 5</div></div>';exchangePanel.append(document.querySelector(".inventory-actions"));pages[3].append(exchangePanel);
+  const exchangePanel=document.createElement("section");exchangePanel.className="panel exchange-panel";exchangePanel.innerHTML='<div class="section-head"><strong>🔄 Контракт обмена</strong><span>5 → 1</span></div><p class="hint">Выбери ровно 5 доставленных Telegram-подарков на странице «Склад». NEXUS подберёт доступный подарок стоимостью не менее 1,5× средней стоимости выбранных.</p><div class="exchange-steps"><div><b>01</b><span>Отметь 5 подарков</span></div><div><b>02</b><span>Проверь условия</span></div><div><b>03</b><span>Получи новый подарок</span></div></div><div class="exchange-slot" id="exchangeSelectionHint">🎁 Выбрано: 0 / 5</div>';exchangePanel.append(document.querySelector(".inventory-actions"));pages[3].append(exchangePanel);
   pageHost.before($("pageNav"));
   let activePage=0;
   const pageTabs=[...document.querySelectorAll("[data-page-jump]")];
@@ -587,6 +587,7 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
     });
   }
   let inventoryItems=[],selectedInventory=new Set();
+  function updateExchangeSelectionHint(){const hint=$("exchangeSelectionHint");if(hint)hint.textContent="🎁 Выбрано: "+selectedInventory.size+" / 5";}
   function renderInventory(items){
     inventoryItems=Array.isArray(items)?items:[];
     const box=$("inventoryList");box.replaceChildren();$("inventoryCount").textContent=inventoryItems.length+" наград";
@@ -596,10 +597,10 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
       if(item.imageUrl){const img=document.createElement("img");img.src=item.imageUrl;img.alt=item.label||"Подарок";img.loading="lazy";img.onerror=()=>{img.style.display="none";};card.append(img);}
       const rarity=rarityBadge(Number(item.cost||0),/Telegram Premium/i.test(item.label||"")?"telegram_premium":/NEXUS Ultra/i.test(item.label||"")?"nexus_ultra":/NEXUS Premium/i.test(item.label||"")?"nexus_plus":"gift");
       const title=document.createElement("b");title.textContent=item.label||"Выигранная награда";const value=document.createElement("span");value.textContent=(Number(item.cost||0)?Number(item.cost).toLocaleString("ru-RU")+" ⭐ · ":"")+(item.tradeable||item.giftId?"Доставлено · можно использовать в контракте":"Доставлено · архивная награда");card.append(rarity,title,value);
-      if(item.tradeable||item.giftId){const checkLabel=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=selectedInventory.has(item.spinId);check.addEventListener("change",()=>{if(check.checked){if(selectedInventory.size>=5){check.checked=false;return;}selectedInventory.add(item.spinId);}else selectedInventory.delete(item.spinId);$("contractButton").disabled=selectedInventory.size!==5;});checkLabel.append(check,document.createTextNode("В контракт"));const note=document.createElement("span");note.className="inventory-action-note";note.textContent="Уже отправленный Telegram-подарок нельзя забрать обратно для апгрейда. Улучшать можно только подарки в ожидании отправки.";card.append(checkLabel,note);}
+      if(item.tradeable||item.giftId){const checkLabel=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=selectedInventory.has(item.spinId);check.addEventListener("change",()=>{if(check.checked){if(selectedInventory.size>=5){check.checked=false;return;}selectedInventory.add(item.spinId);}else selectedInventory.delete(item.spinId);$("contractButton").disabled=selectedInventory.size!==5;updateExchangeSelectionHint();});checkLabel.append(check,document.createTextNode("В контракт"));const note=document.createElement("span");note.className="inventory-action-note";note.textContent="Уже отправленный Telegram-подарок нельзя забрать обратно для апгрейда. Улучшать можно только подарки в ожидании отправки.";card.append(checkLabel,note);}
       box.append(card);
     });
-    $("contractButton").disabled=selectedInventory.size!==5;
+    $("contractButton").disabled=selectedInventory.size!==5;updateExchangeSelectionHint();
   }
   function renderHistory(items){
     const box=$("historyList");box.replaceChildren();$("historyCount").textContent=items.length+" записей";
