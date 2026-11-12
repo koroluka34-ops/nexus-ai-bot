@@ -71,12 +71,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .theme-blue{filter:hue-rotate(20deg)}.theme-green{filter:hue-rotate(95deg)}.theme-purple{filter:hue-rotate(220deg)}.theme-ruby{filter:hue-rotate(300deg)}
 .extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.achievement{padding:11px;border:1px solid #34446b;border-radius:14px;background:#0b1428}.achievement b{display:block;font-size:11px}.achievement span{display:block;margin-top:5px;color:#9fb0ce;font-size:10px}.achievement.done{border-color:#d9aa52;background:#392b1b88}
 .calendar-days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}.calendar-day{padding:8px 2px;text-align:center;border:1px solid #34446b;border-radius:10px;color:#aab8d2;font-size:9px}.calendar-day.today{border-color:#f5d78b;color:#ffe4a0;background:#6b4b1d66}
+.page-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 0}.page-nav button{flex:1;border:1px solid #3a4c78;background:#17213c;color:#eaf0ff;border-radius:12px;padding:11px 8px;font-weight:850}.page-nav button:disabled{opacity:.35}.page-indicator{color:#f4d47e;font-size:11px;font-weight:900;white-space:nowrap}.app-page{display:none}.app-page.active{display:block}.coin-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid #80622d;background:#342817;border-radius:13px;margin:10px 0}.coin-value{font-size:20px;font-weight:950;color:#ffe39b}.daily-task{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #34446b;border-radius:12px;background:#111a30}.daily-task button{flex-shrink:0;padding:9px 12px;border-radius:10px;border:0;font-weight:900;background:linear-gradient(120deg,#f3cf7d,#b77b2b);color:#24180a}.daily-task button:disabled{opacity:.45}
 </style>
 </head>
 <body>
 <main>
   <div class="header"><div class="logo">NEXUS <span>✦</span> AI</div><div class="live">● DAILY GIFT DROP</div></div>
   <div class="hero"><div class="eyebrow">ТВОЙ ЕЖЕДНЕВНЫЙ ШАНС</div><h1>Gift Roulette</h1><p class="subtitle">Крути колесо и выигрывай настоящие подарки Telegram, Telegram Premium на 12 месяцев или подписки NEXUS.</p></div>
+  <div class="page-nav" id="pageNav"><button id="prevPage" disabled>← НАЗАД</button><span class="page-indicator" id="pageIndicator">СТРАНИЦА 1 / 3</span><button id="nextPage">СЛЕДУЮЩАЯ →</button></div>
   <section class="panel">
     <div class="stats"><span>Твои прокрутки</span><strong id="spinStatus">Проверяем…</strong><span class="balance" id="balanceValue">⭐ —</span></div>
     <div class="wheel-wrap"><div class="pointer"></div><div class="outer"><div class="wheel" id="wheel"></div></div></div>
@@ -104,10 +106,17 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     <div class="quest" id="timedQuestRow"><span id="timedQuestText">⏱ Сделай 3 прокрутки за 5 минут — +2 попытки</span><button id="timedQuest">ЗАБРАТЬ</button></div>
     <div class="quest" id="inviteQuestRow"><span id="inviteQuestText">👥 Пригласи 3 новых друзей — +3 попытки</span><button id="inviteQuest">ЗАБРАТЬ</button></div>
     <p class="hint" id="questStatus">Выполняй задания и забирай бонусы.</p>
+    <div class="section-head"><strong>🎲 Твои случайные задания</strong><span>Обновляются каждый день</span></div><div id="dailyQuestList"></div>
+  </section>
+  <section class="panel">
+    <div class="section-head"><strong>🧰 Кейс NEXUS</strong><span>20 монет за открытие</span></div>
+    <div class="coin-panel"><div><div>Твой баланс</div><div class="coin-value" id="coinsValue">🪙 0</div></div><div style="text-align:right;font-size:12px;color:#d5c29d">Обычный кейс<br>Случайные бонусы</div></div>
+    <button class="spin" id="caseButton">ОТКРЫТЬ КЕЙС · 20 🪙</button>
+    <p class="hint" id="caseStatus">В кейсе могут выпасть монеты или бонусные прокрутки. За каждую прокрутку рулетки начисляется 1 монета.</p>
   </section>
   <section class="panel">
     <div class="section-head"><strong>👥 Приглашения</strong><span id="referralCount">0 друзей</span></div>
-    <p class="hint">Другу +1 прокрутка, тебе +2 за каждого нового игрока.</p>
+    <p class="hint">Друг должен открыть именно твою ссылку и впервые нажать START в боте. Просто переход по ссылке не засчитывается. За подтверждённого нового игрока тебе +2 прокрутки.</p>
     <div class="field"><input id="referralLink" readonly placeholder="Ссылка появится после загрузки"><button id="copyReferral">КОПИРОВАТЬ</button></div>
   </section>
   <section class="panel">
@@ -159,6 +168,14 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   try{tg?.setHeaderColor?.("#080b18");tg?.setBackgroundColor?.("#080b18");}catch{}
   const initData=tg?.initData||"";
   const $=id=>document.getElementById(id);
+  const pageGroups=[[0,1,10],[2,3,4,5],[6,7,8,9,11,12,13]];
+  const allPanels=[...document.querySelectorAll("main > section.panel")];
+  const pageHost=document.createElement("div");pageHost.id="pageHost";
+  const pages=pageGroups.map((indices,index)=>{const page=document.createElement("div");page.className="app-page"+(index===0?" active":"");page.dataset.page=String(index);indices.forEach(i=>{if(allPanels[i])page.append(allPanels[i]);});pageHost.append(page);return page;});
+  const firstPanel=allPanels[0];firstPanel.before(pageHost);
+  let activePage=0;
+  function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="СТРАНИЦА "+(activePage+1)+" / "+pages.length;}
+  $("prevPage").addEventListener("click",()=>showPage(activePage-1));$("nextPage").addEventListener("click",()=>showPage(activePage+1));
   const spinButton=$("spinButton"),spinStatus=$("spinStatus"),balanceNote=$("balanceNote"),balanceValue=$("balanceValue"),prizesBox=$("prizes"),wheel=$("wheel"),pointer=document.querySelector(".pointer"),result=$("result"),errorBox=$("errorBox");
   const colors=["#2854a5","#183a7b","#7852a6","#9a6428","#246b70","#8b3f58","#3c568d"];
   let busy=false,currentPrizes=[],wheelRotation=0;
@@ -392,6 +409,11 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   setInterval(()=>{if(!busy)refresh();},20000);
   updateRouletteCountdown();
 
+  function renderDailyQuests(tasks){
+    const box=$("dailyQuestList");box.replaceChildren();
+    tasks.forEach(task=>{const row=document.createElement("div");row.className="daily-task";const label=document.createElement("span");label.textContent=task.title+" · "+task.progress+"/"+task.target+" · награда "+task.reward+" 🪙";const button=document.createElement("button");button.textContent=task.claimed?"ПОЛУЧЕНО":task.done?"ЗАБРАТЬ":"В ПРОЦЕССЕ";button.disabled=!!task.claimed||!task.done;button.dataset.quest="daily_"+task.id;row.append(label,button);box.append(row);});
+    if(!tasks.length){const empty=document.createElement("p");empty.className="hint";empty.textContent="Новые задания появятся после обновления.";box.append(empty);}
+  }
   function renderExtraFeatures(data){
     const grid=$("achievementGrid");grid.replaceChildren();
     (data.achievements||[]).forEach(item=>{const card=document.createElement("div");card.className="achievement"+(item.done?" done":"");const b=document.createElement("b");b.textContent=(item.done?"✅ ":"🔒 ")+item.icon+" "+item.title;const span=document.createElement("span");span.textContent=item.done?"Получено":item.progress+"/"+item.target+" выполнено";card.append(b,span);grid.append(card);});
@@ -429,7 +451,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     if(!initData){spinStatus.textContent="Открой через Telegram";balanceNote.textContent="Запусти Mini App кнопкой /roulette в боте.";spinButton.disabled=true;return;}
     try{
       const data=await api("/roulette/api/status");
-      renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;
+      renderCatalog(data.prizes,data.giftOptions||[]);renderPendingGifts(data.pendingGifts);balanceValue.textContent="⭐ "+data.balance;$("coinsValue").textContent="🪙 "+(data.coins||0);renderDailyQuests(data.dailyQuests||[]);
       $("spinsRemaining").textContent="Прокруток осталось: "+data.totalSpinsAvailable+" (дополнительных: "+data.bonusSpins+")";
       $("luckStatus").textContent="🔥 Серия: "+(data.streak||0)+" дн. · удача x"+(data.luckMultiplier||1)+(data.event?.active?" · NEXUS EVENT":"")+(data.luckBoost?.active?" · 🍀 ПРЕМИУМ-ШАНС УСИЛЕН!":"");
       renderLeaderboard(data.leaderboard||[]);renderExtraFeatures(data);$("referralLink").value=data.referralLink||"";$("referralCount").textContent=(data.referralCount||0)+" друзей";
@@ -471,6 +493,13 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   $("dailyQuest").addEventListener("click",()=>claimQuest("daily_spin"));
   $("timedQuest").addEventListener("click",()=>claimQuest("timed_spin"));
   $("inviteQuest").addEventListener("click",()=>claimQuest("invite_friend"));
+  $("dailyQuestList").addEventListener("click",event=>{const button=event.target.closest("button[data-quest]");if(button)claimQuest(button.dataset.quest);});
+  $("caseButton").addEventListener("click",async()=>{
+    const button=$("caseButton");button.disabled=true;
+    try{const data=await api("/roulette/api/case/open","POST",{});$("caseStatus").textContent="🎉 Выпало: "+data.reward.title+" — "+data.reward.detail;$("coinsValue").textContent="🪙 "+data.coins;await refresh();}
+    catch(error){$("caseStatus").textContent="ℹ️ "+error.message;}
+    finally{button.disabled=false;}
+  });
   $("copyReferral").addEventListener("click",async()=>{
     const link=$("referralLink").value;if(!link){$("questStatus").textContent="Ссылка ещё загружается.";return;}
     try{await navigator.clipboard.writeText(link);$("questStatus").textContent="✅ Ссылка скопирована.";}
