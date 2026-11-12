@@ -300,7 +300,7 @@ async function getGiftCatalog(bot) {
         featuredName: featuredGift?.name || ""
       };
     })
-    // Keep the 11 requested Telegram gifts at the top, while retaining the
+    // Keep the 21 pictured Telegram gifts at the top, while retaining the
     // rest of Telegram's live sendable catalogue below them.
     .sort((a, b) => Number(b.featured) - Number(a.featured) || a.cost - b.cost);
   const premiumAvailable = balance >= 2500;
