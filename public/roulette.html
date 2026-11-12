@@ -102,7 +102,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 .case-modal-prize{font-size:14px;margin:14px 0 8px}
 .case-reveal{display:none;text-align:center;margin:14px auto 6px;padding:18px 14px;border:1px solid #c49a53;border-radius:18px;background:radial-gradient(circle at 50% 0,#514022,#18223b 70%);box-shadow:0 0 28px #e9bc5a24}
 .case-reveal.show{display:block;animation:cardPop .55s cubic-bezier(.16,1.3,.3,1)}
-.case-reveal img{width:118px;height:118px;object-fit:contain;filter:drop-shadow(0 0 20px #f7d78a88)}
+.case-reveal img{width:118px;height:118px;object-fit:contain;filter:drop-shadow(0 0 20px #f7d78a88)}\n.case-crate.lid-open{animation:crateKick .72s cubic-bezier(.2,.8,.2,1)}\n.case-crate.lid-open:after{content:"";position:absolute;inset:8% 20%;border-radius:50%;background:radial-gradient(circle,#fff5c6aa 0,#f7c75b55 35%,transparent 72%);filter:blur(12px);pointer-events:none;animation:crateBurst 1.2s ease-out both}\n.case-reveal.show img{animation:giftEmerge 1.25s cubic-bezier(.16,1.35,.3,1) both}\n@keyframes crateKick{0%,100%{transform:translateY(0) scale(1)}35%{transform:translateY(5px) scale(1.035)}65%{transform:translateY(-4px) scale(1.015)}}\n@keyframes crateBurst{0%{opacity:0;transform:scale(.35)}35%{opacity:1;transform:scale(1.3)}100%{opacity:.25;transform:scale(1.7)}}\n@keyframes giftEmerge{0%{opacity:0;transform:translateY(-75px) scale(.18) rotate(-18deg)}55%{opacity:1;transform:translateY(8px) scale(1.28) rotate(8deg)}78%{transform:translateY(-5px) scale(.94) rotate(-3deg)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
 .case-reveal h3{margin:8px 0 4px;font-size:18px;color:#fff0bd}
 .case-reveal .case-reveal-rarity{font-size:10px;font-weight:950;letter-spacing:.14em;text-transform:uppercase;color:#f6ca70}
 .case-reveal .case-reveal-value{font-size:14px;font-weight:950;color:#ffe3a0;margin-top:7px}
@@ -202,7 +202,8 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
     <div class="case-modal-head"><div><strong id="caseModalTitle">🎁 NEXUS GIFT CASE</strong><small>Стоимость открытия: 100 ₿</small></div><button type="button" class="case-close" id="caseClose" aria-label="Закрыть">✕</button></div>
-    <p class="case-modal-hint">Кейс NEXUS открывается как в CS2: сначала крышка, затем длинная лента подарков и остановка на выигрыше.</p>
+    <p class="case-modal-hint">Сначала длинная лента как в CS2. После остановки кейс эффектно открывается, и из него появляется твой выигранный подарок.</p>
+    <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-crate" id="caseCrate" aria-label="Закрытый кейс NEXUS">
       <div class="case-crate-glow"></div>
       <svg viewBox="0 0 360 170" role="img" aria-label="Золотой кейс NEXUS">
@@ -219,7 +220,6 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       </svg>
       <div class="case-crate-caption">NEXUS SUPPLY DROP</div>
     </div>
-    <div class="case-stage" id="caseStage" aria-live="polite"><div class="case-center-pointer"></div><div class="case-track" id="caseTrack"></div></div>
     <div class="case-modal-prize" id="caseModalPrize">🎁 Здесь появится твой выигрыш</div>
     <div class="case-reveal" id="caseReveal"><img id="caseRevealImage" alt="Выигранный Telegram-подарок"><div class="case-reveal-rarity" id="caseRevealRarity"></div><h3 id="caseRevealTitle"></h3><div class="case-reveal-value" id="caseRevealValue"></div></div>
     <button class="spin" id="caseOpenConfirm">ОТКРЫТЬ ЗА 100 ₿</button>
@@ -617,31 +617,35 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   async function startCaseOpening(){
     const button=$("caseOpenConfirm");if(caseOpening)return;
-    caseOpening=true;button.disabled=true;button.textContent="🎁 ОТКРЫВАЕМ КЕЙС…";
+    caseOpening=true;button.disabled=true;button.textContent="🎁 КРУТИМ ЛЕНТУ…";
     $("caseClose").disabled=true;$("caseModal").classList.add("case-open-lock");
-    $("caseModalStatus").textContent="Крышка кейса открывается... Подбираем подарок.";
+    $("caseModalStatus").textContent="🎰 Лента подарков запускается. Удачи!";
+    $("caseReveal").classList.remove("show");
     $("caseCrate").classList.remove("lid-open");
     try{
-      const crateAnimation=new Promise(resolve=>setTimeout(()=>{$("caseCrate").classList.add("lid-open");setTimeout(resolve,1150);},120));
-      const dataPromise=api("/roulette/api/case/open","POST",{});
-      const data=await dataPromise;
-      await crateAnimation;
-      $("caseModalStatus").textContent="Кейс открыт! Лента подарков прокручивается...";
+      const data=await api("/roulette/api/case/open","POST",{});
+      $("caseModalStatus").textContent="🎰 Лента NEXUS ускоряется…";
       await animateCaseOpening(data.reel);
       const stars=Number(data.reward.giftStars||0),rarity=caseRarity(stars);
-      $("caseModalPrize").textContent="🏆 ВЫИГРЫШ НАЙДЕН!";
+      $("caseModalPrize").textContent="🎯 ЛЕНТА ОСТАНОВИЛАСЬ — ВЫПАЛ ПОДАРОК!";
+      $("caseModalStatus").textContent="🔓 Замки открываются… Сейчас кейс раскроется!";
+      button.textContent="🔓 ОТКРЫВАЕМ КЕЙС…";
+      await new Promise(resolve=>setTimeout(resolve,450));
+      $("caseCrate").classList.add("lid-open");
+      await new Promise(resolve=>setTimeout(resolve,1250));
       $("caseRevealImage").src=data.reward.imageUrl;
       $("caseRevealTitle").textContent=data.reward.title;
       $("caseRevealRarity").textContent=rarity.label;
       $("caseRevealValue").textContent=stars+" ⭐ · стоимость подарка";
       $("caseReveal").classList.add("show");
-      $("caseModalStatus").textContent="🎉 Подарок поставлен в очередь отправки. Статус доставки смотри в разделе «Ожидающие подарки».";
-      $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+stars+" ⭐";
+      $("caseModalPrize").textContent="🏆 ТВОЙ ВЫИГРЫШ!";
+      $("caseModalStatus").textContent="🎉 Подарок закреплён за тобой и ожидает отправки. Бот доставит его автоматически, когда на балансе будет достаточно Stars.";
+      $("caseStatus").textContent="🎉 Кейс открыт: "+data.reward.title+" · "+stars+" ⭐ · ожидает выдачи";
       $("coinsValue").textContent="₿ "+data.coins;
       button.textContent="КЕЙС ОТКРЫТ";
       await refresh();
     }catch(error){
-      $("caseModalStatus").textContent="❌ "+error.message+" Баланс не должен списываться, если сервер отклонил открытие.";
+      $("caseModalStatus").textContent="❌ "+error.message+" Если сервер отклонил открытие, 100 ₿ не должны списываться.";
       button.disabled=false;button.textContent="ПОВТОРИТЬ · 100 ₿";
     }finally{
       caseOpening=false;$("caseClose").disabled=false;$("caseModal").classList.remove("case-open-lock");
