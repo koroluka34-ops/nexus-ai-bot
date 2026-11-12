@@ -601,36 +601,11 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   }
   $("giftFilterAll")?.addEventListener("click",()=>{showFavoriteGifts=false;updateGiftFilters();if(lastCatalogData)renderCatalog(lastCatalogData.prizes,lastCatalogData.gifts);});
   $("giftFilterFav")?.addEventListener("click",()=>{showFavoriteGifts=true;updateGiftFilters();if(lastCatalogData)renderCatalog(lastCatalogData.prizes,lastCatalogData.gifts);});
-  // Витринные предметы с присланных скриншотов. Это визуальные карточки,
-  // они не выдаются как официальные Telegram-подарки и не участвуют в розыгрыше.
-  const showcaseGifts=[
-    {id:"showcase-cone",label:"🍦 Мороженое",emoji:"🍦",value:300},
-    {id:"showcase-mask",label:"🥅 Хоккейная маска",emoji:"🥅",value:929},
-    {id:"showcase-liberty",label:"🗽 Статуя Свободы",emoji:"🗽",value:563},
-    {id:"showcase-croc",label:"🐊 Крокодил с короной",emoji:"🐊",value:581},
-    {id:"showcase-noodles",label:"🍜 Золотая лапша",emoji:"🍜",value:430},
-    {id:"showcase-lantern",label:"🏮 Фонарь",emoji:"🏮",value:480},
-    {id:"showcase-lollipop",label:"🍭 Леденец",emoji:"🍭",value:500},
-    {id:"showcase-choco",label:"🍫 Шоколадное эскимо",emoji:"🍫",value:500},
-    {id:"showcase-flamingo",label:"🦩 Розовый фламинго",emoji:"🦩",value:490},
-    {id:"showcase-backpack",label:"🎒 Рюкзак",emoji:"🎒",value:562},
-    {id:"showcase-poop",label:"💩 Забавный сюрприз",emoji:"💩",value:500},
-    {id:"showcase-bees",label:"🐝 Пчелиный сюрприз",emoji:"🐝",value:581},
-    {id:"showcase-bouquet",label:"🌸 Цветочный подарок",emoji:"🌸",value:484},
-    {id:"showcase-snowman",label:"☃️ Снеговик",emoji:"☃️",value:435},
-    {id:"showcase-candycane",label:"🍬 Новогодняя конфета",emoji:"🍬",value:420},
-    {id:"showcase-clover",label:"🍀 Четырёхлистный клевер",emoji:"🍀",value:581},
-    {id:"showcase-sleigh",label:"🛷 Новогодние сани",emoji:"🛷",value:425},
-    {id:"showcase-socks",label:"🧦 Носки",emoji:"🧦",value:510},
-    {id:"showcase-present",label:"🎁 Подарочная коробка",emoji:"🎁",value:500},
-    {id:"showcase-birthday",label:"🎂 Happy Birthday",emoji:"🎂",value:500},
-    {id:"showcase-lightsaber",label:"🗡️ Световой меч",emoji:"🗡️",value:500}
-  ];
   function renderCatalog(prizes,giftOptions=[]){
     lastCatalogData={prizes,gifts:giftOptions};
     drawWheel(prizes);
     const rewards=(prizes||[]).filter(p=>["jackpot","secret","nexus_plus","nexus_ultra","telegram_premium"].includes(p.type));
-    $("giftCount").textContent=giftOptions.length+" реальных подарков · "+showcaseGifts.length+" витринных · "+rewards.length+" особых призов";
+    $("giftCount").textContent=giftOptions.length+" настоящих подарков Telegram · "+rewards.length+" особых призов";
     prizesBox.replaceChildren();
     const visibleGifts=showFavoriteGifts?giftOptions.filter(gift=>favoriteGiftIds.has(String(gift.giftId||gift.id))):giftOptions;
     visibleGifts.forEach(gift=>{
@@ -647,14 +622,6 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
       const fav=document.createElement("button");fav.type="button";fav.className="gift-fav"+(favoriteGiftIds.has(giftKey)?" saved":"");fav.textContent=favoriteGiftIds.has(giftKey)?"♥ В избранном":"♡ В избранное";
       fav.addEventListener("click",()=>{if(favoriteGiftIds.has(giftKey))favoriteGiftIds.delete(giftKey);else favoriteGiftIds.add(giftKey);saveFavoriteGiftIds();updateGiftFilters();fav.classList.toggle("saved",favoriteGiftIds.has(giftKey));fav.textContent=favoriteGiftIds.has(giftKey)?"♥ В избранном":"♡ В избранное";if(showFavoriteGifts&&!favoriteGiftIds.has(giftKey))item.remove();});
       item.append(b,s,fav);prizesBox.append(item);
-    });
-    showcaseGifts.forEach(gift=>{
-      const item=document.createElement("div");item.className="prize showcase-prize";
-      const art=document.createElement("div");art.className="gift-art emoji-art";art.textContent=gift.emoji;item.append(art);
-      const b=document.createElement("b");b.textContent=gift.label;item.append(b);
-      const s=document.createElement("span");s.textContent="Витринный номинал: "+gift.value+" ⭐ · не является выдаваемым Telegram-подарком";item.append(s);
-      const tag=document.createElement("small");tag.textContent="ВИТРИНА";tag.className="showcase-tag";item.append(tag);
-      prizesBox.append(item);
     });
     updateGiftFilters();
     if(showFavoriteGifts&&!visibleGifts.length){const empty=document.createElement("div");empty.className="prize";const b=document.createElement("b");b.textContent="♥ Пока нет избранных подарков";const s=document.createElement("span");s.textContent="Нажми «В избранное» на понравившемся подарке во вкладке «Все подарки».";empty.append(b,s);prizesBox.append(empty);}
