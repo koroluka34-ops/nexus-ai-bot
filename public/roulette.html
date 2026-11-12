@@ -230,7 +230,7 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
   <div class="win-screen" id="winScreen" role="dialog" aria-modal="true" aria-label="Твой выигрыш">
     <div class="win-card"><div style="font-size:12px;letter-spacing:.2em;color:#f7d78a;font-weight:950">NEXUS · ПОЗДРАВЛЯЕМ</div><div id="winEmoji" style="font-size:48px;margin:12px">🎁</div><img id="winArt" class="win-art" alt="Выигранный подарок" style="display:none"><h2 id="winTitle">ТЫ ВЫИГРАЛ!</h2><p id="winMessage"></p><button class="win-close" id="winClose">ЗАБРАТЬ ПОБЕДУ ✨</button></div>
   </div>
-  <p class="disclaimer">В секторах показаны призы NEXUS. Настоящие Telegram-подарки отправляются ботом после подтверждения Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
+  <p class="disclaimer">В рулетке прокручивается кейс NEXUS. После открытия показывается выбранный приз: настоящий Telegram-подарок или Premium-награда. Выдача выполняется ботом через Telegram. Одна бесплатная попытка в сутки по времени Киева; бонусные попытки выдаются за серию дней.</p>
 </main>
 <div class="case-modal" id="caseModal" aria-hidden="true">
   <div class="case-dialog" role="dialog" aria-modal="true" aria-labelledby="caseModalTitle">
@@ -286,12 +286,17 @@ h1{font-size:32px;line-height:1;margin:9px 0 8px;letter-spacing:-.055em}
     currentPrizes=Array.isArray(prizes)&&prizes.length?prizes:[];
     const track=$("mainCaseTrack");
     if(track&&!busy){
+      const wrap=document.querySelector(".main-case-wrap"),stage=$("mainCaseStage"),chest=$("mainCaseChest");
+      wrap?.classList.remove("revealing");
+      if(stage){stage.style.display="flex";stage.classList.remove("rolling");}
+      chest?.classList.remove("opening");
+      $("mainCaseCaption").textContent="Стрелка выберет кейс — затем он откроется и покажет твой приз";
       track.replaceChildren();
       for(let i=0;i<9;i++){
         const tile=document.createElement("div");tile.className="main-case-tile";
         tile.innerHTML="🧰<small>КЕЙС NEXUS</small>";track.append(tile);
       }
-      track.style.transform="translateX(0px)";
+      track.style.transition="none";track.style.transform="translateX(0px)";
     }
   }
   function keepWheelLabelsUpright(rotation){
