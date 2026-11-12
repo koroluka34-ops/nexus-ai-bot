@@ -109,7 +109,7 @@ function dailyQuestProgress(state, quest, today) {
   if (quest.kind === "cases") return todayRows.filter(item => item.source === "case").length;
   if (quest.kind === "gifts") return todayRows.filter(item => item.status === "delivered" && item.giftId).length;
   if (quest.kind === "contracts") return todayRows.filter(item => item.source === "contract" && item.prize === "contract_gift").length;
-  if (quest.kind === "upgrades") return todayRows.filter(item => item.source === "upgrade" && item.prize === "upgrade_gift").length;
+  if (quest.kind === "upgrades") return todayRows.filter(item => item.source === "upgrade" && ["upgrade_gift", "pending_upgrade_gift"].includes(item.prize)).length;
   if (quest.kind === "referrals") return (state.referralHistory || []).filter(at => new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Kyiv"}).format(new Date(Number(at))) === today).length;
   if (quest.kind === "mixed") return Math.min(quest.target, spins.length + todayRows.filter(item => item.source === "case").length);
   if (quest.kind === "mixedwin") return Math.min(quest.target, spins.length + spins.filter(item => item.prize !== "no_prize" && item.status !== "declined").length);
