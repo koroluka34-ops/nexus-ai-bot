@@ -793,6 +793,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const body = await readBody(req), ids = Array.isArray(body.spinIds) ? [...new Set(body.spinIds.map(String))] : [];
           if (ids.length !== 5) { json(res, 400, { ok: false, error: "Для контракта выбери ровно 5 подарков." }); return true; }
           const [state, catalog, queue] = await Promise.all([readState(user.id), telegramApi("getAvailableGifts"), readPendingQueue()]);
+          const originalState = JSON.parse(JSON.stringify(state));
           const selected = ids.map(id => state.history.find(row => row.spinId === id));
           if (selected.some(row => !row || row.status !== "delivered" || !row.giftId || Number(row.cost) <= 0)) { json(res, 409, { ok: false, error: "Один или несколько подарков уже использованы или недоступны." }); return true; }
           const average = selected.reduce((sum,row)=>sum+Number(row.cost||0),0)/selected.length;
@@ -803,9 +804,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
           const label = (gift.sticker?.emoji || "🎁") + " Подарок из контракта · " + stars + " ⭐";
           state.history.push({ spinId, day: kyivDay(), prize: "contract_gift", label, giftId: gift.id, cost: stars, status: "processing", at: Date.now(), source: "contract" });
           state.history = state.history.slice(-100);
-          await writeState(user.id, state);
           queue.push({ spinId, userId: String(user.id), type: "case_gift", giftId: gift.id, cost: stars, label, createdAt: Date.now(), source: "contract" });
-          await writePendingQueue(queue);
+          try { await writeState(user.id, state); await writePendingQueue(queue); }
+          catch (error) { await writeState(user.id, originalState).catch(()=>{}); throw error; }
           processPendingGiftQueue().catch(()=>{});
           json(res, 200, { ok: true, label, stars, message: "Контракт собран. Награда добавлена в очередь отправки." }); return true;
         } finally { locks.delete("inventory:" + user.id); }
@@ -816,6 +817,7 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
         try {
           const body = await readBody(req), spinId = String(body.spinId || "");
           const [state, catalog, queue] = await Promise.all([readState(user.id), telegramApi("getAvailableGifts"), readPendingQueue()]);
+          const originalState = JSON.parse(JSON.stringify(state));
           const source = state.history.find(row => row.spinId === spinId);
           if (!source || source.status !== "delivered" || !source.giftId || Number(source.cost) <= 0) { json(res, 409, { ok: false, error: "Этот подарок уже использован или недоступен для апгрейда." }); return true; }
           const sourceCost = Number(source.cost);
@@ -833,8 +835,9 @@ function installRoulette(bot, { grantPrize, isAdmin, resolveUsername } = {}) {
             state.history.push({ spinId: crypto.randomUUID(), day: kyivDay(), prize: "upgrade_failed", label, cost: 0, status: "upgrade_failed", at: Date.now(), source: "upgrade" });
           }
           state.history = state.history.slice(-100);
-          await writeState(user.id, state);
-          if (success) { await writePendingQueue(queue); processPendingGiftQueue().catch(()=>{}); }
+          try { await writeState(user.id, state); if (success) await writePendingQueue(queue); }
+          catch (error) { await writeState(user.id, originalState).catch(()=>{}); throw error; }
+          if (success) processPendingGiftQueue().catch(()=>{});
           json(res, 200, { ok: true, success, label, chance: "35%", message: success ? "Удача! Новый подарок сохранён в очереди отправки." : "Не повезло. Подарок был использован, апгрейд не прошёл." }); return true;
         } finally { locks.delete("inventory:" + user.id); }
       }
