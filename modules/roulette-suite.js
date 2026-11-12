@@ -17,6 +17,22 @@ const JACKPOT_WEIGHT = 100; // 0.01%, exact 1000-Star Telegram gift
 const SECRET_WEIGHT = 100; // 0.01%, hidden gift prize
 const MAX_GIFTS_IN_WHEEL = 20;
 
+// These are the 11 real Telegram gifts previously confirmed in the bot's /realgifts
+// catalogue. Match them against Telegram's live Bot API response; never invent IDs.
+const FEATURED_TELEGRAM_GIFTS = [
+  { emoji: "💝", stars: 15 }, { emoji: "🧸", stars: 15 },
+  { emoji: "🎁", stars: 25 }, { emoji: "🌹", stars: 25 },
+  { emoji: "🎂", stars: 50 }, { emoji: "💐", stars: 50 },
+  { emoji: "🚀", stars: 50 }, { emoji: "🍾", stars: 50 },
+  { emoji: "🏆", stars: 100 }, { emoji: "💍", stars: 100 },
+  { emoji: "💎", stars: 100 }
+];
+function isFeaturedTelegramGift(gift) {
+  const emoji = String(gift?.sticker?.emoji || "");
+  const stars = Number(gift?.star_count);
+  return FEATURED_TELEGRAM_GIFTS.some(item => item.emoji === emoji && item.stars === stars);
+}
+
 function kvReady() { return Boolean(ACCOUNT && TOKEN && NAMESPACE); }
 function kvUrl(userId) {
   return "https://api.cloudflare.com/client/v4/accounts/" + encodeURIComponent(ACCOUNT) +
@@ -261,9 +277,12 @@ async function getGiftCatalog(bot) {
       stickerFormat: g.sticker?.format || "",
       probability: "",
       type: "gift",
-      cost: Number(g.star_count)
+      cost: Number(g.star_count),
+      featured: isFeaturedTelegramGift(g)
     }))
-    .sort((a, b) => a.cost - b.cost);
+    // Keep the 11 requested Telegram gifts at the top, while retaining the
+    // rest of Telegram's live sendable catalogue below them.
+    .sort((a, b) => Number(b.featured) - Number(a.featured) || a.cost - b.cost);
   const premiumAvailable = balance >= 2500;
   const settings = await readGlobal("settings", { giftPercent: 38 });
   const giftPercent = Math.max(1, Math.min(90, Number(settings.giftPercent) || 38));
