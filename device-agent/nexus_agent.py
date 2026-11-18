@@ -111,6 +111,9 @@ def _send_windows_input(kind, code, down=True):
 
 def execute(command):
     action, args = command["action"], command.get("args", {})
+    if action == "create_game_project":
+        from game_studio import create_game_project
+        return {"result": create_game_project(args)}
     if action == "inspect_ui":
         # Только чтение доступных имён элементов активного окна; никаких кликов/ввода.
         ps = r"""
