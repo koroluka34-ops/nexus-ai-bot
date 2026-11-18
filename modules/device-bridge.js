@@ -209,6 +209,26 @@ function requestVoicePcConfirmation(ctx, action, args, description) {
 
 function installDeviceBridge(bot) {
   deviceBot = bot;
+
+  // NEXUS Game Studio: local project creation is executed only on the owner's
+  // paired Windows agent and requires an explicit Telegram confirmation.
+  bot.command("studio", async ctx => {
+    if (!authorized(ctx)) return ctx.reply("⛔ Game Studio доступна только владельцу NEXUS.");
+    if (!TOKEN || TOKEN.length < 32) return ctx.reply("⚠️ Мост ПК не настроен: проверь PC_AGENT_TOKEN в Render.");
+    const device = devices.get("windows-main");
+    if (!device || Date.now() - device.lastSeen > 45000) return ctx.reply("🔴 ПК не подключён. Запусти NEXUS Agent на Windows.");
+    const raw = String(ctx.match || "").trim();
+    const split = raw.indexOf("|");
+    if (split < 1) return ctx.reply("Формат: /studio Название игры | Подробное описание игры");
+    const name = raw.slice(0, split).trim();
+    const description = raw.slice(split + 1).trim();
+    if (!name || name.length > 60) return ctx.reply("Название игры: от 1 до 60 символов.");
+    if (!description || description.length > 4000) return ctx.reply("Описание игры: от 1 до 4000 символов.");
+    const id = crypto.randomUUID();
+    pending.set(id, { action: "create_game_project", args: { name, description }, userId: String(ctx.from.id), chatId: ctx.chat.id });
+    const keyboard = new InlineKeyboard().text("✅ Создать проект на ПК", "pc_yes:" + id).text("❌ Отмена", "pc_no:" + id);
+    return ctx.reply("🎮 <b>NEXUS Game Studio</b>\n\nНазвание: <b>" + safeText(name, 60).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) + "</b>\nОписание принято. После подтверждения на ПК будет создан HTML5 Canvas-проект и ZIP-архив в Documents/NEXUS-Projects.", { parse_mode: "HTML", reply_markup: keyboard });
+  });
   bot.command("pc", async ctx => {
     if (!authorized(ctx)) return ctx.reply("⛔ Управление ПК доступно только владельцу бота.");
     if (!TOKEN || TOKEN.length < 32) return ctx.reply("⚠️ Мост ПК ещё не настроен: добавь PC_AGENT_TOKEN (не менее 32 символов) в переменные Render.");
