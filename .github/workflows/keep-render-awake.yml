@@ -1,0 +1,20 @@
+name: Keep NEXUS AI awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping Render health endpoint
+        run: |
+          curl --fail --silent --show-error --max-time 25 \
+            --retry 2 --retry-delay 5 \
+            "https://nexus-ai-bot-kt4w.onrender.com/"
