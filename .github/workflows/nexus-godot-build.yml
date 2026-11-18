@@ -8,7 +8,7 @@ on:
         required: true
         type: string
 
-run-name: NEXUS game build \${{ inputs.job_id }}
+run-name: NEXUS game build ${{ inputs.job_id }}
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PROJECT="generated-games/\${{ inputs.job_id }}"
+          PROJECT="generated-games/${{ inputs.job_id }}"
           test -f "$PROJECT/project.godot"
           mkdir -p "$PROJECT/build"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
@@ -66,16 +66,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd "generated-games/\${{ inputs.job_id }}"
-          zip -qr "../../NEXUS-\${{ inputs.job_id }}-project-and-builds.zip" .
+          cd "generated-games/${{ inputs.job_id }}"
+          zip -qr "../../NEXUS-${{ inputs.job_id }}-project-and-builds.zip" .
           cd ../..
           mkdir -p artifacts
-          mv "NEXUS-\${{ inputs.job_id }}-project-and-builds.zip" "artifacts/NEXUS-\${{ inputs.job_id }}-project-and-builds.zip"
+          mv "NEXUS-${{ inputs.job_id }}-project-and-builds.zip" "artifacts/NEXUS-${{ inputs.job_id }}-project-and-builds.zip"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-game-\${{ inputs.job_id }}
-          path: artifacts/NEXUS-\${{ inputs.job_id }}-project-and-builds.zip
+          name: nexus-game-${{ inputs.job_id }}
+          path: artifacts/NEXUS-${{ inputs.job_id }}-project-and-builds.zip
           if-no-files-found: error
           retention-days: 7
