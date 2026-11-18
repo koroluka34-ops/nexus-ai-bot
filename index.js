@@ -24,6 +24,7 @@ const { spawn } = require("child_process");
 
 const ffmpegPath = require("ffmpeg-static");
 const { routeTask, MODEL_GPT, MODEL_QWEN } = require("./modules/model-router");
+const { handleGameStudioRequest } = require("./modules/game-studio");
 
 // ======================================================
 // CONFIG
@@ -5407,6 +5408,9 @@ bot.on("message:text", async ctx => {
     if (cleanedQuestion) ctx.message.text = cleanedQuestion;
   }
   const addressedQuestion = ctx.message.text.trim();
+
+  // Route game-creation requests to the cloud Godot agent before the normal chat model.
+  if (await handleGameStudioRequest(ctx, addressedQuestion)) return;
 
   // Deterministic PC commands from ordinary Telegram text (do not send these to Groq).
   const normalizedCommand = addressedQuestion.replace(/[.!?]+$/g, "").trim();
