@@ -159,6 +159,9 @@ def open_microsoft_store(query=None):
 
 def execute(action, args):
     args = args or {}
+    if action == "create_game_project":
+        from game_studio import create_game_project
+        return create_game_project(args)
     if action == "open_store":
         return open_microsoft_store()
     if action == "open_url":
