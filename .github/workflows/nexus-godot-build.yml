@@ -1,0 +1,81 @@
+name: NEXUS Godot Cloud Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: NEXUS game job identifier
+        required: true
+        type: string
+
+run-name: NEXUS game build \${{ inputs.job_id }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    timeout-minutes: 35
+    steps:
+      - name: Checkout NEXUS project
+        uses: actions/checkout@v4
+
+      - name: Prepare project
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT="generated-games/\${{ inputs.job_id }}"
+          test -f "$PROJECT/project.godot"
+          mkdir -p "$PROJECT/build"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+
+      - name: Import and validate Godot project
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --version
+          godot --headless --editor --path "$PROJECT" --quit
+
+      - name: Export Windows and Linux builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path "$PROJECT" --export-release "Windows Desktop" "$PROJECT/build/NEXUS-Game.exe"
+          godot --headless --path "$PROJECT" --export-release "Linux/X11" "$PROJECT/build/NEXUS-Game.x86_64"
+          test -s "$PROJECT/build/NEXUS-Game.exe"
+          test -s "$PROJECT/build/NEXUS-Game.x86_64"
+
+      - name: Add build notes
+        shell: bash
+        run: |
+          cat > "$PROJECT/BUILD-RESULT.txt" <<'EOF'
+          NEXUS Game Studio cloud build
+          Engine: Godot 4.4.1
+          Outputs:
+          - build/NEXUS-Game.exe (Windows)
+          - build/NEXUS-Game.x86_64 (Linux)
+          This build does not provide a permanently hosted multiplayer server.
+          Test the game locally before distributing it.
+          EOF
+
+      - name: Package project and builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "generated-games/\${{ inputs.job_id }}"
+          zip -qr "../../NEXUS-\${{ inputs.job_id }}-project-and-builds.zip" .
+          cd ../..
+          mkdir -p artifacts
+          mv "NEXUS-\${{ inputs.job_id }}-project-and-builds.zip" "artifacts/NEXUS-\${{ inputs.job_id }}-project-and-builds.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-game-\${{ inputs.job_id }}
+          path: artifacts/NEXUS-\${{ inputs.job_id }}-project-and-builds.zip
+          if-no-files-found: error
+          retention-days: 7
