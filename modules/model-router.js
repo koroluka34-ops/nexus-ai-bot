@@ -13,7 +13,7 @@ function routeTask(text, preference = "auto") {
   const value = String(text || "");
   const rules = [
     { category: "coding", re: /\b(code|coding|debug|javascript|typescript|python|node\.js|sql|regex|api|github|git|html|css)\b|код|программ|скрипт|ошибк[аи] в коде|разработ|деплой|сервер|конфиг|лог[аи]|minecraft|майнкрафт|fabric|forge|neoforge/i },
-    { category: "reasoning", re: /сравни|проанализ|рассчитай|математ|логическ|докажи|пошагов|архитектур|оптимиз|диагност|почему не работает/i }
+    { category: "reasoning", re: /сравни|проанализ|рассчитай|математ|логическ|докажи|пошагов|архитектур|оптимиз|диагност|почему не работает|сколько.{0,40}(заработ|получ|стоить|плат)|заработ.{0,40}сколько|посчитай|вычисли|процент|вероятност|срок окупаемости/i }
   ];
   const match = rules.find(rule => rule.re.test(value));
   if (match) return { model: MODEL_QWEN, category: match.category, reason: "Техническая или аналитическая задача" };
