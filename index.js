@@ -52,6 +52,23 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+// Track private-chat activity for NEXUS's opt-in proactive mode.
+bot.use(async (ctx, next) => {
+  if (ctx.from && ctx.chat?.type === "private" && ctx.message && kvConfigured()) {
+    try {
+      const registry = await getProactiveRegistry();
+      const id = String(ctx.from.id);
+      const previous = registry[id] && typeof registry[id] === "object" ? registry[id] : {};
+      registry[id] = { ...previous, chatId: ctx.chat.id, lastSeenAt: Date.now() };
+      await writeKvJson("nexus:proactive:registry", registry);
+    } catch (error) {
+      console.error("PROACTIVE ACTIVITY:", error.message);
+    }
+  }
+  await next();
+});
+
+
 const { installPremium, resolveUsername } = require("./modules/premium-suite");
 installPremium(bot);
 
@@ -268,6 +285,58 @@ async function writeKvJson(key, value) {
   } catch (error) {
     console.error("KV JSON WRITE:", error.message);
     return false;
+  }
+}
+
+async function getProactiveRegistry() {
+  const value = await readKvJson("nexus:proactive:registry", {});
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+async function setProactivePreference(userId, enabled, chatId) {
+  if (!kvConfigured()) return false;
+  const registry = await getProactiveRegistry();
+  const id = String(userId);
+  const previous = registry[id] && typeof registry[id] === "object" ? registry[id] : {};
+  registry[id] = {
+    ...previous,
+    chatId: chatId ?? previous.chatId,
+    enabled: Boolean(enabled),
+    lastSeenAt: Date.now()
+  };
+  return writeKvJson("nexus:proactive:registry", registry);
+}
+
+async function runProactiveCheck() {
+  if (!kvConfigured()) return;
+  const registry = await getProactiveRegistry();
+  const now = Date.now();
+  const INACTIVE_MS = 6 * 60 * 60 * 1000;
+  const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const openers = [
+    "Эй, ты куда пропал? Как день проходит?",
+    "Чем занят? Я тут подумал — можем во что-нибудь сыграть или просто поболтать.",
+    "Как ты там? Есть что интересное за сегодня?",
+    "Заглянул первым: как настроение? Если нужна помощь с чем-нибудь — пиши.",
+    "Ну что, как дела? Давно не пересекались."
+  ];
+
+  for (const [id, state] of Object.entries(registry)) {
+    if (!state || state.enabled !== true || !state.chatId) continue;
+    if (now - Number(state.lastSeenAt || 0) < INACTIVE_MS) continue;
+    if (now - Number(state.lastSentAt || 0) < COOLDOWN_MS) continue;
+    try {
+      const index = Math.abs((Number(id) || 0) + Math.floor(now / COOLDOWN_MS)) % openers.length;
+      await bot.api.sendMessage(state.chatId, openers[index]);
+      state.lastSentAt = now;
+      await writeKvJson("nexus:proactive:registry", registry);
+    } catch (error) {
+      console.error("PROACTIVE SEND:", error.message);
+      if (/blocked|chat not found|deactivated/i.test(error.message || "")) {
+        state.enabled = false;
+        await writeKvJson("nexus:proactive:registry", registry);
+      }
+    }
   }
 }
 
@@ -4471,7 +4540,32 @@ bot.command("kb", async ctx => {
   );
 });
 
-bot.command("start", async ctx => {
+bot.command("start", async ctx => {bot.command("proactive_on", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Эта настройка работает только в личном чате.");
+  if (!kvConfigured()) return ctx.reply("Для автономных сообщений нужно подключить Cloudflare KV в настройках NEXUS.");
+  const saved = await setProactivePreference(ctx.from.id, true, ctx.chat.id);
+  await ctx.reply(saved
+    ? "🤖 Самостоятельные сообщения включены. Если ты не будешь писать 6 часов, NEXUS сможет первым написать тебе. Не чаще одного раза в сутки. Выключить: /proactive_off"
+    : "❌ Не удалось сохранить настройку в Cloudflare KV.");
+});
+
+bot.command("proactive_off", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Эта настройка работает только в личном чате.");
+  const saved = await setProactivePreference(ctx.from.id, false, ctx.chat.id);
+  await ctx.reply(saved ? "Окей, больше не буду начинать диалог первым." : "❌ Не удалось сохранить настройку. Проверь Cloudflare KV.");
+});
+
+bot.command("proactive", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Настройка доступна в личном чате.");
+  if (!kvConfigured()) return ctx.reply("Cloudflare KV не подключён — статус автономных сообщений не сохраняется.");
+  const registry = await getProactiveRegistry();
+  const state = registry[String(ctx.from.id)] || {};
+  await ctx.reply(state.enabled === true
+    ? "🤖 Самостоятельные сообщения: включены. Порог тишины — 6 часов, ограничение — 1 сообщение за 24 часа. /proactive_off — выключить."
+    : "Самостоятельные сообщения выключены. Включить: /proactive_on");
+});
+
+
   await loadMemory(ctx.from.id);
   const referralResult = await rouletteSuite.registerReferral(ctx.from.id, String(ctx.match || ""));
   if (referralResult?.ok) await ctx.reply("🎁 Добро пожаловать! За переход по приглашению начислена +1 бонусная прокрутка NEXUS.");
@@ -5728,9 +5822,19 @@ bot.on("message:text", async ctx => {
 async function start() {
   await bot.init();
 
+  // Check every five minutes while the Render instance is awake.
+  setInterval(() => {
+    runProactiveCheck().catch(error => console.error("PROACTIVE LOOP:", error.message));
+  }, 5 * 60 * 1000);
+  runProactiveCheck().catch(error => console.error("PROACTIVE START:", error.message));
+
+
   // Native Telegram "/" command menu with short Russian descriptions.
   const commonCommands = [
     { command: "start", description: "Запустить бота и открыть приветствие" },
+    { command: "proactive", description: "Статус самостоятельных сообщений NEXUS" },
+    { command: "proactive_on", description: "Разрешить NEXUS первым начинать диалог" },
+    { command: "proactive_off", description: "Запретить NEXUS первым писать" },
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
     { command: "personality", description: "Выбрать характер NEXUS AI" },
@@ -5896,7 +6000,13 @@ async function start() {
       return;
     }
 
-    if (req.method === "GET" && req.url === "/") {
+    if (req.method === "GET" && req.url === "/") {    if (req.method === "GET" && req.url === "/heartbeat") {
+      runProactiveCheck().catch(error => console.error("HEARTBEAT:", error.message));
+      res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
+      return res.end("NEXUS heartbeat OK");
+    }
+
+
       res.writeHead(200, {
         "Content-Type": "text/plain"
       });
