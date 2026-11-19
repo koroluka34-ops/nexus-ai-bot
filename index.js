@@ -52,14 +52,14 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
-// Track private-chat activity for NEXUS's opt-in proactive mode.
+// Track private-chat activity. Proactive messages are on by default; users can opt out.
 bot.use(async (ctx, next) => {
   if (ctx.from && ctx.chat?.type === "private" && ctx.message && kvConfigured()) {
     try {
       const registry = await getProactiveRegistry();
       const id = String(ctx.from.id);
       const previous = registry[id] && typeof registry[id] === "object" ? registry[id] : {};
-      registry[id] = { ...previous, chatId: ctx.chat.id, lastSeenAt: Date.now() };
+      registry[id] = { ...previous, chatId: ctx.chat.id, enabled: previous.enabled !== false, lastSeenAt: Date.now() };
       await writeKvJson("nexus:proactive:registry", registry);
     } catch (error) {
       console.error("PROACTIVE ACTIVITY:", error.message);
@@ -369,7 +369,7 @@ async function runProactiveCheck() {
   }
 
   for (const [id, state] of Object.entries(registry)) {
-    if (!state || state.enabled !== true || !state.chatId) continue;
+    if (!state || state.enabled === false || !state.chatId) continue;
     const inactivityMs = ( [6, 12, 24].includes(Number(state.inactivityHours)) ? Number(state.inactivityHours) * 60 * 60 * 1000 : DEFAULT_INACTIVE_MS );\n    if (now - Number(state.lastSeenAt || 0) < inactivityMs) continue;
     if (now - Number(state.lastSentAt || 0) < COOLDOWN_MS) continue;
     try {
@@ -2966,7 +2966,7 @@ bot.command("autonomy", async ctx => {
     const ok = await setProactivePreference(ctx.from.id, false, ctx.chat.id);
     return ctx.reply(ok ? "Автономные сообщения выключены." : "Не удалось сохранить настройку.");
   }
-  return ctx.reply("Автономные сообщения: " + (state.enabled ? "включены" : "выключены") + ".\n/autonomy on — включить\n/autonomy off — выключить\n/proactive — подробный статус");
+  return ctx.reply("Автономные сообщения: " + (state.enabled !== false ? "включены" : "выключены") + ".\n/autonomy on — включить\n/autonomy off — выключить\n/proactive — подробный статус");
 });
 
 bot.command("social", async ctx => {
