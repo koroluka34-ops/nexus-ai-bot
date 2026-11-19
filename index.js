@@ -1172,13 +1172,18 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     }
   ];
 
-  // Deterministic handling for the earnings-period clarification: do not let the model add unsolicited averages.
+  // Deterministic total-earnings calculation after the user clarifies the period.
+  // A stated 2–3k daily rate over three months is multiplied by 90 days.
   const priorHistory = getHistory(historyKey);
   const previousUserTurn = [...priorHistory].reverse().find(item => item.role === "user")?.content || "";
+  const hasThreeMonths = /3\s*(?:месяц|мес)|три\s+месяц/iu.test(previousUserTurn);
+  const hasDailyWorkContext = /(?:за\s+день|в\s+день|ежедневно|каждый\s+день)/iu.test(previousUserTurn) ||
+    /с\s*\d{1,2}\s*(?:утра|час(?:ов|а)?)?\s*(?:до|-)\s*\d{1,2}\s*(?:вечера|час(?:ов|а)?)/iu.test(previousUserTurn);
   const isTotalEarningsClarification =
-    /(?:за\s+всё|за\s+все\s+3\s+месяц|за\s+весь\s+период)/iu.test(question) &&
+    /(?:за\s+всё|за\s+все\s+3\s+месяц|за\s+весь\s+период|за\s+всё\s+время)/iu.test(question) &&
     /зарабат|заработ|буду\s+летом/iu.test(previousUserTurn) &&
-    /2\s*[–-]\s*3\s*тысяч/iu.test(previousUserTurn);
+    /2\s*[–-]\s*3\s*(?:тысяч|к\b)/iu.test(previousUserTurn) &&
+    hasThreeMonths && hasDailyWorkContext;
 
   let result;
 
@@ -1202,7 +1207,7 @@ async function askAI(userId, question, searchMode = false, options = {}) {
   }
 
   if (isTotalEarningsClarification) {
-    result.answer = "За все три месяца получится 2 000–3 000 грн.";
+    result.answer = "Если получать 2–3 тысячи грн каждый рабочий день, то за 90 дней (3 месяца без выходных) получится 180 000–270 000 грн.";
   }
 
   addHistory(historyKey, "user", question);
