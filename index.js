@@ -289,7 +289,14 @@ async function writeKvJson(key, value) {
 }
 
 async function getProactiveRegistry() {
-  const value = await readKvJson("nexus:proactive:registry", {});
+  if (!kvConfigured()) return {};
+  const response = await fetch(kvValueUrl("nexus:proactive:registry"), {
+    headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}` },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (response.status === 404) return {};
+  if (!response.ok) throw new Error("Proactive KV HTTP " + response.status);
+  const value = await response.json();
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
