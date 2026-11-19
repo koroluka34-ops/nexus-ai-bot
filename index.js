@@ -325,7 +325,7 @@ async function runProactiveCheck() {
   if (!kvConfigured()) return;
   const registry = await getProactiveRegistry();
   const now = Date.now();
-  const INACTIVE_MS = 6 * 60 * 60 * 1000;
+  const DEFAULT_INACTIVE_MS = 6 * 60 * 60 * 1000;
   const COOLDOWN_MS = 24 * 60 * 60 * 1000;
   async function createProactiveOpener(userId) {
     const memory = await loadMemory(userId);
@@ -370,7 +370,7 @@ async function runProactiveCheck() {
 
   for (const [id, state] of Object.entries(registry)) {
     if (!state || state.enabled !== true || !state.chatId) continue;
-    if (now - Number(state.lastSeenAt || 0) < INACTIVE_MS) continue;
+    const inactivityMs = ( [6, 12, 24].includes(Number(state.inactivityHours)) ? Number(state.inactivityHours) * 60 * 60 * 1000 : DEFAULT_INACTIVE_MS );\n    if (now - Number(state.lastSeenAt || 0) < inactivityMs) continue;
     if (now - Number(state.lastSentAt || 0) < COOLDOWN_MS) continue;
     try {
       const opener = await createProactiveOpener(id);
@@ -863,7 +863,7 @@ function allCommandsText() {
 <code>/start</code> — запустить бота.
 <code>/menu</code> — открыть главное меню.
 <code>/commands</code> — показать все команды.
-<code>/status</code> — проверить состояние сервисов.\n<code>/antiscam on|off</code> — защита группы от фишинга и скама.\n<code>/checksite URL</code> — разовая проверка сайта.\n<code>/watch URL</code>, <code>/watches</code>, <code>/unwatch ID</code> — мониторинг сайтов.\n<code>/groupstats</code> — статистика активности группы (админам).\n<code>/rule add фраза | предупреждение</code> — своё правило группы.\n<code>/rule list|remove ID</code> — список / удаление правил.\n<code>/checkapi URL</code> — проверить API, HTTP, задержку и JSON.\n<code>/domaincheck домен</code> — проверить SPF, DMARC и MX.\n<code>/factcheck утверждение</code> — предварительный ИИ-разбор факта.\n<code>/nexushealth</code> — RAM, uptime, Node.js и состояние процесса.\n<code>/personality</code> — выбрать характер NEXUS AI.
+<code>/status</code> — проверить состояние сервисов.\n<code>/antiscam on|off</code> — защита группы от фишинга и скама.\n<code>/checksite URL</code> — разовая проверка сайта.\n<code>/watch URL</code>, <code>/watches</code>, <code>/unwatch ID</code> — мониторинг сайтов.\n<code>/groupstats</code> — статистика активности группы (админам).\n<code>/rule add фраза | предупреждение</code> — своё правило группы.\n<code>/rule list|remove ID</code> — список / удаление правил.\n<code>/checkapi URL</code> — проверить API, HTTP, задержку и JSON.\n<code>/domaincheck домен</code> — проверить SPF, DMARC и MX.\n<code>/factcheck утверждение</code> — предварительный ИИ-разбор факта.\n<code>/nexushealth</code> — RAM, uptime, Node.js и состояние процесса.\n<code>/personality</code> — выбрать характер NEXUS AI.\n<code>/mood</code> — текущий стиль и режим NEXUS.\n<code>/autonomy on|off</code> — включить инициативные сообщения.\n<code>/social 6|12|24</code> — настроить паузу перед сообщением.\n<code>/diary add текст</code> — запись в дневник NEXUS.\n<code>/diary</code> — открыть дневник.
 <code>/reset</code> — очистить текущую историю диалога.
 <code>/groupmode on|off</code> — общий контекст ИИ в группе.
 <code>/kb</code> — база знаний из твоих документов.
@@ -2941,6 +2941,70 @@ bot.command("memory", async ctx => {
     "\n\n/memory add Категория | текст\n/memory search запрос\n/memory delete ID"
   );
 });;
+
+
+ // NEXUS persona controls and private diary.
+bot.command("mood", async ctx => {
+  const memory = await loadMemory(ctx.from.id);
+  const labels = { default: "спокойный и дружелюбный", bold: "дерзкий и прямой", funny: "весёлый и шутливый", genius: "сосредоточенный и аналитичный", cold: "сдержанный", dark: "мрачновато-ироничный", kind: "мягкий и поддерживающий" };
+  const hour = new Date().getHours();
+  const timeTone = hour < 6 ? "ночной режим" : hour < 12 ? "утренний настрой" : hour < 18 ? "дневной режим" : "вечерний режим";
+  await ctx.reply("🎭 Сейчас мой стиль: " + (labels[memory.personality] || labels.default) + ".\n🕒 " + timeTone + ".\nЭто настройка моей ИИ-персоны, а не настоящее человеческое чувство.");
+});
+
+bot.command("autonomy", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Автономность настраивается в личном чате.");
+  if (!kvConfigured()) return ctx.reply("Для автономного режима нужно подключить Cloudflare KV.");
+  const arg = String(ctx.match || "").trim().toLowerCase();
+  const registry = await getProactiveRegistry();
+  const state = registry[String(ctx.from.id)] || {};
+  if (["on", "вкл", "включить"].includes(arg)) {
+    const ok = await setProactivePreference(ctx.from.id, true, ctx.chat.id);
+    return ctx.reply(ok ? "🤖 Автономность включена. Я смогу первым написать после выбранной паузы. Лимит — не чаще раза в сутки. Выключить: /autonomy off" : "Не удалось сохранить настройку.");
+  }
+  if (["off", "выкл", "выключить"].includes(arg)) {
+    const ok = await setProactivePreference(ctx.from.id, false, ctx.chat.id);
+    return ctx.reply(ok ? "Автономные сообщения выключены." : "Не удалось сохранить настройку.");
+  }
+  return ctx.reply("Автономные сообщения: " + (state.enabled ? "включены" : "выключены") + ".\n/autonomy on — включить\n/autonomy off — выключить\n/proactive — подробный статус");
+});
+
+bot.command("social", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Настройка доступна в личном чате.");
+  if (!kvConfigured()) return ctx.reply("Для настройки нужен Cloudflare KV.");
+  const arg = String(ctx.match || "").trim().toLowerCase();
+  const registry = await getProactiveRegistry();
+  const id = String(ctx.from.id);
+  const state = registry[id] || {};
+  const hours = Number(arg.replace(/h$/i, ""));
+  if ([6, 12, 24].includes(hours)) {
+    registry[id] = { ...state, chatId: ctx.chat.id, inactivityHours: hours };
+    const ok = await writeKvJson("nexus:proactive:registry", registry);
+    return ctx.reply(ok ? "💬 Пауза перед первым сообщением: " + hours + " ч. Частота ограничена одним сообщением за 24 часа." : "Не удалось сохранить настройку.");
+  }
+  return ctx.reply("💬 Частота инициативы NEXUS\nСейчас: " + (Number(state.inactivityHours) || 6) + " ч тишины.\n/social 6 — чаще\n/social 12 — умеренно\n/social 24 — редко");
+});
+
+bot.command("diary", async ctx => {
+  const memory = await loadMemory(ctx.from.id);
+  memory.diary = Array.isArray(memory.diary) ? memory.diary : [];
+  const input = String(ctx.match || "").trim();
+  const [action, ...rest] = input.split(/\s+/);
+  const value = rest.join(" ").trim();
+  if (action === "add" && value) {
+    memory.diary.push({ text: value.slice(0, 1000), at: new Date().toISOString() });
+    memory.diary = memory.diary.slice(-100);
+    const ok = await saveMemory(ctx.from.id);
+    return ctx.reply(ok ? "📓 Записал в личный дневник NEXUS." : "Не удалось сохранить запись в KV.");
+  }
+  if (action === "clear") {
+    memory.diary = [];
+    const ok = await saveMemory(ctx.from.id);
+    return ctx.reply(ok ? "Дневник очищен." : "Не удалось сохранить изменения.");
+  }
+  const entries = memory.diary.slice(-20);
+  return ctx.reply("📓 ДНЕВНИК NEXUS\n\n" + (entries.length ? entries.map((x, i) => (i + 1) + ". " + x.text + " (" + new Date(x.at).toLocaleString("ru-RU") + ")").join("\n") : "Пока записей нет.") + "\n\n/diary add текст — добавить запись\n/diary clear — очистить дневник");
+});
 
 bot.command("minecraft", async ctx => {
   const userId = ctx.from.id;
@@ -5885,7 +5949,7 @@ async function start() {
     { command: "proactive_off", description: "Запретить NEXUS первым писать" },
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
-    { command: "personality", description: "Выбрать характер NEXUS AI" },
+    { command: "personality", description: "Выбрать характер NEXUS AI" },\n    { command: "mood", description: "Посмотреть текущий стиль NEXUS" },\n    { command: "autonomy", description: "Включить или выключить инициативу NEXUS" },\n    { command: "social", description: "Настроить частоту первых сообщений" },\n    { command: "diary", description: "Личный дневник NEXUS" },
     { command: "image", description: "Создать изображение по описанию" },
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
