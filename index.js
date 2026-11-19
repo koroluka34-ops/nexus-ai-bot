@@ -1178,14 +1178,14 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     .filter(item => item.role === "user")
     .slice(-4)
     .map(item => item.content)
-    .join("\\n");
-  const earningsContext = recentUserContext + "\\n" + question;
-  const hasThreeMonths = /3\\s*(?:месяц|мес)|три\\s+месяц/iu.test(earningsContext);
-  const hasDailyWorkContext = /(?:за\\s+день|в\\s+день|ежедневно|каждый\\s+день)/iu.test(earningsContext);
-  const hasTwoToThreeThousandRate = /2\\s*[–-]\\s*3\\s*(?:тысяч|к\\b)/iu.test(earningsContext);
-  const asksThreeMonthTotal = /(?:сколько\\s+(?:я\\s+)?заработаю|сколько\\s+получится|за\\s+всё|за\\s+все\\s+3\\s+месяц|за\\s+весь\\s+период)/iu.test(question);
+    .join("\n");
+  const earningsContext = recentUserContext + "\n" + question;
+  const hasThreeMonths = /3\s*(?:месяц|мес)|три\s+месяц/iu.test(earningsContext);
+  const hasDailyWorkContext = /(?:за\s+день|в\s+день|ежедневно|каждый\s+день)/iu.test(earningsContext);
+  const hasTwoToThreeThousandRate = /2\s*[–-]\s*3\s*(?:тысяч|к\b)/iu.test(earningsContext);
+  const asksThreeMonthTotal = /(?:сколько\s+(?:я\s+)?заработаю|сколько\s+получится|за\s+всё|за\s+все\s+3\s+месяц|за\s+весь\s+период)/iu.test(question);
   const isThreeMonthDailyEarnings =
-    /зарабат|заработ|буду\\s+летом/iu.test(earningsContext) &&
+    /зарабат|заработ|буду\s+летом/iu.test(earningsContext) &&
     hasThreeMonths && hasDailyWorkContext && hasTwoToThreeThousandRate &&
     asksThreeMonthTotal;
 
