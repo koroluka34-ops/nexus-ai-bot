@@ -1,0 +1,13 @@
+name: NEXUS heartbeat
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake NEXUS and check proactive messages
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 15 "https://nexus-ai-bot-kt4w.onrender.com/heartbeat"
