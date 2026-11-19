@@ -130,6 +130,7 @@ const MAX_DOCUMENT_BYTES = 18 * 1024 * 1024;
 const MAX_MEMORY_CHARS = 8000;
 
 const histories = new Map();
+const numberStreams = new Map(); // userId -> next integer
 const longMemory = new Map();
 const groupModes = new Map();
 
@@ -5433,6 +5434,28 @@ bot.on("message:text", async ctx => {
     if (cleanedQuestion) ctx.message.text = cleanedQuestion;
   }
   const addressedQuestion = ctx.message.text.trim();
+
+  // Number stream: send finite Telegram-sized chunks and continue on demand.
+  // Telegram cannot deliver a literally infinite message; "стоп" cancels the stream.
+  const streamKey = String(userId);
+  const streamText = addressedQuestion.toLocaleLowerCase("ru").trim();
+  if (/^(?:стоп|остановись|хватит|прекрати)$/iu.test(streamText) && numberStreams.has(streamKey)) {
+    numberStreams.delete(streamKey);
+    await ctx.reply("Остановил счёт. Если захочешь начать заново — попроси писать числа бесконечно.");
+    return;
+  }
+  const startsNumberStream = /(?:пиши|считай|перечисляй).{0,50}(?:бесконеч|безs+конца).{0,40}(?:числ|цифр)?|(?:бесконечн|безs+конца).{0,40}(?:числ|цифр)/iu.test(streamText);
+  const continuesNumberStream = numberStreams.has(streamKey) &&
+    /^(?:да|дальше|продолжай|ещ[её]|го|пиши|следующ(?:ие|ую)s+часть)[.!? ]*$/iu.test(streamText);
+  if (startsNumberStream || continuesNumberStream) {
+    const startAt = startsNumberStream ? 1 : numberStreams.get(streamKey);
+    const count = 250;
+    const endAt = startAt + count - 1;
+    const chunk = Array.from({ length: count }, (_, i) => String(startAt + i)).join(", ");
+    numberStreams.set(streamKey, endAt + 1);
+    await ctx.reply(chunk + "\n\nПродолжить — напиши «дальше». Остановить — «стоп».");
+    return;
+  }
 
   // Route game-creation requests to the cloud Godot agent before the normal chat model.
   if (await handleGameStudioRequest(ctx, addressedQuestion)) return;
