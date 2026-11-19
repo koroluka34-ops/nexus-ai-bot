@@ -1172,18 +1172,22 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     }
   ];
 
-  // Deterministic total-earnings calculation after the user clarifies the period.
-  // A stated 2–3k daily rate over three months is multiplied by 90 days.
+  // Deterministic earnings calculation when the user explicitly states a daily rate and period.
   const priorHistory = getHistory(historyKey);
-  const previousUserTurn = [...priorHistory].reverse().find(item => item.role === "user")?.content || "";
-  const hasThreeMonths = /3\s*(?:месяц|мес)|три\s+месяц/iu.test(previousUserTurn);
-  const hasDailyWorkContext = /(?:за\s+день|в\s+день|ежедневно|каждый\s+день)/iu.test(previousUserTurn) ||
-    /с\s*\d{1,2}\s*(?:утра|час(?:ов|а)?)?\s*(?:до|-)\s*\d{1,2}\s*(?:вечера|час(?:ов|а)?)/iu.test(previousUserTurn);
-  const isTotalEarningsClarification =
-    /(?:за\s+всё|за\s+все\s+3\s+месяц|за\s+весь\s+период|за\s+всё\s+время)/iu.test(question) &&
-    /зарабат|заработ|буду\s+летом/iu.test(previousUserTurn) &&
-    /2\s*[–-]\s*3\s*(?:тысяч|к\b)/iu.test(previousUserTurn) &&
-    hasThreeMonths && hasDailyWorkContext;
+  const recentUserContext = priorHistory
+    .filter(item => item.role === "user")
+    .slice(-4)
+    .map(item => item.content)
+    .join("\\n");
+  const earningsContext = recentUserContext + "\\n" + question;
+  const hasThreeMonths = /3\\s*(?:месяц|мес)|три\\s+месяц/iu.test(earningsContext);
+  const hasDailyWorkContext = /(?:за\\s+день|в\\s+день|ежедневно|каждый\\s+день)/iu.test(earningsContext);
+  const hasTwoToThreeThousandRate = /2\\s*[–-]\\s*3\\s*(?:тысяч|к\\b)/iu.test(earningsContext);
+  const asksThreeMonthTotal = /(?:сколько\\s+(?:я\\s+)?заработаю|сколько\\s+получится|за\\s+всё|за\\s+все\\s+3\\s+месяц|за\\s+весь\\s+период)/iu.test(question);
+  const isThreeMonthDailyEarnings =
+    /зарабат|заработ|буду\\s+летом/iu.test(earningsContext) &&
+    hasThreeMonths && hasDailyWorkContext && hasTwoToThreeThousandRate &&
+    asksThreeMonthTotal;
 
   let result;
 
@@ -1206,8 +1210,8 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     result = await askOpenRouter(messages);
   }
 
-  if (isTotalEarningsClarification) {
-    result.answer = "Если получать 2–3 тысячи грн каждый рабочий день, то за 90 дней (3 месяца без выходных) получится 180 000–270 000 грн.";
+  if (isThreeMonthDailyEarnings) {
+    result.answer = "Если зарабатывать каждый день по 2–3 тысячи грн, то за 90 дней (примерно 3 месяца) получится 180 000–270 000 грн.";
   }
 
   addHistory(historyKey, "user", question);
