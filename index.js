@@ -5704,6 +5704,8 @@ bot.on("message:text", async ctx => {
   }
   const addressedQuestion = ctx.message.text.trim();
 
+  // Resolve chat modes before any feature branch that may need them.
+
   // Number stream: send finite Telegram-sized chunks and continue on demand.
   // Telegram cannot deliver a literally infinite message; "стоп" cancels the stream.
   const streamKey = String(userId);
