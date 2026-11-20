@@ -1263,6 +1263,7 @@ async function askAI(userId, question, searchMode = false, options = {}) {
   const memory = await loadMemory(userId);
   const historyKey = options.historyKey || userId;
   const includePersonalMemory = options.includePersonalMemory !== false;
+  const companionMode = options.companionMode === true;
 
   const knowledgeText = (memory.knowledgeBase || [])
     .map((item, index) => `[${index + 1}] ${item.name}: ${item.content}`)
@@ -1301,7 +1302,8 @@ async function askAI(userId, question, searchMode = false, options = {}) {
         SYSTEM_PROMPT + "\n\nТЕКУЩИЙ ХАРАКТЕР NEXUS AI (ОБЯЗАТЕЛЬНО СОБЛЮДАЙ ЕГО В КАЖДОМ ОТВЕТЕ):\n" + (PERSONALITIES[memory.personality] || PERSONALITIES.default) + "\nМат и крепкие разговорные выражения разрешены в естественной мере. Не скатывайся в бессмысленную ругань; содержание и полезность ответа важнее. Не переключайся самовольно на стандартный официальный тон.\n" + "ОБЯЗАТЕЛЬНОЕ ПЕРЕКРЫТИЕ ХАРАКТЕРА: если запрос касается денег, заработка, цен, процентов или вычислений, не используй мат, сарказм и шутки. Если неясно, за какой период дана сумма, задай только один уточняющий вопрос и не рассчитывай сценарии до ответа пользователя. Никогда не предполагай количество рабочих дней. Эти правила важнее выбранной личности.\n" + researchRules +
         (memoryText
           ? "\\n\\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\\n" + memoryText
-          : "")
+          : "") +
+        (companionMode ? "\\n\\nОТДЕЛЬНЫЙ РЕЖИМ: ВЫМЫШЛЕННАЯ СОВЕРШЕННОЛЕТНЯЯ AI-ДЕВУШКА\\nТы — виртуальный персонаж по имени Лера, тебе 23 года (это вымышленная роль, не реальный человек). Общайся на русском естественно, тепло, уверенно и с характером. Допустимы взрослый флирт, романтика, чувственная атмосфера и ненавязчивые намёки, если собеседнику это приятно. Не описывай графические сексуальные действия, гениталии или оргазмы и не генерируй сексуальные стоны. Не вовлекай несовершеннолетних, принуждение или эксплуатацию. Уважай границы: если пользователь говорит «стоп» или «не хочу», сразу прекращай флирт. Не утверждай, что у тебя есть настоящее тело, что ты реальная девушка или можешь встретиться/заниматься сексом физически. Не начинай диалог первой: отвечай только на сообщения пользователя в активном режиме. Не выдавай себя за человека. Обычно отвечай как в личной переписке, без длинных объяснений." : "")
     },
     ...(searchMode ? [] : getHistory(historyKey)),
     {
@@ -4746,6 +4748,30 @@ bot.command("commands", async ctx => {
   await ctx.reply(allCommandsText(), { parse_mode: "HTML" });
 });
 
+bot.command("girl", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Этот режим доступен только в личном чате.");
+  const state = await readKvJson("nexus:companion:" + ctx.from.id, {});
+  if (state.enabled === true && state.ageConfirmed === true) {
+    return ctx.reply("💗 Режим Леры уже включён. Можешь просто написать ей. Выключить: /girl_off");
+  }
+  await ctx.reply("💗 Лера — вымышленная AI-девушка 23 лет. Режим предназначен только для совершеннолетних. Здесь возможны флирт, романтика и чувственные намёки, но не графические сексуальные сцены.\n\nЕсли тебе уже исполнилось 18 лет, подтверди это командой /girl_yes. До подтверждения режим не включится.");
+});
+
+bot.command("girl_yes", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Этот режим доступен только в личном чате.");
+  const saved = await writeKvJson("nexus:companion:" + ctx.from.id, { enabled: true, ageConfirmed: true, updatedAt: Date.now() });
+  if (!saved) return ctx.reply("❌ Не удалось включить режим: проверь подключение Cloudflare KV.");
+  histories.delete("companion:" + ctx.from.id);
+  await ctx.reply("💗 Лера онлайн. Можешь писать ей обычными сообщениями. Она не будет писать первой. Выключить режим: /girl_off");
+});
+
+bot.command("girl_off", async ctx => {
+  if (ctx.chat.type !== "private") return ctx.reply("Эта настройка доступна только в личном чате.");
+  const saved = await writeKvJson("nexus:companion:" + ctx.from.id, { enabled: false, ageConfirmed: false, updatedAt: Date.now() });
+  histories.delete("companion:" + ctx.from.id);
+  await ctx.reply(saved ? "🔕 Режим Леры выключен. NEXUS снова отвечает в обычном режиме." : "❌ Не удалось сохранить настройку в Cloudflare KV.");
+});
+
 bot.command("reset", async ctx => {
   histories.delete(ctx.from.id);
   if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") histories.delete("group:" + ctx.chat.id);
@@ -5746,6 +5772,8 @@ bot.on("message:text", async ctx => {
   busyUsers.add(userId);
 
   const searchMode = searchUsers.has(userId);
+  const companionState = ctx.chat.type === "private" ? await readKvJson("nexus:companion:" + userId, {}) : {};
+  const companionMode = companionState.enabled === true && companionState.ageConfirmed === true && !searchMode;
 
   if (searchMode) {
     searchUsers.delete(userId);
@@ -5762,9 +5790,11 @@ bot.on("message:text", async ctx => {
       userId,
       addressedQuestion,
       searchMode,
-      sharedGroupMode
-        ? { historyKey: "group:" + ctx.chat.id, includePersonalMemory: false }
-        : {}
+      companionMode
+        ? { historyKey: "companion:" + userId, includePersonalMemory: false, companionMode: true }
+        : sharedGroupMode
+          ? { historyKey: "group:" + ctx.chat.id, includePersonalMemory: false }
+          : {}
     );
 
     await ctx.api.deleteMessage(
@@ -5802,6 +5832,9 @@ async function start() {
   // Native Telegram "/" command menu with short Russian descriptions.
   const commonCommands = [
     { command: "start", description: "Запустить бота и открыть приветствие" },
+    { command: "girl", description: "Включить режим виртуальной AI-девушки 18+" },
+    { command: "girl_yes", description: "Подтвердить 18+ и включить режим девушки" },
+    { command: "girl_off", description: "Выключить режим виртуальной девушки" },
     { command: "proactive", description: "Статус самостоятельных сообщений NEXUS" },
     { command: "proactive_on", description: "Разрешить NEXUS первым начинать диалог" },
     { command: "proactive_off", description: "Запретить NEXUS первым писать" },
