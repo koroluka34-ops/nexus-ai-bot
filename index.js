@@ -5644,7 +5644,11 @@ bot.on("message:voice", async ctx => {
       }
     }
 
-    const result = await askAI(userId, transcript, false);
+    const companionState = ctx.chat.type === "private" ? await readKvJson("nexus:companion:" + userId, {}) : {};
+    const companionMode = companionState.enabled === true && companionState.ageConfirmed === true;
+    const result = await askAI(userId, transcript, false, companionMode
+      ? { historyKey: "companion:" + userId, includePersonalMemory: false, companionMode: true }
+      : {});
 
     await deliverAnswer(ctx, userId, result);
   } catch (error) {
