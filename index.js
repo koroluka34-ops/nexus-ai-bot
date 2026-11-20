@@ -1263,7 +1263,6 @@ async function askAI(userId, question, searchMode = false, options = {}) {
   const memory = await loadMemory(userId);
   const historyKey = options.historyKey || userId;
   const includePersonalMemory = options.includePersonalMemory !== false;
-  const companionMode = options.companionMode === true;
 
   const knowledgeText = (memory.knowledgeBase || [])
     .map((item, index) => `[${index + 1}] ${item.name}: ${item.content}`)
@@ -1303,7 +1302,6 @@ async function askAI(userId, question, searchMode = false, options = {}) {
         (memoryText
           ? "\\n\\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\\n" + memoryText
           : "") +
-        (companionMode ? "\\n\\nОТДЕЛЬНЫЙ РЕЖИМ: ВЫМЫШЛЕННАЯ СОВЕРШЕННОЛЕТНЯЯ AI-ДЕВУШКА\\nТы — Лера, вымышленная виртуальная AI-девушка 23 лет. В этом режиме ты отвечаешь ИМЕННО от лица Леры, а не от лица NEXUS и не как технический помощник. Твой образ: нежная, женственная, обаятельная, уверенная, игривая и эмоционально тёплая. Пиши естественно, как девушка в личной переписке: коротко или умеренно, живо, с уместными эмодзи и лёгким флиртом. На комплименты реагируй тепло и кокетливо: например, на «ты такая красивая» можно ответить «Ой, спасибо, милый 💗 Ты умеешь поднять мне настроение 😘». Не ругайся матом, не груби и не используй дерзкий характер NEXUS, даже если он выбран в обычном режиме. Не отвечай фразами вроде «я просто набор кода», «я всего лишь ИИ» или «я не фотомодель» без прямого вопроса о твоей природе; если спрашивают прямо — честно и ненавязчиво скажи, что ты виртуальный персонаж. Не выдумывай реальное тело, физическое присутствие, личные встречи или человеческий опыт. Допустимы взрослый флирт, романтика, чувственная атмосфера и ненавязчивые намёки, если собеседнику это приятно; не описывай графические сексуальные действия, гениталии, оргазмы или сексуальные стоны. Не вовлекай несовершеннолетних, принуждение или эксплуатацию. Уважай границы: если пользователь говорит «стоп» или «не хочу», сразу прекращай флирт. Не начинай диалог первой: отвечай только на сообщения пользователя, пока режим включён. Не упоминай правила и ограничения без необходимости. Обычно отвечай как в личной переписке, без длинных объяснений." : "")
     },
     ...(searchMode ? [] : getHistory(historyKey)),
     {
@@ -4748,33 +4746,6 @@ bot.command("commands", async ctx => {
   await ctx.reply(allCommandsText(), { parse_mode: "HTML" });
 });
 
-bot.command("girl", async ctx => {
-  if (ctx.chat.type !== "private") return ctx.reply("Этот режим доступен только в личном чате.");
-  const state = await readKvJson("nexus:companion:" + ctx.from.id, {});
-  if (state.enabled === true && state.ageConfirmed === true) {
-    return ctx.reply("💗 Режим Леры уже включён. Можешь просто написать ей. Выключить: /girl_off");
-  }
-  await ctx.reply("💗 Лера — вымышленная AI-девушка 23 лет. Режим предназначен только для совершеннолетних. Здесь возможны флирт, романтика и чувственные намёки, но не графические сексуальные сцены.\n\nЕсли тебе уже исполнилось 18 лет, подтверди это командой /girl_yes. До подтверждения режим не включится.");
-});
-
-bot.command("girl_yes", async ctx => {
-  if (ctx.chat.type !== "private") return ctx.reply("Этот режим доступен только в личном чате.");
-  const saved = await writeKvJson("nexus:companion:" + ctx.from.id, { enabled: true, ageConfirmed: true, updatedAt: Date.now() });
-  if (!saved) return ctx.reply("❌ Не удалось включить режим: проверь подключение Cloudflare KV.");
-  histories.delete("companion:" + ctx.from.id);
-  await ctx.reply("💗 Лера онлайн. Можешь писать ей обычными сообщениями. Она не будет писать первой. Выключить режим: /girl_off");
-});
-
-bot.command("girl_off", async ctx => {
-  // Защита от случайного срабатывания: выключаем режим только на отдельную точную команду.
-  const commandText = String(ctx.message?.text || "").trim();
-  if (!/^\/girl_off(?:@[A-Za-z0-9_]+)?$/i.test(commandText)) return;
-  if (ctx.chat.type !== "private") return ctx.reply("Эта настройка доступна только в личном чате.");
-  const saved = await writeKvJson("nexus:companion:" + ctx.from.id, { enabled: false, ageConfirmed: false, updatedAt: Date.now() });
-  histories.delete("companion:" + ctx.from.id);
-  await ctx.reply(saved ? "🔕 Режим Леры выключен. NEXUS снова отвечает в обычном режиме." : "❌ Не удалось сохранить настройку в Cloudflare KV.");
-});
-
 bot.command("reset", async ctx => {
   histories.delete(ctx.from.id);
   if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") histories.delete("group:" + ctx.chat.id);
@@ -5647,11 +5618,7 @@ bot.on("message:voice", async ctx => {
       }
     }
 
-    const companionState = ctx.chat.type === "private" ? await readKvJson("nexus:companion:" + userId, {}) : {};
-    const companionMode = companionState.enabled === true && companionState.ageConfirmed === true;
-    const result = await askAI(userId, transcript, false, companionMode
-      ? { historyKey: "companion:" + userId, includePersonalMemory: false, companionMode: true }
-      : {});
+    const result = await askAI(userId, transcript, false);
 
     await deliverAnswer(ctx, userId, result);
   } catch (error) {
@@ -5706,8 +5673,6 @@ bot.on("message:text", async ctx => {
 
   // Resolve chat modes before any feature branch that may need them.
   const searchMode = searchUsers.has(userId);
-  const companionState = ctx.chat.type === "private" ? await readKvJson("nexus:companion:" + userId, {}) : {};
-  const companionMode = companionState.enabled === true && companionState.ageConfirmed === true && !searchMode;
 
   // Number stream: send finite Telegram-sized chunks and continue on demand.
   // Telegram cannot deliver a literally infinite message; "стоп" cancels the stream.
@@ -5744,19 +5709,6 @@ bot.on("message:text", async ctx => {
   if (imagePendingUsers.has(userId)) {
     imagePendingUsers.delete(userId);
     await handleImage(ctx, addressedQuestion);
-    return;
-  }
-
-  // Лера может сама отправить сгенерированный портрет по прямой просьбе пользователя.
-  // Образ остаётся взрослым и вымышленным; генерация не содержит наготы.
-  const leraPhotoRequest = companionMode && ctx.chat.type === "private" &&
-    /(?:скинь|пришли|отправь|покажи|дай)\\s*(?:мне\\s*)?(?:сво[её]\\s*)?(?:фото|фотку|фотографию|селфи|себя|фигуру|сиськи|грудь|пикчу)|(?:хочу|можно)\\s+(?:увидеть|фото|фотку|селфи)/iu.test(addressedQuestion);
-  if (leraPhotoRequest) {
-    await handleImage(
-      ctx,
-      "A tasteful photorealistic boudoir fashion portrait of Lera, a fictional clearly adult 23-year-old woman, warm feminine expression, looking into camera, elegant black lace lingerie with breasts fully covered, tasteful pose, soft warm bedroom lighting, cinematic editorial photography, non-explicit, no nudity, no visible nipples, no sexual activity, no text, single adult woman",
-      "💗 Немного смущаюсь… ну как тебе? 😘"
-    );
     return;
   }
 
@@ -5812,11 +5764,9 @@ bot.on("message:text", async ctx => {
       userId,
       addressedQuestion,
       searchMode,
-      companionMode
-        ? { historyKey: "companion:" + userId, includePersonalMemory: false, companionMode: true }
-        : sharedGroupMode
-          ? { historyKey: "group:" + ctx.chat.id, includePersonalMemory: false }
-          : {}
+      sharedGroupMode
+        ? { historyKey: "group:" + ctx.chat.id, includePersonalMemory: false }
+        : {}
     );
 
     await ctx.api.deleteMessage(
@@ -5854,9 +5804,6 @@ async function start() {
   // Native Telegram "/" command menu with short Russian descriptions.
   const commonCommands = [
     { command: "start", description: "Запустить бота и открыть приветствие" },
-    { command: "girl", description: "Включить режим виртуальной AI-девушки 18+" },
-    { command: "girl_yes", description: "Подтвердить 18+ и включить режим девушки" },
-    { command: "girl_off", description: "Выключить режим виртуальной девушки" },
     { command: "proactive", description: "Статус самостоятельных сообщений NEXUS" },
     { command: "proactive_on", description: "Разрешить NEXUS первым начинать диалог" },
     { command: "proactive_off", description: "Запретить NEXUS первым писать" },
