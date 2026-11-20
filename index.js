@@ -1499,7 +1499,7 @@ async function generateImage(prompt) {
   return buffer;
 }
 
-async function handleImage(ctx, prompt) {
+async function handleImage(ctx, prompt, caption = "🖼 Готово!") {
   const userId = ctx.from.id;
   const cleanPrompt = String(prompt || "").trim();
 
@@ -1539,7 +1539,7 @@ async function handleImage(ctx, prompt) {
 
     await ctx.replyWithPhoto(
       new InputFile(image, "nexus-image.jpg"),
-      { caption: "🖼 Готово!" }
+      { caption }
     );
   } catch (error) {
     await refundQuota(userId, "image");
@@ -5736,6 +5736,19 @@ bot.on("message:text", async ctx => {
   if (imagePendingUsers.has(userId)) {
     imagePendingUsers.delete(userId);
     await handleImage(ctx, addressedQuestion);
+    return;
+  }
+
+  // Лера может сама отправить сгенерированный портрет по прямой просьбе пользователя.
+  // Образ остаётся взрослым и вымышленным; генерация не содержит наготы.
+  const leraPhotoRequest = companionMode && ctx.chat.type === "private" &&
+    /(?:скинь|пришли|отправь|покажи|дай)\\s*(?:мне\\s*)?(?:сво[её]\\s*)?(?:фото|фотку|фотографию|селфи|себя|фигуру|сиськи|грудь|пикчу)|(?:хочу|можно)\\s+(?:увидеть|фото|фотку|селфи)/iu.test(addressedQuestion);
+  if (leraPhotoRequest) {
+    await handleImage(
+      ctx,
+      "A tasteful photorealistic boudoir fashion portrait of Lera, a fictional clearly adult 23-year-old woman, warm feminine expression, looking into camera, elegant black lace lingerie with breasts fully covered, tasteful pose, soft warm bedroom lighting, cinematic editorial photography, non-explicit, no nudity, no visible nipples, no sexual activity, no text, single adult woman",
+      "💗 Немного смущаюсь… ну как тебе? 😘"
+    );
     return;
   }
 
