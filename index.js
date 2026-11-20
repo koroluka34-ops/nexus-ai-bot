@@ -5705,6 +5705,9 @@ bot.on("message:text", async ctx => {
   const addressedQuestion = ctx.message.text.trim();
 
   // Resolve chat modes before any feature branch that may need them.
+  const searchMode = searchUsers.has(userId);
+  const companionState = ctx.chat.type === "private" ? await readKvJson("nexus:companion:" + userId, {}) : {};
+  const companionMode = companionState.enabled === true && companionState.ageConfirmed === true && !searchMode;
 
   // Number stream: send finite Telegram-sized chunks and continue on demand.
   // Telegram cannot deliver a literally infinite message; "стоп" cancels the stream.
@@ -5793,9 +5796,6 @@ bot.on("message:text", async ctx => {
 
   busyUsers.add(userId);
 
-  const searchMode = searchUsers.has(userId);
-  const companionState = ctx.chat.type === "private" ? await readKvJson("nexus:companion:" + userId, {}) : {};
-  const companionMode = companionState.enabled === true && companionState.ageConfirmed === true && !searchMode;
 
   if (searchMode) {
     searchUsers.delete(userId);
