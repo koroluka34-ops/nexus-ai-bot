@@ -94,8 +94,10 @@ installUtilitySuite(bot);
 const { installQrSuite } = require("./modules/qr-suite");
 installQrSuite(bot);
 
-const { installDeviceBridge, handleDeviceHttp, queueVoiceAction, requestVoiceStoreInstallConfirmation, requestVoicePcConfirmation } = require("./modules/device-bridge");
-installDeviceBridge(bot);
+// Управление локальным ПК полностью отключено: сервер не подключается к устройствам.
+function queueVoiceAction() { throw new Error("Доступ NEXUS к компьютеру полностью удалён."); }
+function requestVoiceStoreInstallConfirmation() { throw new Error("Доступ NEXUS к компьютеру полностью удалён."); }
+function requestVoicePcConfirmation() { throw new Error("Доступ NEXUS к компьютеру полностью удалён."); }
 
 const { installRoulette } = require("./modules/roulette-suite");
 const { installBitcoinSuite } = require("./modules/bitcoin-suite");
@@ -5999,8 +6001,6 @@ async function start() {
     { command: "dns", description: "Проверить DNS-записи домена" },
     { command: "tz", description: "Текущее время в часовом поясе" },
     { command: "urlinfo", description: "Разобрать структуру интернет-ссылки" },
-    { command: "pc", description: "Управление подключённым компьютером" },
-    { command: "pcdisconnect", description: "Отключить мост управления ПК" },
     { command: "weather", description: "Узнать погоду" },
     { command: "fx", description: "Показать курс валют" },
     { command: "country", description: "Информация о стране" },
@@ -6096,14 +6096,6 @@ async function start() {
       });
       return;
     }
-    if (req.url.startsWith("/device/")) {
-      handleDeviceHttp(req, res).catch(error => {
-        console.error("Device bridge:", error.message);
-        if (!res.headersSent) { res.writeHead(500); res.end("Internal error"); }
-      });
-      return;
-    }
-
     if (req.method === "GET" && req.url === "/") {    if (req.method === "GET" && req.url === "/heartbeat") {
       runProactiveCheck().catch(error => console.error("HEARTBEAT:", error.message));
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
