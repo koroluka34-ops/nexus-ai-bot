@@ -1240,6 +1240,24 @@ function formatSources(annotations) {
 // MAIN AI
 // ======================================================
 
+async function callProviderWithRetry(providerName, operation, maxAttempts = 2) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const message = String(error?.message || error);
+      const permanent = /(?:401|403|404|invalid api key|authentication|permission denied|не настроен|неверн\w* ключ)/iu.test(message);
+      if (permanent || attempt === maxAttempts) break;
+      const delayMs = 700 * attempt;
+      console.warn(`${providerName} attempt ${attempt}/${maxAttempts} failed; retrying in ${delayMs}ms: ${message.slice(0, 240)}`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError || new Error(providerName + " не ответил.");
+}
+
 async function askAI(userId, question, searchMode = false, options = {}) {
   const memory = await loadMemory(userId);
   const historyKey = options.historyKey || userId;
@@ -1317,7 +1335,11 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     const route = routeTask(question, searchMode ? "gpt" : preference);
     // GPT-OSS 20B supports Groq browser search; use it for research requests.
     const selectedModel = searchMode ? "openai/gpt-oss-20b" : route.model;
-    result = await askGroq(messages, searchMode, selectedModel);
+    result = await callProviderWithRetry(
+      "Groq",
+      () => askGroq(messages, searchMode, selectedModel),
+      2
+    );
   } catch (error) {
     console.error("Groq:", error.message);
 
@@ -1328,7 +1350,11 @@ async function askAI(userId, question, searchMode = false, options = {}) {
       );
     }
 
-    result = await askOpenRouter(messages);
+    result = await callProviderWithRetry(
+      "OpenRouter",
+      () => askOpenRouter(messages),
+      2
+    );
   }
 
   if (isThreeMonthDailyEarnings) {
