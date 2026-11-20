@@ -4768,7 +4768,7 @@ bot.command("girl_yes", async ctx => {
 bot.command("girl_off", async ctx => {
   // Защита от случайного срабатывания: выключаем режим только на отдельную точную команду.
   const commandText = String(ctx.message?.text || "").trim();
-  if (!/^\\/girl_off(?:@[A-Za-z0-9_]+)?$/i.test(commandText)) return;
+  if (!/^\/girl_off(?:@[A-Za-z0-9_]+)?$/i.test(commandText)) return;
   if (ctx.chat.type !== "private") return ctx.reply("Эта настройка доступна только в личном чате.");
   const saved = await writeKvJson("nexus:companion:" + ctx.from.id, { enabled: false, ageConfirmed: false, updatedAt: Date.now() });
   histories.delete("companion:" + ctx.from.id);
