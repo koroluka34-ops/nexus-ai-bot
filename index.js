@@ -372,7 +372,8 @@ async function runProactiveCheck() {
 
   for (const [id, state] of Object.entries(registry)) {
     if (!state || state.enabled === false || !state.chatId) continue;
-    const inactivityMs = ( [6, 12, 24].includes(Number(state.inactivityHours)) ? Number(state.inactivityHours) * 60 * 60 * 1000 : DEFAULT_INACTIVE_MS );\n    if (now - Number(state.lastSeenAt || 0) < inactivityMs) continue;
+    const inactivityMs = ([6, 12, 24].includes(Number(state.inactivityHours)) ? Number(state.inactivityHours) * 60 * 60 * 1000 : DEFAULT_INACTIVE_MS);
+    if (now - Number(state.lastSeenAt || 0) < inactivityMs) continue;
     if (now - Number(state.lastSentAt || 0) < COOLDOWN_MS) continue;
     try {
       const opener = await createProactiveOpener(id);
@@ -5668,178 +5669,6 @@ bot.on("message:text", async ctx => {
   // Route game-creation requests to the cloud Godot agent before the normal chat model.
   if (await handleGameStudioRequest(ctx, addressedQuestion)) return;
 
-  // Deterministic PC commands from ordinary Telegram text (do not send these to Groq).
-  const normalizedCommand = addressedQuestion.replace(/[.!?]+$/g, "").trim();
-
-  const youtubeChannelMatch = normalizedCommand.match(/^(?:на\s+(?:ютубе|youtube)\s+)?(?:открой|найди|покажи)\s+(?:мне\s+)?канал\s+(.+)$/iu);
-  if (youtubeChannelMatch) {
-    const channelName = youtubeChannelMatch[1].trim();
-    if (!channelName || channelName.length > 80) {
-      await ctx.reply("⚠️ Укажи название YouTube-канала.");
-      return;
-    }
-    try {
-      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(channelName + " канал");
-      queueVoiceAction("open_url", { url }, userId, ctx.chat.id);
-      await ctx.reply("▶️ Ищу YouTube-канал «" + channelName + "» на подключённом ПК.");
-    } catch (error) {
-      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
-    }
-    return;
-  }
-
-  const youtubeVideosMatch = normalizedCommand.match(/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)\s+и\s+(?:включи|поставь|запусти)\s+(\d{1,2})\s+видео(?:\s+(.+))?$/iu);
-  if (youtubeVideosMatch) {
-    const count = Number(youtubeVideosMatch[1]);
-    const topic = String(youtubeVideosMatch[2] || "").trim();
-    if (!topic) {
-      await ctx.reply("🎬 Укажи тему или автора. Например: «открой ютуб и включи 2 видео Эдисона».");
-      return;
-    }
-    if (count < 1 || count > 5 || topic.length > 100) {
-      await ctx.reply("⚠️ Можно искать от 1 до 5 видео; тема должна быть короче 100 символов.");
-      return;
-    }
-    try {
-      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(topic);
-      queueVoiceAction("open_url", { url }, userId, ctx.chat.id);
-      await ctx.reply("🎬 Открыл поиск YouTube по теме «" + topic + "». Нашёл выдачу для выбора " + count + " видео; YouTube не позволяет гарантированно запустить несколько роликов одновременно одной командой.");
-    } catch (error) {
-      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
-    }
-    return;
-  }
-
-  if (/^(?:открой|запусти|включи)\s+(?:ютуб|youtube)(?:\s+сайт)?$/iu.test(normalizedCommand)) {
-    try {
-      queueVoiceAction("open_url", { url: "https://www.youtube.com/" }, userId, ctx.chat.id);
-      await ctx.reply("▶️ Отправил команду открыть YouTube на подключённом ПК.");
-    } catch (error) { await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500)); }
-    return;
-  }
-
-  const brightnessSet = normalizedCommand.match(/^(?:установи|поставь|сделай)\s+яркость(?:\s+экрана)?\s+(?:на|до)\s+(\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu);
-  const brightnessChange = normalizedCommand.match(/^(уменьши|понизь|снизь|увеличь|повысь|прибавь|убольши)\s+(?:мне\s+)?яркость(?:\s+экрана)?\s+(?:на\s+)?(\d{1,3})\s*(?:%|процент(?:а|ов)?)?$/iu);
-  if (brightnessSet || brightnessChange) {
-    const isSet = Boolean(brightnessSet);
-    const amount = Number(isSet ? brightnessSet[1] : brightnessChange[2]);
-    const direction = isSet ? "set" : /^(?:увеличь|повысь|прибавь|убольши)$/iu.test(brightnessChange[1]) ? "up" : "down";
-    if (amount < (isSet ? 0 : 1) || amount > 100) {
-      await ctx.reply("⚠️ Укажи яркость или изменение от 0 до 100%.");
-      return;
-    }
-    try {
-      const args = direction === "set" ? { mode: "set", percent: amount } : { mode: direction, amount };
-      queueVoiceAction("set_brightness", args, userId, ctx.chat.id);
-      await ctx.reply(direction === "set"
-        ? "🌗 Устанавливаю яркость на " + amount + "%."
-        : "🌗 Отправил команду " + (direction === "up" ? "увеличить" : "уменьшить") + " яркость на " + amount + "%.");
-    } catch (error) {
-      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
-    }
-    return;
-  }
-
-  // Текстовые команды Microsoft Store: отдельная установка и составная команда
-  // «Открой Microsoft Store и скачай ChatGPT».
-  const storeName = "(?:microsoft\\s+store|майкрософт\\s+стор(?:е)?|микрософт\\s+стор(?:е)?)";
-  const storeInstallMatch = addressedQuestion.match(
-    new RegExp("^(?:пожалуйста[, ]*)?(?:(?:открой|запусти)\\s+" + storeName + "\\s+и\\s+(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)|(?:скачай|скачать|загрузи|загрузить|установи|установить|поставь|инсталлируй)\\s+(.+?)\\s+(?:из|через|в)\\s+" + storeName + ")[.!?]*$", "iu")
-  );
-  if (storeInstallMatch) {
-    const appName = (storeInstallMatch[1] || storeInstallMatch[2] || "")
-      .replace(/^(?:приложение|программу)\\s+/iu, "")
-      .replace(/[.!?]+$/g, "")
-      .trim();
-    if (!appName || appName.length > 80 || !/^[\\p{L}\\p{N} ._()+-]+$/u.test(appName)) {
-      await ctx.reply("⚠️ Не понял название приложения. Напиши, например: «Открой Microsoft Store и скачай ChatGPT».");
-      return;
-    }
-    try {
-      await requestVoiceStoreInstallConfirmation(ctx, appName);
-    } catch (error) {
-      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
-    }
-    return;
-  }
-
-  const storeOpenMatch = addressedQuestion.match(
-    /^(?:пожалуйста[, ]*)?(?:открой|запусти)\s+(?:microsoft\s+store|майкрософт\s+стор(?:е)?|микрософт\s+стор(?:е)?)[.!?]*$/iu
-  );
-  if (storeOpenMatch) {
-    try {
-      queueVoiceAction("open_store", {}, userId, ctx.chat.id);
-      await ctx.reply("🛍 Отправил команду открыть Microsoft Store на подключённом ПК.");
-    } catch (error) {
-      await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
-    }
-    return;
-  }
-
-  // General natural-language PC command routing for text messages.
-  // Reuse the same constrained semantic interpreter as voice commands instead of
-  // letting Groq answer that it cannot access the connected Windows PC.
-  const ownerId = String(process.env.ADMIN_ID || process.env.OWNER_ID || "");
-  const looksLikePcCommand = !/^(?:как|почему|что|зачем|можно ли|подскажи)\b/iu.test(addressedQuestion) &&
-    /(?:открой|открыть|запусти|запустить|включи|включить|выключи|выключить|закрой|закрыть|удали|удалить|установи|установить|скачай|скачать|найди|найти|поищи|ищи|перезагруз|перезапуст|выруби|заблокируй|усыпи|спящ|яркост|ярче|темнее|светлее|громкост|громче|тише|звук|вай.?фай|wi.?fi|авиарежим|режим самол[её]т|рабочий стол|загрузки|документы|батаре|состояни.*(?:пк|компьютер|ноут)|канал|ютуб|youtube|google|гугл)/iu.test(addressedQuestion);
-  if (looksLikePcCommand) {
-    let interpreted = null;
-    try { interpreted = await interpretVoiceCommand(addressedQuestion); }
-    catch (error) { console.warn("NEXUS text PC interpreter failed:", error.message); }
-    if (interpreted?.action) {
-      let { action, args } = interpreted;
-      args = args || {};
-      if (action === "open_google") { action = "open_url"; args = { url: "https://www.google.com/" }; }
-      else if (action === "open_youtube") { action = "open_url"; args = { url: "https://www.youtube.com/" }; }
-      else if (action === "search_google" || action === "search_youtube") {
-        const query = String(args.query || "").trim();
-        const searchTarget = action;
-        if (query) {
-          action = "open_url";
-          args = { url: searchTarget === "search_youtube"
-            ? "https://www.youtube.com/results?search_query=" + encodeURIComponent(query)
-            : "https://www.google.com/search?q=" + encodeURIComponent(query) };
-        }
-      }
-      const needsConfirmation = [
-        "shutdown_pc", "restart_pc", "sleep_pc", "lock_pc", "uninstall_app",
-        "close_all_apps", "close_app", "install_app"
-      ].includes(action) || (action === "set_wifi" && args.state === "off") || action === "set_airplane_mode";
-      if (action === "install_app") {
-        await requestVoicePcConfirmation(ctx, action, args, "Установить «" + args.query + "» через winget");
-        return;
-      }
-      if (needsConfirmation) {
-        const descriptions = {
-          shutdown_pc: "Выключить компьютер", restart_pc: "Перезагрузить компьютер",
-          sleep_pc: "Перевести компьютер в спящий режим", lock_pc: "Заблокировать компьютер",
-          uninstall_app: "Удалить приложение «" + args.app + "»",
-          close_app: "Закрыть приложение «" + args.app + "»",
-          close_all_apps: "Закрыть все приложения (несохранённые изменения могут быть потеряны)",
-          set_wifi: "Отключить Wi-Fi на компьютере",
-          set_airplane_mode: args.state === "on" ? "Включить авиарежим (Wi-Fi и Bluetooth будут отключены)" : "Выключить авиарежим (Wi-Fi и Bluetooth будут включены)"
-        };
-        await requestVoicePcConfirmation(ctx, action, args, descriptions[action] || "Подтвердить действие на ПК");
-        return;
-      }
-      try {
-        queueVoiceAction(action, args, userId, ctx.chat.id);
-        const labels = {
-          open_app: "Запускаю приложение", open_folder: "Открываю папку",
-          open_url: "Открываю сайт", set_volume: "Меняю громкость",
-          set_brightness: "Меняю яркость", open_settings: "Открываю настройки Windows",
-          set_wifi: "Включаю Wi-Fi", get_pc_status: "Запрашиваю состояние компьютера"
-        };
-        await ctx.reply("🖥 " + (labels[action] || "Отправил команду") + ". Выполняю на подключённом ПК.");
-      } catch (error) {
-        await ctx.reply("⚠️ " + String(error.message || error).slice(0, 500));
-      }
-      return;
-    } else {
-      await ctx.reply("🤔 Не удалось уверенно распознать команду для ПК. Переформулируй её конкретнее — например: «открой Discord», «установи яркость на 50%» или «найди видео на YouTube».");
-      return;
-    }
-  }
   const rememberMatch = addressedQuestion.match(/^(?:запомни|сохрани в памяти)\s*[:,]?\s*(?:что\s+)?([\s\S]{2,1500})$/iu);
   if (rememberMatch) {
     const saved = await addLongTermFact(userId, rememberMatch[1].trim());
@@ -5951,7 +5780,11 @@ async function start() {
     { command: "proactive_off", description: "Запретить NEXUS первым писать" },
     { command: "menu", description: "Открыть главное меню возможностей" },
     { command: "commands", description: "Показать список команд и описания" },
-    { command: "personality", description: "Выбрать характер NEXUS AI" },\n    { command: "mood", description: "Посмотреть текущий стиль NEXUS" },\n    { command: "autonomy", description: "Включить или выключить инициативу NEXUS" },\n    { command: "social", description: "Настроить частоту первых сообщений" },\n    { command: "diary", description: "Личный дневник NEXUS" },
+    { command: "personality", description: "Выбрать характер NEXUS AI" },
+    { command: "mood", description: "Посмотреть текущий стиль NEXUS" },
+    { command: "autonomy", description: "Включить или выключить инициативу NEXUS" },
+    { command: "social", description: "Настроить частоту первых сообщений" },
+    { command: "diary", description: "Личный дневник NEXUS" },
     { command: "image", description: "Создать изображение по описанию" },
     { command: "create", description: "Создать контент с помощью ИИ" },
     { command: "sticker", description: "Создать стикер из текста или фото" },
@@ -6065,10 +5898,11 @@ async function start() {
       // Explicit group scope takes precedence over all_group_chats.
       { type: "chat", chat_id: -1004462919324 }
     ]) {
-      await bot.api.setMyCommands(fullCommands, { scope });
-      await bot.api.setMyCommands(fullCommands, { scope, language_code: "ru" });
+      const menuCommands = fullCommands.slice(0, 100);
+      await bot.api.setMyCommands(menuCommands, { scope });
+      await bot.api.setMyCommands(menuCommands, { scope, language_code: "ru" });
     }
-    console.log(`Telegram full command menus registered (default + RU, including target group): ${fullCommands.length} commands.`);
+    console.log(`Telegram command menus registered (default + RU): ${Math.min(fullCommands.length, 100)} commands.`)
   } catch (error) {
     console.error("Command menu registration:", error.message);
   }
@@ -6096,17 +5930,14 @@ async function start() {
       });
       return;
     }
-    if (req.method === "GET" && req.url === "/") {    if (req.method === "GET" && req.url === "/heartbeat") {
+    if (req.method === "GET" && req.url === "/heartbeat") {
       runProactiveCheck().catch(error => console.error("HEARTBEAT:", error.message));
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
       return res.end("NEXUS heartbeat OK");
     }
 
-
-      res.writeHead(200, {
-        "Content-Type": "text/plain"
-      });
-
+    if (req.method === "GET" && req.url === "/") {
+      res.writeHead(200, { "Content-Type": "text/plain" });
       return res.end("NEXUS AI is running");
     }
 
