@@ -82,7 +82,7 @@ function installTruthCheckSuite(bot, askAI, isAddressedToBot = () => true) {
         usedFallbackWithoutSearch = true;
         result = await askAI(
           ctx.from.id,
-          prompt + "\\n\\nВАЖНО: веб-поиск сейчас недоступен. Не утверждай, что проверил интернет или источники. Дай только предварительный анализ известных тебе сведений и прямо укажи, что он не подтверждён поиском.",
+          prompt + "\n\nВАЖНО: веб-поиск сейчас недоступен. Не утверждай, что проверил интернет или источники. Дай только предварительный анализ известных тебе сведений и прямо укажи, что он не подтверждён поиском.",
           false,
           { historyKey: "truth-check:" + String(ctx.chat.id), includePersonalMemory: false }
         );
