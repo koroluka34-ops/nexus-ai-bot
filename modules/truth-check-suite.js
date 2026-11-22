@@ -114,17 +114,20 @@ function installTruthCheckSuite(bot, askAI, isAddressedToBot = () => true) {
   });
 
   bot.command("lie", async ctx => {
-    const target = ctx.message?.reply_to_message;
-    const claim = replyText(ctx) || String(ctx.match || "").trim();
-    if (!claim) {
-      return ctx.reply("Чтобы проверить сообщение, зажми его и выбери «Ответить», затем отправь /lie.\nМожно и так: /lie <утверждение>");
-    }
     const rows = chatMessages.get(String(ctx.chat.id)) || [];
-    const authorId = String(target?.from?.id || "");
-    const before = target ? rows
-      .filter(row => row.userId === authorId && row.at <= Number(target.date || Date.now() / 1000))
+    const replied = ctx.message?.reply_to_message;
+    const recent = rows.length && Number(ctx.message?.date || Date.now() / 1000) - rows[rows.length - 1].at <= 300
+      ? rows[rows.length - 1] : null;
+    const claim = replyText(ctx) || String(ctx.match || "").trim() || (recent ? recent.text : "");
+    if (!claim) {
+      return ctx.reply("Не вижу сообщения для проверки. Ответь /lie на нужное сообщение или отправь /lie <утверждение>. Если бот не получает обычные сообщения группы, нужен ответ на сообщение.");
+    }
+    const authorId = String(replied?.from?.id || recent?.userId || "");
+    const targetDate = Number(replied?.date || recent?.at || Date.now() / 1000);
+    const before = rows
+      .filter(row => row.userId === authorId && row.at <= targetDate)
       .slice(-12)
-      .map(row => row.name + ": " + row.text) : [];
+      .map(row => row.name + ": " + row.text);
     const context = before.length ? before.join("\n") : "Других сообщений этого автора в доступной истории пока нет.";
     await runCheck(ctx, claim, "lie", context);
   });
