@@ -56,6 +56,8 @@ const { installStreakSuite } = require("./modules/streak-suite");
 installStreakSuite(bot);
 const { installPairFireSuite, handleHttp: handlePairFireHttp } = require("./modules/pair-fire-suite");
 installPairFireSuite(bot);
+const { installTruthCheckSuite } = require("./modules/truth-check-suite");
+installTruthCheckSuite(bot, askAI, isAddressedToBot);
 
 // Track private-chat activity. Proactive messages are on by default; users can opt out.
 bot.use(async (ctx, next) => {
@@ -985,6 +987,9 @@ function allCommandsText() {
 🔎 <b>ПОИСК И АНАЛИЗ</b>
 <code>/research тема</code> — найти информацию в интернете и дать источники.
 <code>/factcheck утверждение</code> — разобрать утверждение и проверить аргументы.
+<code>/truth утверждение</code> — оценить достоверность в процентах с объяснением.
+<code>/lie</code> — ответить на сообщение и проверить его на противоречия.
+<code>/detective</code> — проанализировать доступную переписку.
 <code>/country страна</code> — справка о стране.
 <code>/weather город</code> — погода в городе.
 <code>/fx 100 USD EUR</code> — конвертация валют.
@@ -1126,6 +1131,9 @@ const COMMAND_CATALOG = {
   search: { title: "🌐 Поиск и анализ", items: [
     ["research","/research","Найти информацию в интернете и собрать ответ с источниками.","/research Последние новости Minecraft"],
     ["factcheck","/factcheck","Проверить утверждение и разобрать, насколько оно достоверно.","/factcheck Утверждение для проверки"],
+    ["truth","/truth","Оценить достоверность утверждения в процентах и объяснить вывод.","/truth Правда ли, что ..."],
+    ["lie","/lie","Ответить на сообщение и проверить его на фактические ошибки и противоречия.","/lie"],
+    ["detective","/detective","Проанализировать доступные сообщения чата и найти противоречия.","/detective"],
     ["weather","/weather","Узнать погоду в указанном городе.","/weather Харьков"],
     ["country","/country","Получить краткую справку о стране.","/country Украина"],
     ["checksite","/checksite","Проверить сайт и его доступность.","/checksite https://example.com"],
