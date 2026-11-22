@@ -441,7 +441,8 @@ button:not(:disabled):active{filter:brightness(1.12);transform:translateY(1px) s
   const pageTabs=[...document.querySelectorAll("[data-page-jump]")];
   function showPage(next){activePage=Math.max(0,Math.min(pages.length-1,next));pages.forEach((page,i)=>page.classList.toggle("active",i===activePage));pageTabs.forEach((tab,i)=>{const active=i===activePage;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});$("prevPage").disabled=activePage===0;$("nextPage").disabled=activePage===pages.length-1;$("pageIndicator").textContent="РАЗДЕЛ "+(activePage+1)+" / "+pages.length;window.scrollTo({top:0,left:0,behavior:"instant"});}
   $("prevPage").addEventListener("click",()=>showPage(activePage-1));$("nextPage").addEventListener("click",()=>showPage(activePage+1));
-  pageTabs.forEach(tab=>tab.addEventListener("click",()=>showPage(Number(tab.dataset.pageJump))));\n  if(new URLSearchParams(location.search).get("tab")==="fire")showPage(5);
+  pageTabs.forEach(tab=>tab.addEventListener("click",()=>showPage(Number(tab.dataset.pageJump))));
+  if(new URLSearchParams(location.search).get("tab")==="fire")showPage(5);
   const profileModal=$("profileModal");
   function openProfile(){profileModal.classList.add("open");profileModal.setAttribute("aria-hidden","false");$("profileClose").focus();}
   function closeProfile(){profileModal.classList.remove("open");profileModal.setAttribute("aria-hidden","true");$("profileOpen").focus();}
