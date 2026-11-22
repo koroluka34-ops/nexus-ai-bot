@@ -75,7 +75,7 @@ function installHabitSuite(bot) {
   bot.command("habit", async ctx => {
     await load();
     const input = String(ctx.match || "").trim();
-    const match = input.match(/^(add|done|undo|del|list|stats)(?:\\s+([\\s\\S]+))?$/i);
+    const match = input.match(/^(add|done|undo|del|list|stats)(?:\s+([\s\S]+))?$/i);
     const action = match ? match[1].toLowerCase() : "help";
     const arg = (match && match[2] || "").trim();
     const data = user(ctx.from.id);
