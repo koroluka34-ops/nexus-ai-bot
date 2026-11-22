@@ -1209,6 +1209,104 @@ const COMMAND_CATALOG = {
   ]}
 };
 
+// Дополнительные команды собраны из реально зарегистрированных обработчиков index.js и modules/*.js.
+const EXTRA_COMMANDS = {
+  voice: [
+    ["astravoice","/astravoice","Настроить голосовой режим ASTRA.","/astravoice"],
+    ["astraselect","/astraselect","Выбрать профиль или голос ASTRA.","/astraselect"]
+  ],
+  security: [
+    ["antiscam","/antiscam","Проверить текст или ссылку на признаки мошенничества.","/antiscam https://example.com"],
+    ["watch","/watch","Добавить сайт в список наблюдения.","/watch example.com"],
+    ["watches","/watches","Показать сайты под наблюдением.","/watches"],
+    ["unwatch","/unwatch","Убрать сайт из списка наблюдения.","/unwatch example.com"],
+    ["antispam","/antispam","Настроить защиту группового чата от спама.","/antispam"],
+    ["autoflow","/autoflow","Управлять автоматическими действиями сообщества.","/autoflow"]
+  ],
+  community: [
+    ["groupstats","/groupstats","Посмотреть статистику группового чата.","/groupstats"],
+    ["rule","/rule","Показать или настроить правила сообщества.","/rule"],
+    ["ghwatch","/ghwatch","Начать отслеживать репозиторий GitHub.","/ghwatch owner/repository"],
+    ["ghwatches","/ghwatches","Показать отслеживаемые репозитории GitHub.","/ghwatches"],
+    ["ghunwatch","/ghunwatch","Отключить отслеживание репозитория.","/ghunwatch owner/repository"]
+  ],
+  tools: [
+    ["dns","/dns","Проверить DNS-записи домена.","/dns example.com"],
+    ["tz","/tz","Узнать время в указанном часовом поясе.","/tz Europe/Kyiv"],
+    ["timestamp","/timestamp","Преобразовать дату и Unix timestamp.","/timestamp 1790000000"],
+    ["color","/color","Показать информацию о цвете и его форматах.","/color #ff6600"],
+    ["api","/api","Проверить доступность или ответ API.","/api https://example.com"],
+    ["id","/id","Показать Telegram ID пользователя или чата.","/id"],
+    ["chatid","/chatid","Показать ID текущего чата.","/chatid"],
+    ["hash","/hash","Создать хеш текста.","/hash текст"],
+    ["base64","/base64","Закодировать или декодировать Base64.","/base64 encode Привет"],
+    ["gift","/gift","Посмотреть доступные подарки NEXUS.","/gift"],
+    ["mygifts","/mygifts","Посмотреть свои подарки.","/mygifts"]
+  ],
+  games: [
+    ["roulette","/roulette","Открыть рулетку и посмотреть доступные действия.","/roulette"],
+    ["spinadd","/spinadd","Добавить вращения рулетки по доступным правилам.","/spinadd"],
+    ["use","/use","Использовать предмет или бонус из инвентаря рулетки.","/use"],
+    ["roulettecode","/roulettecode","Активировать код рулетки.","/roulettecode КОД"],
+    ["roulettehistory","/roulettehistory","Посмотреть историю вращений.","/roulettehistory"],
+    ["roulettewins","/roulettewins","Посмотреть свои выигрыши.","/roulettewins"],
+    ["rouletteevent","/rouletteevent","Посмотреть активные события рулетки.","/rouletteevent"],
+    ["rouletteodds","/rouletteodds","Посмотреть шансы и вероятности рулетки.","/rouletteodds"],
+    ["roulettebalance","/roulettebalance","Посмотреть баланс рулетки.","/roulettebalance"],
+    ["roulettegifts","/roulettegifts","Посмотреть подарки и предметы рулетки.","/roulettegifts"]
+  ],
+  crypto: [
+    ["btc","/btc","Посмотреть текущую информацию о Bitcoin.","/btc"],
+    ["btcdaily","/btcdaily","Получить ежедневный Bitcoin-бонус.","/btcdaily"],
+    ["btcroulette","/btcroulette","Открыть Bitcoin-рулетку.","/btcroulette"],
+    ["btccase","/btccase","Открыть Bitcoin-кейс.","/btccase"]
+  ],
+  info: [
+    ["minecraft","/minecraft","Открыть Minecraft-инструменты и справку.","/minecraft"],
+    ["joke","/joke","Получить случайную шутку.","/joke"],
+    ["jokelang","/jokelang","Выбрать язык шуток.","/jokelang"],
+    ["model","/model","Посмотреть или выбрать модель ИИ.","/model"],
+    ["suggest","/suggest","Отправить предложение по улучшению NEXUS.","/suggest Добавь новую функцию"]
+  ],
+  admin: [
+    ["adminhelp","/adminhelp","Справка по административным командам.","/adminhelp"],
+    ["admin","/admin","Открыть панель администрирования (если есть права).","/admin"],
+    ["devmode","/devmode","Управлять режимом разработчика (только администратор).","/devmode"],
+    ["premiumgrant","/premiumgrant","Выдать Premium пользователю (только администратор).","/premiumgrant"],
+    ["giftgrant","/giftgrant","Выдать подарок (только администратор).","/giftgrant"],
+    ["rouletteadmin","/rouletteadmin","Администрировать рулетку (только администратор).","/rouletteadmin"],
+    ["rouletteban","/rouletteban","Заблокировать участие в рулетке (только администратор).","/rouletteban ID"],
+    ["rouletteunban","/rouletteunban","Снять блокировку рулетки (только администратор).","/rouletteunban ID"],
+    ["roulettegrant","/roulettegrant","Выдать бонус рулетки (только администратор).","/roulettegrant ID"],
+    ["roulettegiftgrant","/roulettegiftgrant","Выдать предмет рулетки (только администратор).","/roulettegiftgrant ID"],
+    ["roulettewinners","/roulettewinners","Посмотреть победителей рулетки.","/roulettewinners"],
+    ["ban","/ban","Заблокировать участника группы (только администратор).","/ban"],
+    ["unban","/unban","Снять блокировку участника (только администратор).","/unban"],
+    ["kick","/kick","Удалить участника из группы (только администратор).","/kick"],
+    ["mute","/mute","Запретить участнику писать (только администратор).","/mute"],
+    ["unmute","/unmute","Вернуть участнику право писать (только администратор).","/unmute"],
+    ["warn","/warn","Выдать предупреждение участнику (только администратор).","/warn"],
+    ["warnings","/warnings","Посмотреть предупреждения участника.","/warnings"],
+    ["clearwarns","/clearwarns","Очистить предупреждения участника.","/clearwarns"],
+    ["purge","/purge","Удалить сообщения в группе (только администратор).","/purge"],
+    ["pin","/pin","Закрепить сообщение в группе.","/pin"],
+    ["unpin","/unpin","Открепить сообщение в группе.","/unpin"],
+    ["groupmode","/groupmode","Настроить режим работы NEXUS в группе.","/groupmode"],
+    ["premium","/premium","Управлять Premium-доступом и подпиской.","/premium"],
+    ["terms","/terms","Показать условия Premium.","/terms"],
+    ["starcheck","/starcheck","Проверить оплату Telegram Stars.","/starcheck"],
+    ["paysupport","/paysupport","Получить помощь по оплате.","/paysupport"]
+  ]
+};
+for (const [key, items] of Object.entries(EXTRA_COMMANDS)) {
+  if (!COMMAND_CATALOG[key]) COMMAND_CATALOG[key] = { title: ({
+    security:"🛡 Безопасность", community:"👥 Сообщество", games:"🎰 Игры и рулетка",
+    crypto:"₿ Bitcoin", info:"✨ Дополнительные функции", admin:"🔐 Администрирование"
+  })[key] || "🧰 Дополнительные команды", items: [] };
+  const known = new Set(COMMAND_CATALOG[key].items.map(x => x[1].toLowerCase()));
+  for (const item of items) if (!known.has(item[1].toLowerCase())) COMMAND_CATALOG[key].items.push(item);
+}
+
 function catalogHomeKeyboard() {
   return new InlineKeyboard()
     .text("💬 Общение", "catalog:cat:chat").text("🌐 Поиск", "catalog:cat:search").row()
@@ -1216,7 +1314,10 @@ function catalogHomeKeyboard() {
     .text("📝 Заметки", "catalog:cat:notes").text("🖼 Медиа", "catalog:cat:media").row()
     .text("🎙 Голос", "catalog:cat:voice").text("📄 Файлы", "catalog:cat:files").row()
     .text("🤖 ИИ-агенты", "catalog:cat:agent").text("🧰 Инструменты", "catalog:cat:tools").row()
-    .text("⚙️ Настройки", "catalog:cat:account").row()
+    .text("⚙️ Настройки", "catalog:cat:account").text("🛡 Безопасность", "catalog:cat:security").row()
+    .text("👥 Сообщество", "catalog:cat:community").text("🎰 Игры", "catalog:cat:games").row()
+    .text("₿ Bitcoin", "catalog:cat:crypto").text("✨ Другое", "catalog:cat:info").row()
+    .text("🔐 Администрирование", "catalog:cat:admin").row()
     .text("🏠 Главное меню", "catalog:exit");
 }
 function catalogCategoryKeyboard(key) {
