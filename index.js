@@ -98,14 +98,15 @@ const { installPersonalSuite, installKVCheck } = require("./modules/personal-sui
 installPersonalSuite(bot);
 installKVCheck(bot);
 
+const { installHabitSuite } = require("./modules/habit-suite");
+installHabitSuite(bot);
+
 const { installUtilitySuite } = require("./modules/utility-suite");
 installUtilitySuite(bot);
 
 const { installQrSuite } = require("./modules/qr-suite");
 installQrSuite(bot);
 
-const { createPhoneBridge } = require("./modules/phone-bridge");
-const phoneBridge = createPhoneBridge(bot);
 
 // Управление локальным ПК полностью отключено: сервер не подключается к устройствам.
 function queueVoiceAction() { throw new Error("Доступ NEXUS к компьютеру полностью удалён."); }
@@ -5802,8 +5803,6 @@ bot.on("message:text", async ctx => {
   // Route game-creation requests to the cloud Godot agent before the normal chat model.
   if (await handleGameStudioRequest(ctx, addressedQuestion)) return;
 
-  if (await phoneBridge.handleText(ctx, addressedQuestion)) return;
-
   const rememberMatch = addressedQuestion.match(/^(?:запомни|сохрани в памяти)\s*[:,]?\s*(?:что\s+)?([\s\S]{2,1500})$/iu);
   if (rememberMatch) {
     const saved = await addLongTermFact(userId, rememberMatch[1].trim());
@@ -6055,14 +6054,6 @@ async function start() {
       res.end();
       return;
     }
-    if (req.url.startsWith("/phone/")) {
-      phoneBridge.handleHttp(req, res).catch(error => {
-        console.error("NEXUS PHONE:", error.message);
-        if (!res.headersSent) { res.writeHead(500); res.end(JSON.stringify({ error: "internal_error" })); }
-      });
-      return;
-    }
-
     if (req.url === "/roulette" || req.url.startsWith("/roulette/")) {
       rouletteSuite.handleHttp(req, res).then(handled => {
         if (!handled && !res.headersSent) { res.writeHead(404); res.end("Not found"); }
