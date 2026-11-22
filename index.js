@@ -59,7 +59,14 @@ bot.use(async (ctx, next) => {
       const registry = await getProactiveRegistry();
       const id = String(ctx.from.id);
       const previous = registry[id] && typeof registry[id] === "object" ? registry[id] : {};
-      registry[id] = { ...previous, chatId: ctx.chat.id, enabled: previous.enabled !== false, lastSeenAt: Date.now() };
+      registry[id] = {
+        ...previous,
+        chatId: ctx.chat.id,
+        enabled: previous.enabled !== false,
+        lastSeenAt: Date.now(),
+        // Любое новое сообщение отменяет ранее выбранное время инициативы.
+        nextProactiveAt: null
+      };
       await writeKvJson("nexus:proactive:registry", registry);
     } catch (error) {
       console.error("PROACTIVE ACTIVITY:", error.message);
@@ -317,20 +324,17 @@ async function setProactivePreference(userId, enabled, chatId) {
   const previous = registry[id] && typeof registry[id] === "object" ? registry[id] : {};
   registry[id] = {
     ...previous,
-    chatId: chatId ?? previous.chatId,
-    enabled: Boolean(enabled),
-    lastSeenAt: Date.now()
-  };
-  return writeKvJson("nexus:proactive:registry", registry);
-}
-
-async function runProactiveCheck() {
+    chatId: chatId ?async function runProactiveCheck() {
   if (!kvConfigured()) return;
   const registry = await getProactiveRegistry();
   const now = Date.now();
   const DEFAULT_INACTIVE_MS = 6 * 60 * 60 * 1000;
   const COOLDOWN_MS = 24 * 60 * 60 * 1000;
-  async function createProactiveOpener(userId) {
+  // После порога тишины выбирается случайный момент в следующие 5 минут — 18 часов.
+  const RANDOM_WAIT_MIN_MS = 5 * 60 * 1000;
+  const RANDOM_WAIT_MAX_MS = 18 * 60 * 60 * 1000;
+
+  async function createProactiveOpener(userId, state) {
     const memory = await loadMemory(userId);
     const recent = getHistory(userId).slice(-8);
     const personalContext = [
@@ -338,53 +342,113 @@ async function runProactiveCheck() {
       ...(Array.isArray(memory.facts) ? memory.facts.slice(-8) : []),
       ...(Array.isArray(memory.memoryItems) ? memory.memoryItems.slice(-8).map(item => item.content) : [])
     ].filter(Boolean).join("\n").slice(0, 1800);
+
+    // Не зацикливаемся на личных проектах: чаще выбираем новую общую тему.
+    const roll = Math.random();
+    const mode = roll < 0.45 ? "fresh" : roll < 0.75 ? "checkin" : "context";
+    const modeInstructions = {
+      fresh: "Выбери совершенно новую общую тему, не привязанную к профилю человека и его старым проектам. Подойдут игры, музыка, фильмы, технологии, необычные наблюдения, бытовые ситуации, юмор, интересные вопросы или неожиданные идеи. Не притягивай Fabric, Minecraft или любую другую прошлую тему без естественной причины.",
+      checkin: "Начни с естественного check-in: спроси, чем человек занят, как у него дела или куда он пропал. Не используй каждый раз одинаковое «как дела?» — добавь живой повод или конкретный вопрос.",
+      context: "Можешь продолжить одну конкретную недавнюю тему или аккуратно вспомнить один важный факт, только если это действительно уместно. Не перечисляй проекты и не вставляй личные детали ради галочки."
+    }[mode];
+
     const messages = [
       {
         role: "system",
-        content: SYSTEM_PROMPT + "\n\nТы сейчас сам начинаешь личный разговор после длительной паузы. Напиши ОДНО короткое, естественное сообщение на русском (обычно 1-2 предложения, до 240 символов). Используй недавний контекст, если он есть; если нет — выбери живую небанальную тему. Не говори, что скучал, ждал или испытывал человеческие чувства. Не упоминай, что сообщение автоматическое. Не дави и не требуй ответа. Не повторяй банальное «как дела?» без причины. Не используй markdown, списки и кавычки."
+        content: SYSTEM_PROMPT + "\n\nТЫ САМ НАЧИНАЕШЬ РАЗГОВОР. Напиши одно короткое естественное сообщение на русском, обычно 1–2 предложения, максимум 240 символов. Текущий режим: " + mode + ". " + modeInstructions + "\n\nКРИТИЧЕСКИ ВАЖНО: сообщение должно содержать одну цельную мысль или одну тему. Не склеивай два случайных предмета, факта или проекта в одну фразу. Не упоминай слово только потому, что оно встречалось в памяти. Если темы не связаны — выбери только одну. Не выдумывай события, новости, действия или общие воспоминания. Перед ответом проверь, звучит ли фраза логично и естественно, как реальное начало переписки. Не говори, что скучал, ждал или испытывал человеческие чувства. Не упоминай автоматизацию. Не дави и не требуй ответа. Не используй markdown, списки и кавычки."
       },
-      ...(recent.length ? recent : []),
+      ...(mode === "fresh" ? [] : recent),
       {
         role: "user",
-        content: "Начни разговор первым. Контекст о собеседнике, используй только если уместно:\n" + (personalContext || "Пока нет сохранённых личных деталей.")
+        content:
+          "Начни разговор первым. Не повторяй прошлое самостоятельное сообщение: " +
+          (state.lastProactiveMessage || "нет") +
+          "\nКонтекст о собеседнике (используй только в режиме context и только если уместно):\n" +
+          (personalContext || "Пока нет сохранённых личных деталей.")
       }
     ];
+
     const model = memory.selectedModel && memory.selectedModel !== "auto"
       ? memory.selectedModel
       : "openai/gpt-oss-120b";
+
     try {
       const result = await askGroq(messages, false, model);
-      const message = String(result.answer || "").trim().replace(/^["«]|["»]$/g, "").slice(0, 280);
+      const message = String(result.answer || "").trim().replace(/^[\"«]|[\"»]$/g, "").slice(0, 280);
       if (message.length >= 8) return message;
     } catch (error) {
       console.error("PROACTIVE AI GENERATION:", error.message);
       if (OPENROUTER_API_KEY) {
         try {
           const result = await askOpenRouter(messages);
-          const message = String(result.answer || "").trim().replace(/^["«]|["»]$/g, "").slice(0, 280);
+          const message = String(result.answer || "").trim().replace(/^[\"«]|[\"»]$/g, "").slice(0, 280);
           if (message.length >= 8) return message;
         } catch (fallbackError) {
           console.error("PROACTIVE OPENROUTER:", fallbackError.message);
         }
       }
     }
-    return "Слушай, вспомнил нашу переписку и решил заглянуть. Чем сейчас занимаешься?";
+
+    const fallbacks = [
+      "Слушай, вопрос внезапный: какую игру ты бы с удовольствием прошёл ещё раз с нуля?",
+      "Вот интересно: какая песня у тебя сейчас чаще всего крутится в голове?",
+      "Если бы сегодня можно было телепортироваться в любое место на пару часов, куда бы отправился?",
+      "Как думаешь, какая технология сильнее всего изменит обычную жизнь в ближайшие годы?",
+      "Есть фильм или сериал, который ты можешь пересматривать и не уставать?",
+      "Чем сейчас занят? Давно не пересекались, решил закинуть тебе вопрос."
+    ];
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }
 
   for (const [id, state] of Object.entries(registry)) {
     if (!state || state.enabled === false || !state.chatId) continue;
-    const inactivityMs = ([6, 12, 24].includes(Number(state.inactivityHours)) ? Number(state.inactivityHours) * 60 * 60 * 1000 : DEFAULT_INACTIVE_MS);
-    if (now - Number(state.lastSeenAt || 0) < inactivityMs) continue;
+
+    const inactivityMs = ([6, 12, 24].includes(Number(state.inactivityHours))
+      ? Number(state.inactivityHours) * 60 * 60 * 1000
+      : DEFAULT_INACTIVE_MS);
+    const inactiveFor = now - Number(state.lastSeenAt || 0);
+
+    if (inactiveFor < inactivityMs) {
+      if (state.nextProactiveAt) {
+        state.nextProactiveAt = null;
+        await writeKvJson("nexus:proactive:registry", registry);
+      }
+      continue;
+    }
+
     if (now - Number(state.lastSentAt || 0) < COOLDOWN_MS) continue;
+
+    // Время назначается один раз и не пересчитывается на каждом 5-минутном цикле.
+    if (!Number.isFinite(Number(state.nextProactiveAt)) || !state.nextProactiveAt) {
+      const randomWait = RANDOM_WAIT_MIN_MS +
+        Math.floor(Math.random() * (RANDOM_WAIT_MAX_MS - RANDOM_WAIT_MIN_MS));
+      state.nextProactiveAt = now + randomWait;
+      await writeKvJson("nexus:proactive:registry", registry);
+      continue;
+    }
+
+    if (now < Number(state.nextProactiveAt)) continue;
+
     try {
-      const opener = await createProactiveOpener(id);
+      const opener = await createProactiveOpener(id, state);
       await bot.api.sendMessage(state.chatId, opener);
       addHistory(id, "assistant", opener);
       state.lastSentAt = now;
+      state.lastProactiveMessage = opener;
+      state.nextProactiveAt = null;
       await writeKvJson("nexus:proactive:registry", registry);
     } catch (error) {
       console.error("PROACTIVE SEND:", error.message);
       if (/blocked|chat not found|deactivated/i.test(error.message || "")) {
+        state.enabled = false;
+        state.nextProactiveAt = null;
+        await writeKvJson("nexus:proactive:registry", registry);
+      }
+    }
+  }
+}
+
+t not found|deactivated/i.test(error.message || "")) {
         state.enabled = false;
         await writeKvJson("nexus:proactive:registry", registry);
       }
