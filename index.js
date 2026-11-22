@@ -324,7 +324,15 @@ async function setProactivePreference(userId, enabled, chatId) {
   const previous = registry[id] && typeof registry[id] === "object" ? registry[id] : {};
   registry[id] = {
     ...previous,
-    chatId: chatId ?async function runProactiveCheck() {
+    chatId: chatId ?? previous.chatId,
+    enabled: Boolean(enabled),
+    lastSeenAt: Date.now(),
+    nextProactiveAt: null
+  };
+  return writeKvJson("nexus:proactive:registry", registry);
+}
+
+async function runProactiveCheck() {
   if (!kvConfigured()) return;
   const registry = await getProactiveRegistry();
   const now = Date.now();
@@ -343,7 +351,6 @@ async function setProactivePreference(userId, enabled, chatId) {
       ...(Array.isArray(memory.memoryItems) ? memory.memoryItems.slice(-8).map(item => item.content) : [])
     ].filter(Boolean).join("\n").slice(0, 1800);
 
-    // Не зацикливаемся на личных проектах: чаще выбираем новую общую тему.
     const roll = Math.random();
     const mode = roll < 0.45 ? "fresh" : roll < 0.75 ? "checkin" : "context";
     const modeInstructions = {
@@ -418,7 +425,6 @@ async function setProactivePreference(userId, enabled, chatId) {
 
     if (now - Number(state.lastSentAt || 0) < COOLDOWN_MS) continue;
 
-    // Время назначается один раз и не пересчитывается на каждом 5-минутном цикле.
     if (!Number.isFinite(Number(state.nextProactiveAt)) || !state.nextProactiveAt) {
       const randomWait = RANDOM_WAIT_MIN_MS +
         Math.floor(Math.random() * (RANDOM_WAIT_MAX_MS - RANDOM_WAIT_MIN_MS));
@@ -442,14 +448,6 @@ async function setProactivePreference(userId, enabled, chatId) {
       if (/blocked|chat not found|deactivated/i.test(error.message || "")) {
         state.enabled = false;
         state.nextProactiveAt = null;
-        await writeKvJson("nexus:proactive:registry", registry);
-      }
-    }
-  }
-}
-
-t not found|deactivated/i.test(error.message || "")) {
-        state.enabled = false;
         await writeKvJson("nexus:proactive:registry", registry);
       }
     }
