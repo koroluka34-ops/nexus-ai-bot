@@ -69,20 +69,21 @@ function format(data, today) {
 }
 function installStreakSuite(bot) {
   bot.use(async (ctx, next) => {
-    await next();
-    if (!ctx.from || ctx.chat?.type !== "private" || !ctx.message) return;
-    await load();
-    const id = String(ctx.from.id);
-    const entry = state.users[id] || { days: [] };
-    if (!Array.isArray(entry.days)) entry.days = [];
-    const today = dayKey();
-    if (entry.days[entry.days.length - 1] !== today) {
-      entry.days.push(today);
-      entry.days = entry.days.slice(-400);
-      entry.updatedAt = Date.now();
-      state.users[id] = entry;
-      await save();
+    if (ctx.from && ctx.chat?.type === "private" && ctx.message) {
+      await load();
+      const id = String(ctx.from.id);
+      const entry = state.users[id] || { days: [] };
+      if (!Array.isArray(entry.days)) entry.days = [];
+      const today = dayKey();
+      if (entry.days[entry.days.length - 1] !== today) {
+        entry.days.push(today);
+        entry.days = entry.days.slice(-400);
+        entry.updatedAt = Date.now();
+        state.users[id] = entry;
+        await save();
+      }
     }
+    await next();
   });
   bot.command("streak", async ctx => {
     await load();
