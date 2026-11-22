@@ -1143,6 +1143,7 @@ const COMMAND_CATALOG = {
     ["diary","/diary","Открыть дневник NEXUS.","/diary add Сегодня был хороший день"]
   ]},
   habits: { title: "🔥 Огонёк и привычки", items: [
+    ["fire","/fire","Открыть общий огонёк с приглашённым человеком.","/fire"],
     ["streak","/streak","Посмотреть серию дней общения с NEXUS.","/streak"],
     ["habit","/habit","Показать привычки и доступные действия.","/habit list"],
     ["habitadd","/habit add","Добавить привычку, которую хочешь выполнять регулярно.","/habit add Читать 10 страниц"],
@@ -6148,6 +6149,7 @@ async function start() {
     { command: "starcheck", description: "Проверить реальные оплаты Stars (админ)" },
     { command: "paysupport", description: "Помощь с оплатой Telegram Stars" },
     { command: "model", description: "Посмотреть или выбрать модель ИИ" },
+    { command: "fire", description: "Открыть общий огонёк с человеком" },
     { command: "status", description: "Проверить состояние бота" },
     { command: "voice", description: "Настройки голосового ответа" },
     { command: "voice_on", description: "Включить голосовые ответы" },
