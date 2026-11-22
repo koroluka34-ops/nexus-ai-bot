@@ -101,6 +101,9 @@ installKVCheck(bot);
 const { installHabitSuite } = require("./modules/habit-suite");
 installHabitSuite(bot);
 
+const { installStreakSuite } = require("./modules/streak-suite");
+installStreakSuite(bot);
+
 const { installUtilitySuite } = require("./modules/utility-suite");
 installUtilitySuite(bot);
 
@@ -963,139 +966,150 @@ function errorText(data) {
 }
 
 function allCommandsText() {
-  return `✦ <b>NEXUS AI — ВСЕ КОМАНДЫ</b> ✦
-<i>Команды, инструменты и примеры использования</i> 🤖
+  return `🔥 <b>NEXUS AI — ПОНЯТНОЕ МЕНЮ КОМАНД</b>
+<i>Не нужно запоминать всё: выбери нужный раздел.</i>
 
 ━━━━━━━━━━━━━━━━━━
-🤖 <b>УПРАВЛЕНИЕ</b>
-<code>/start</code> — запустить бота.
-<code>/menu</code> — открыть главное меню.
-<code>/commands</code> — показать все команды.
-<code>/status</code> — проверить состояние сервисов.\n<code>/antiscam on|off</code> — защита группы от фишинга и скама.\n<code>/checksite URL</code> — разовая проверка сайта.\n<code>/watch URL</code>, <code>/watches</code>, <code>/unwatch ID</code> — мониторинг сайтов.\n<code>/groupstats</code> — статистика активности группы (админам).\n<code>/rule add фраза | предупреждение</code> — своё правило группы.\n<code>/rule list|remove ID</code> — список / удаление правил.\n<code>/checkapi URL</code> — проверить API, HTTP, задержку и JSON.\n<code>/domaincheck домен</code> — проверить SPF, DMARC и MX.\n<code>/factcheck утверждение</code> — предварительный ИИ-разбор факта.\n<code>/nexushealth</code> — RAM, uptime, Node.js и состояние процесса.\n<code>/personality</code> — выбрать характер NEXUS AI.\n<code>/mood</code> — текущий стиль и режим NEXUS.\n<code>/autonomy on|off</code> — включить инициативные сообщения.\n<code>/social 6|12|24</code> — настроить паузу перед сообщением.\n<code>/diary add текст</code> — запись в дневник NEXUS.\n<code>/diary</code> — открыть дневник.
-<code>/reset</code> — очистить текущую историю диалога.
-<code>/groupmode on|off</code> — общий контекст ИИ в группе.
-<code>/kb</code> — база знаний из твоих документов.
-<code>/ban</code>, <code>/unban</code> — заблокировать / разблокировать (ответом на сообщение).
-<code>/kick</code> — удалить участника из группы.
-<code>/mute 10m</code>, <code>/unmute</code> — выдать / снять мут.
-<code>/warn</code>, <code>/warnings</code>, <code>/clearwarns</code> — предупреждения.
-<code>/purge 10</code> — удалить сообщения до команды.
-<code>/pin</code>, <code>/unpin</code> — закрепить / открепить сообщение.
-<code>/agent задача</code> — поручить ИИ выполнить задачу.
-<code>/research тема</code> — глубокое исследование с веб-поиском и источниками.
-<code>/team задача</code> — запустить команду из нескольких ИИ.
-<code>/overdrive задача</code> — три ИИ анализируют задачу, четвёртый выносит вердикт.
+💬 <b>ОБЩЕНИЕ И ИИ</b>
+<code>/start</code> — начать работу и открыть меню.
+<code>/menu</code> — показать кнопки разделов.
+<code>/commands</code> — это подробное руководство.
+<code>/reset</code> — очистить контекст текущего диалога (память не удаляется).
+<code>/personality</code> — выбрать характер общения.
+<code>/mood</code> — посмотреть текущий стиль NEXUS.
+Просто напиши вопрос обычным сообщением — для общения команда не нужна.
 
-━━━━━━━━━━━━━━━━━━
-💬 <b>ТЕКСТ И ИИ</b>
-<code>/translate язык текст</code> — перевести текст.
-<code>/summary</code> — кратко пересказать текст (можно ответом на сообщение).
-<code>/explain</code> — объяснить тему простыми словами.
-<code>/rewrite</code> — переписать текст понятнее и грамотнее.
-<code>/ideas</code> — придумать идеи по теме.
-<code>/email</code> — составить письмо.
-<code>/plan</code> — составить пошаговый план.
-<code>/quiz</code> — создать тест с вопросами.
-<code>/table</code> — оформить информацию в таблицу.
-<code>/json</code> — преобразовать описание в JSON.
-<code>/regex</code> — создать и объяснить регулярное выражение.
-<code>/review</code> — проверить текст, идею или проект.
-<code>/title</code> — придумать заголовки.
-<code>/social</code> — написать пост для соцсетей.
-<code>/story</code> — придумать историю.
-<code>/compare</code> — сравнить варианты.
-<code>/steps</code> — разложить задачу на шаги.
-<code>/proscons</code> — перечислить плюсы и минусы.
-<code>/code</code> — написать, объяснить или проверить код.
+🔎 <b>ПОИСК И АНАЛИЗ</b>
+<code>/research тема</code> — найти информацию в интернете и дать источники.
+<code>/factcheck утверждение</code> — разобрать утверждение и проверить аргументы.
+<code>/country страна</code> — справка о стране.
+<code>/weather город</code> — погода в городе.
+<code>/fx 100 USD EUR</code> — конвертация валют.
+<code>/api</code> — список подключённых API.
 
-━━━━━━━━━━━━━━━━━━
-🧠 <b>ПАМЯТЬ</b>
-<code>/remember текст</code> — сохранить факт о себе.
-<code>/memory</code> — посмотреть сохранённые факты.
-<code>/remind дата-время текст</code> — создать напоминание с часовым поясом.
+🧠 <b>ПАМЯТЬ, ПЛАНЫ И НАПОМИНАНИЯ</b>
+<code>/remember текст</code> — сохранить важный факт о себе.
+<code>/memory</code> — посмотреть сохранённую память.
+<code>/forget</code> — управление удалением памяти.
+<code>/remind 25.11 18:30 Позвонить</code> — создать напоминание.
 <code>/reminders</code> — список напоминаний.
 <code>/cancelreminder ID</code> — отменить напоминание.
-<code>/forget</code> — удалить память и историю.
+<code>/diary</code> — открыть дневник NEXUS.
+<code>/diary add текст</code> — добавить запись в дневник.
 
-━━━━━━━━━━━━━━━━━━
-🎨 <b>ИЗОБРАЖЕНИЯ И МЕДИА</b>
-<code>/image описание</code> — создать изображение по описанию.
-<code>/sticker описание</code> — создать стикер по тексту.
-<code>/sticker</code> — сделать стикер из фото (ответом на фото).
-<code>/enhance</code> — увеличить фото и обработать резкость (ответом на фото).
-<code>/ocr</code> — извлечь весь текст с фото или скриншота (ответом на фото).
+🔥 <b>ОГОНЁК И ПРИВЫЧКИ</b>
+<code>/streak</code> — посмотреть ваш огонёк общения и серию дней.
+<code>/habit</code> — справка по привычкам.
+<code>/habit add Читать 10 страниц</code> — добавить привычку.
+<code>/habit list</code> — прогресс и серии.
+<code>/habit done ID</code> — отметить выполнение.
+<code>/habit undo ID</code> — отменить отметку за сегодня.
+<code>/habit del ID</code> — удалить привычку.
+
+📝 <b>ЗАМЕТКИ И ЗАДАЧИ</b>
+<code>/note add текст</code> — сохранить заметку (можно ответом на сообщение).
+<code>/note list</code> — показать заметки.
+<code>/note get ID</code> — открыть заметку.
+<code>/note find слово</code> — найти заметку.
+<code>/note del ID</code> — удалить заметку.
+<code>/todo add Купить продукты</code> — добавить задачу.
+<code>/todo list</code> — показать задачи.
+<code>/todo done ID</code> — отметить задачу выполненной.
+<code>/todo undo ID</code> — вернуть задачу в активные.
+<code>/todo del ID</code> — удалить задачу.
+<code>/poll Вопрос | Да | Нет</code> — создать опрос в Telegram.
+
+🖼 <b>ФОТО, КАРТИНКИ И ВИДЕО</b>
+<code>/image описание</code> — создать картинку по тексту.
+<code>/editphoto</code> — обработать фото по запросу.
+<code>/enhance</code> — улучшить качество фото (ответь этой командой на фото).
+<code>/ocr</code> — распознать текст на фото/скриншоте.
+<code>/sticker описание</code> — сделать стикер по описанию.
+<code>/sticker</code> — превратить фото в стикер (ответом на фото).
 <code>/circle</code> — сделать видеокружок из фото или видео.
-<code>/video</code> — посмотреть информацию о генерации ИИ-видео.
+<code>/video</code> — справка по видеофункциям.
+<code>/website описание</code> — создать сайт по описанию.
 
-━━━━━━━━━━━━━━━━━━
 🎙 <b>ГОЛОС И АУДИО</b>
-<code>/voice</code> — включить или выключить голосовые ответы.
-<code>/voice_on</code> — включить голосовые ответы.
-<code>/voice_off</code> — выключить голосовые ответы.
-<code>/say текст</code> — озвучить текст аудиофайлом.\n<code>/sayvoice текст</code> — отправить как Telegram voice message.\n<code>/voicepick</code> — выбрать голос (дополнительные голоса Premium).
+<code>/voice</code> — переключить озвучивание ответов.
+<code>/voice_on</code> / <code>/voice_off</code> — включить / выключить голос.
+<code>/voicepick</code> — выбрать голос озвучивания.
+<code>/say текст</code> — отправить озвученный аудиофайл.
+<code>/sayvoice текст</code> — отправить голосовое сообщение.
 <code>/transcribe</code> — расшифровать аудио (ответом на аудио).
+<code>/astravoice</code> — открыть инструменты Astra Voice.
 
-━━━━━━━━━━━━━━━━━━
-📁 <b>ФАЙЛЫ</b>
-<code>/create docx текст</code> — создать Word.
+📄 <b>ФАЙЛЫ И РАЗРАБОТКА</b>
 <code>/create pdf текст</code> — создать PDF.
-<code>/create xlsx текст</code> — создать Excel.
-<code>/create pptx текст</code> — создать презентацию PowerPoint.
-Отправь PDF, DOCX, TXT, CSV или файл с кодом — бот сможет прочитать его и ответить на вопрос.
+<code>/create docx текст</code> — создать документ Word.
+<code>/create xlsx текст</code> — создать таблицу Excel.
+<code>/create pptx текст</code> — создать презентацию.
+Отправь боту PDF/DOCX/TXT/CSV или файл с кодом — он сможет прочитать его.
+<code>/code задача</code> — помощь с кодом.
+<code>/agent задача</code> — поручить задачу ИИ-агенту.
+<code>/team задача</code> — несколько ИИ работают над задачей.
+<code>/overdrive задача</code> — несколько моделей анализируют задачу и сверяют выводы.
+<code>/minecraft вопрос</code> — помощь по Minecraft.
+
+🧰 <b>КАЛЬКУЛЯТОР И УТИЛИТЫ</b>
+<code>/calc (25+5)*3</code> — посчитать выражение.
+<code>/convert 10 km mi</code> — перевести единицы измерения.
+<code>/password 20</code> — создать случайный пароль.
+<code>/uuid</code> — создать уникальный ID.
+<code>/random 1 100</code> — случайное число.
+<code>/wordcount</code> — посчитать слова (ответом на текст).
+<code>/hash текст</code> — SHA-256 хеш.
+<code>/base64 encode текст</code> — кодировать / декодировать Base64.
+<code>/dns example.com</code> — посмотреть DNS-записи.
+<code>/tz Europe/Kyiv</code> — время в часовом поясе.
+<code>/timestamp значение</code> — разобрать дату или Unix-время.
+<code>/color #3498db</code> — разобрать цвет.
+<code>/jsoncheck</code> — проверить JSON.
+<code>/urlinfo ссылка</code> — разобрать ссылку.
+<code>/qr текст</code> — создать QR-код.
+<code>/joke</code> — получить шутку.
+
+🎰 <b>ИГРЫ И СООБЩЕСТВО</b>
+<code>/roulette</code> — открыть рулетку и награды.
+<code>/roulettehistory</code> — история прокруток.
+<code>/roulettebalance</code> — баланс рулетки.
+<code>/btc</code> — информация о Bitcoin.
+<code>/btcdaily</code> — ежедневная активность Bitcoin-раздела.
+
+🛡 <b>ГРУППЫ И АДМИНИСТРИРОВАНИЕ</b>
+<code>/antiscam on|off</code> — защита группы от подозрительных ссылок.
+<code>/checksite URL</code> — проверить сайт.
+<code>/watch URL</code> / <code>/watches</code> / <code>/unwatch ID</code> — мониторинг сайтов.
+<code>/groupstats</code> — статистика группы.
+<code>/rule add фраза | предупреждение</code> — добавить правило группы.
+<code>/checkapi URL</code> — проверить API.
+<code>/domaincheck домен</code> — проверить почтовые DNS-записи домена.
+<code>/nexushealth</code> — техническое состояние бота.
+<code>/ban</code>, <code>/unban</code>, <code>/kick</code> — модерация участников (ответом на сообщение).
+<code>/mute 10m</code>, <code>/unmute</code> — выдать / снять мут.
+<code>/warn</code>, <code>/warnings</code>, <code>/clearwarns</code> — предупреждения.
+<code>/purge 10</code> — удалить несколько сообщений.
+<code>/pin</code>, <code>/unpin</code> — закрепить / открепить сообщение.
+
+⚙️ <b>АВТОНОМНОСТЬ И СТАТУС</b>
+<code>/autonomy on|off</code> — разрешить / запретить NEXUS первым начинать диалог.
+<code>/social 6|12|24</code> — задать часы тишины до инициативного сообщения.
+<code>/proactive</code> — посмотреть статус инициативных сообщений.
+<code>/proactive_on</code> / <code>/proactive_off</code> — включить / выключить их.
+<code>/status</code> — проверить подключённые сервисы.
+<code>/kvcheck</code> — проверить сохранение данных в Cloudflare KV.
 
 ━━━━━━━━━━━━━━━━━━
-🧰 <b>ПОЛЕЗНЫЕ ИНСТРУМЕНТЫ</b>
-<code>/calc выражение</code> — посчитать пример. Например: <code>/calc (25+5)*3</code>
-<code>/convert число единица единица</code> — конвертировать длину, вес или температуру. Например: <code>/convert 10 km mi</code>
-<code>/password длина</code> — создать случайный пароль (по умолчанию 16 символов).
-<code>/uuid</code> — создать уникальный идентификатор.
-<code>/random минимум максимум</code> — случайное целое число в диапазоне.
-<code>/wordcount</code> — посчитать слова и символы (можно ответом на текст).
-<code>/hash текст</code> — получить SHA-256 хеш текста.
-<code>/base64 encode текст</code> — закодировать текст в Base64.
-<code>/base64 decode строка</code> — декодировать Base64.
+💡 <b>КАК ПОЛЬЗОВАТЬСЯ</b>
+1. Команда с параметром: сначала команда, затем пробел и текст.
+2. Если написано «ответом на сообщение» — зажми сообщение, выбери «Ответить» и отправь команду.
+3. Если не знаешь, какую команду выбрать, просто опиши NEXUS, что хочешь сделать.
+4. Команды с ID требуют сначала открыть список и скопировать ID.
 
-━━━━━━━━━━━━━━━━━━
-🧠 <b>БИБЛИОТЕКА ИИ-ШАБЛОНОВ</b>
-<code>/skills</code> — 1 000 шаблонов запросов для общего ИИ, не самостоятельные программные функции.
-<code>/skills 2</code> — открыть вторую страницу каталога.
-<code>/skill 501 запрос</code> — запустить выбранный навык.
-<code>/skillsearch тема</code> — найти навыки по ключевым словам.
-<code>/skillrandom</code> — выбрать случайный навык.
-<code>/skillinfo 1000</code> — посмотреть подробности навыка.
+Некоторые функции зависят от подключённых сервисов, прав администратора или тарифа. Если команда не сработала — отправь /status и пришли ответ NEXUS.
 
-━━━━━━━━━━━━━━━━━━
-🧰 <b>РАБОЧИЕ УТИЛИТЫ NEXUS</b>
-<code>/kvcheck</code> — проверить реальные права и работу Cloudflare KV.
-<code>/note add текст</code> — создать личную заметку.
-<code>/note list|get ID|find слово|del ID</code> — управлять заметками.
-<code>/todo add задача</code> — добавить личную задачу.
-<code>/todo list|done ID|undo ID|del ID|clear</code> — список и статусы задач.
-<code>/poll вопрос | вариант 1 | вариант 2</code> — создать настоящий Telegram-опрос.
-<code>/qr текст</code> — создать QR-картинку локально.
-<code>/dns домен</code> — получить публичные DNS-записи.
-<code>/tz Europe/Kyiv</code> — узнать время в часовом поясе.
-<code>/timestamp значение</code> — перевести Unix-время или дату.
-<code>/color #3498db</code> — конвертер HEX/RGB/HSL.
-<code>/jsoncheck</code> — проверить и отформатировать JSON.
-<code>/urlinfo ссылка</code> — разобрать URL и скрыть чувствительные параметры.
-
-━━━━━━━━━━━━━━━━━━
-🌐 <b>ВНЕШНИЕ API</b>
-<code>/api</code> — посмотреть подключённые API.
-<code>/weather город</code> — получить текущую погоду.
-<code>/fx 100 USD EUR</code> — конвертировать валюту по справочному курсу.
-<code>/country страна</code> — узнать информацию о стране.
-<code>/joke</code> — получить шутку на русском.\n<code>/jokelang ru|en</code> — выбрать язык шуток.
-
-━━━━━━━━━━━━━━━━━━
-✨ <b>ПОДСКАЗКА</b>
-Большинство текстовых команд можно отправлять ответом на сообщение, чтобы обработать его содержимое.
-Можно просто написать боту обычным сообщением — команды не обязательны.
-
-<b>NEXUS AI — больше возможностей в одном боте.</b> 🚀`;
+<b>Главное:</b> обычный чат работает без команд. 🚀`;
 }
-
 function mainMenu() {
   return new InlineKeyboard()
     .text("💬 Общение", "menu_chat")
