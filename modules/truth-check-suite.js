@@ -65,14 +65,32 @@ function installTruthCheckSuite(bot, askAI, isAddressedToBot = () => true) {
 
     const status = await ctx.reply(needsWebSearch ? "🔎 Ищу подтверждения в источниках..." : "🔎 Сверяю утверждение с доступным контекстом...");
     try {
-      const result = await askAI(
-        ctx.from.id,
-        prompt,
-        needsWebSearch,
-        { historyKey: "truth-check:" + String(ctx.chat.id), includePersonalMemory: false }
-      );
-      const answer = String(result?.answer || "").trim() || "Не удалось получить результат проверки.";
-      const sources = sourceLines(result);
+      let result;
+      let usedFallbackWithoutSearch = false;
+      try {
+        result = await askAI(
+          ctx.from.id,
+          prompt,
+          needsWebSearch,
+          { historyKey: "truth-check:" + String(ctx.chat.id), includePersonalMemory: false }
+        );
+      } catch (primaryError) {
+        // Search-mode Groq intentionally does not silently downgrade. For this
+        // checker only, retry through the normal Groq -> OpenRouter provider route
+        // and clearly label the result as not web-verified.
+        if (!needsWebSearch) throw primaryError;
+        usedFallbackWithoutSearch = true;
+        result = await askAI(
+          ctx.from.id,
+          prompt + "\\n\\nВАЖНО: веб-поиск сейчас недоступен. Не утверждай, что проверил интернет или источники. Дай только предварительный анализ известных тебе сведений и прямо укажи, что он не подтверждён поиском.",
+          false,
+          { historyKey: "truth-check:" + String(ctx.chat.id), includePersonalMemory: false }
+        );
+      }
+      const answer = (usedFallbackWithoutSearch
+        ? "⚠️ Groq-поиск недоступен. Ниже предварительный анализ через резервный ИИ без веб-проверки — не считай его подтверждённым фактчеком.\\n\\n"
+        : "") + (String(result?.answer || "").trim() || "Не удалось получить результат проверки.");
+      const sources = usedFallbackWithoutSearch ? [] : sourceLines(result);
       const suffix = sources.length ? "\n\nИсточники:\n" + sources.join("\n") : "";
       const output = answer + suffix;
       await ctx.api.deleteMessage(ctx.chat.id, status.message_id).catch(() => {});
