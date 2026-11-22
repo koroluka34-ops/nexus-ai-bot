@@ -1211,11 +1211,23 @@ const COMMAND_CATALOG = {
 
 // Дополнительные команды собраны из реально зарегистрированных обработчиков index.js и modules/*.js.
 const EXTRA_COMMANDS = {
+  media: [
+    ["editphoto","/editphoto","Изменить фотографию по текстовому описанию. Ответь командой на фото.","/editphoto Замени фон на ночной город"]
+  ],
+  files: [
+    ["website","/website","Создать готовый адаптивный сайт по описанию.","/website Сайт кофейни с меню и контактами"],
+    ["createbot","/createbot","Сгенерировать исходный код Telegram-бота на Node.js и grammY.","/createbot Магазин с каталогом и корзиной"]
+  ],
+  tools: [
+    ["fx","/fx","Конвертировать валюту по актуальному справочному курсу.","/fx 100 USD EUR"]
+  ],
   voice: [
     ["astravoice","/astravoice","Настроить голосовой режим ASTRA.","/astravoice"],
     ["astraselect","/astraselect","Выбрать профиль или голос ASTRA.","/astraselect"]
   ],
   security: [
+    ["checkapi","/checkapi","Проверить API endpoint и получить техническую информацию.","/checkapi https://example.com/api"],
+    ["domaincheck","/domaincheck","Проверить домен и его базовые сетевые сведения.","/domaincheck example.com"],
     ["antiscam","/antiscam","Проверить текст или ссылку на признаки мошенничества.","/antiscam https://example.com"],
     ["watch","/watch","Добавить сайт в список наблюдения.","/watch example.com"],
     ["watches","/watches","Показать сайты под наблюдением.","/watches"],
@@ -1262,11 +1274,20 @@ const EXTRA_COMMANDS = {
     ["btccase","/btccase","Открыть Bitcoin-кейс.","/btccase"]
   ],
   info: [
+    ["skills","/skills","Показать каталог встроенных навыков NEXUS. Можно указать страницу.","/skills 1"],
+    ["skill","/skill","Запустить выбранный навык по номеру и передать ему задачу.","/skill 501 объясни JavaScript новичку"],
+    ["skillsearch","/skillsearch","Найти подходящие навыки по теме.","/skillsearch Python отладка"],
+    ["skillrandom","/skillrandom","Выбрать случайный навык из каталога.","/skillrandom"],
+    ["skillinfo","/skillinfo","Посмотреть подробную информацию о навыке по номеру.","/skillinfo 1000"],
+    ["proactive_on","/proactive_on","Разрешить NEXUS первым начинать диалог.","/proactive_on"],
+    ["proactive_off","/proactive_off","Запретить NEXUS первым начинать диалог.","/proactive_off"],
+    ["menu","/menu","Открыть главное меню NEXUS с кнопками.","/menu"],
+    ["commands","/commands","Открыть полный каталог команд и функций.","/commands"],
     ["minecraft","/minecraft","Открыть Minecraft-инструменты и справку.","/minecraft"],
     ["joke","/joke","Получить случайную шутку.","/joke"],
     ["jokelang","/jokelang","Выбрать язык шуток.","/jokelang"],
     ["model","/model","Посмотреть или выбрать модель ИИ.","/model"],
-    ["suggest","/suggest","Отправить предложение по улучшению NEXUS.","/suggest Добавь новую функцию"]
+    ["suggest","/suggest","Отправить предложение по улучшению NEXUS.","/suggest Добавь новую функцию"],\n    ["windows","/windows","Помощь с Windows: анализ ошибки, скриншота или LOG/TXT-файла.","/windows Почему не работает Bluetooth"],\n    ["music","/music","Распознать аудио или создать музыку. Некоторые режимы требуют внешнего API.","/music help"]
   ],
   admin: [
     ["adminhelp","/adminhelp","Справка по административным командам.","/adminhelp"],
