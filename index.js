@@ -1287,7 +1287,9 @@ const EXTRA_COMMANDS = {
     ["joke","/joke","Получить случайную шутку.","/joke"],
     ["jokelang","/jokelang","Выбрать язык шуток.","/jokelang"],
     ["model","/model","Посмотреть или выбрать модель ИИ.","/model"],
-    ["suggest","/suggest","Отправить предложение по улучшению NEXUS.","/suggest Добавь новую функцию"],\n    ["windows","/windows","Помощь с Windows: анализ ошибки, скриншота или LOG/TXT-файла.","/windows Почему не работает Bluetooth"],\n    ["music","/music","Распознать аудио или создать музыку. Некоторые режимы требуют внешнего API.","/music help"]
+    ["suggest","/suggest","Отправить предложение по улучшению NEXUS.","/suggest Добавь новую функцию"],
+    ["windows","/windows","Помощь с Windows: анализ ошибки, скриншота или LOG/TXT-файла.","/windows Почему не работает Bluetooth"],
+    ["music","/music","Распознать аудио или создать музыку. Некоторые режимы требуют внешнего API.","/music help"]
   ],
   admin: [
     ["adminhelp","/adminhelp","Справка по административным командам.","/adminhelp"],
