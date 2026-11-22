@@ -1111,27 +1111,130 @@ function allCommandsText() {
 
 <b>Главное:</b> обычный чат работает без команд. 🚀`;
 }
+const COMMAND_CATALOG = {
+  chat: { title: "💬 Общение и ИИ", items: [
+    ["start","/start","Запустить NEXUS и открыть стартовое меню.","/start"],
+    ["reset","/reset","Очистить текущую историю диалога. Долговременная память останется.","/reset"],
+    ["personality","/personality","Выбрать характер и стиль общения NEXUS.","/personality"],
+    ["mood","/mood","Посмотреть текущий стиль и настроение NEXUS.","/mood"],
+    ["translate","/translate","Перевести текст на нужный язык.","/translate английский Привет, как дела?"],
+    ["summary","/summary","Кратко пересказать текст. Можно ответить командой на сообщение.","/summary"],
+    ["explain","/explain","Объяснить сложную тему простыми словами.","/explain Объясни квантовую физику"],
+    ["ideas","/ideas","Придумать идеи по заданной теме.","/ideas Идеи для Telegram-бота"],
+    ["code","/code","Написать, объяснить или исправить программный код.","/code Найди ошибку в этом коде"]
+  ]},
+  search: { title: "🌐 Поиск и анализ", items: [
+    ["research","/research","Найти информацию в интернете и собрать ответ с источниками.","/research Последние новости Minecraft"],
+    ["factcheck","/factcheck","Проверить утверждение и разобрать, насколько оно достоверно.","/factcheck Утверждение для проверки"],
+    ["weather","/weather","Узнать погоду в указанном городе.","/weather Харьков"],
+    ["country","/country","Получить краткую справку о стране.","/country Украина"],
+    ["checksite","/checksite","Проверить сайт и его доступность.","/checksite https://example.com"],
+    ["urlinfo","/urlinfo","Разобрать ссылку и показать её основные части.","/urlinfo https://example.com"]
+  ]},
+  memory: { title: "🧠 Память и напоминания", items: [
+    ["remember","/remember","Сохранить факт, который NEXUS должен помнить.","/remember Мне нравится Minecraft"],
+    ["memory","/memory","Посмотреть сохранённые факты.","/memory"],
+    ["forget","/forget","Открыть удаление сохранённой памяти.","/forget"],
+    ["remind","/remind","Создать напоминание на дату и время.","/remind 25.11 18:30 Позвонить"],
+    ["reminders","/reminders","Посмотреть все активные напоминания.","/reminders"],
+    ["cancelreminder","/cancelreminder","Отменить напоминание по его ID.","/cancelreminder ID"],
+    ["diary","/diary","Открыть дневник NEXUS.","/diary add Сегодня был хороший день"]
+  ]},
+  habits: { title: "🔥 Огонёк и привычки", items: [
+    ["streak","/streak","Посмотреть серию дней общения с NEXUS.","/streak"],
+    ["habit","/habit","Показать привычки и доступные действия.","/habit list"],
+    ["habitadd","/habit add","Добавить привычку, которую хочешь выполнять регулярно.","/habit add Читать 10 страниц"],
+    ["habitdone","/habit done","Отметить привычку выполненной сегодня. Нужен её ID.","/habit done 1"],
+    ["habitundo","/habit undo","Отменить сегодняшнюю отметку привычки.","/habit undo 1"]
+  ]},
+  notes: { title: "📝 Заметки и задачи", items: [
+    ["noteadd","/note add","Сохранить личную заметку.","/note add Купить подарок"],
+    ["notelist","/note list","Показать сохранённые заметки.","/note list"],
+    ["notefind","/note find","Найти заметку по слову.","/note find подарок"],
+    ["todoadd","/todo add","Добавить задачу в список дел.","/todo add Купить продукты"],
+    ["todolist","/todo list","Показать задачи и их статусы.","/todo list"],
+    ["tododone","/todo done","Отметить задачу выполненной по ID.","/todo done 1"],
+    ["poll","/poll","Создать опрос с вариантами ответа.","/poll Пойдём гулять? | Да | Нет"]
+  ]},
+  media: { title: "🖼 Фото и изображения", items: [
+    ["image","/image","Создать изображение по текстовому описанию.","/image Неоновый город ночью"],
+    ["enhance","/enhance","Улучшить качество фотографии. Используй команду ответом на фото.","/enhance"],
+    ["ocr","/ocr","Распознать текст на фотографии или скриншоте.","/ocr"],
+    ["sticker","/sticker","Создать стикер из описания или из фото (ответом на фото).","/sticker Кот в очках"],
+    ["circle","/circle","Сделать видеокружок из фото или видео.","/circle"],
+    ["video","/video","Посмотреть справку по созданию ИИ-видео.","/video"]
+  ]},
+  voice: { title: "🎙 Голос и аудио", items: [
+    ["voice","/voice","Включить или выключить озвучивание ответов.","/voice"],
+    ["voiceon","/voice_on","Включить голосовые ответы.","/voice_on"],
+    ["voiceoff","/voice_off","Выключить голосовые ответы.","/voice_off"],
+    ["say","/say","Озвучить текст и отправить аудиофайл.","/say Привет! Это NEXUS."],
+    ["sayvoice","/sayvoice","Отправить озвученный текст как голосовое сообщение.","/sayvoice Привет!"],
+    ["voicepick","/voicepick","Посмотреть и выбрать доступный голос.","/voicepick"],
+    ["transcribe","/transcribe","Преобразовать аудио в текст. Отправь команду ответом на аудио.","/transcribe"]
+  ]},
+  files: { title: "📄 Файлы и создание", items: [
+    ["createdocx","/create docx","Создать документ Word по описанию.","/create docx Создай резюме"],
+    ["createpdf","/create pdf","Создать PDF-файл по описанию.","/create pdf Инструкция по безопасности"],
+    ["createxlsx","/create xlsx","Создать таблицу Excel по описанию.","/create xlsx Таблица расходов за месяц"],
+    ["createpptx","/create pptx","Создать презентацию PowerPoint.","/create pptx Презентация о космосе"],
+    ["kb","/kb","Управлять базой знаний из загруженных документов.","/kb"]
+  ]},
+  agent: { title: "🤖 ИИ-агенты", items: [
+    ["agent","/agent","Поручить NEXUS выполнить многошаговую задачу.","/agent Составь план запуска моего проекта"],
+    ["team","/team","Запустить несколько ИИ для совместной работы над задачей.","/team Придумайте концепцию игры"],
+    ["overdrive","/overdrive","Получить несколько независимых анализов и общий вердикт.","/overdrive Сравни два варианта бизнеса"],
+    ["plan","/plan","Составить пошаговый план действий.","/plan Подготовка к экзамену"]
+  ]},
+  tools: { title: "🧰 Полезные инструменты", items: [
+    ["calc","/calc","Посчитать математическое выражение.","/calc (25+5)*3"],
+    ["convert","/convert","Перевести единицы измерения.","/convert 10 km mi"],
+    ["password","/password","Создать случайный пароль указанной длины.","/password 20"],
+    ["uuid","/uuid","Создать уникальный идентификатор.","/uuid"],
+    ["random","/random","Выбрать случайное число в диапазоне.","/random 1 100"],
+    ["wordcount","/wordcount","Посчитать слова и символы в тексте. Можно ответить на сообщение.","/wordcount"],
+    ["qr","/qr","Создать QR-код из текста или ссылки.","/qr https://example.com"],
+    ["jsoncheck","/jsoncheck","Проверить и отформатировать JSON.","/jsoncheck"]
+  ]},
+  account: { title: "⚙️ Настройки и статус", items: [
+    ["status","/status","Проверить подключённые сервисы NEXUS.","/status"],
+    ["autonomy","/autonomy","Включить или выключить инициативные сообщения NEXUS.","/autonomy on"],
+    ["social","/social","Настроить время тишины перед инициативным сообщением.","/social 12"],
+    ["proactive","/proactive","Посмотреть статус самостоятельных сообщений.","/proactive"],
+    ["kvcheck","/kvcheck","Проверить сохранение данных в Cloudflare KV.","/kvcheck"],
+    ["nexushealth","/nexushealth","Показать техническое состояние бота.","/nexushealth"]
+  ]}
+};
+
+function catalogHomeKeyboard() {
+  return new InlineKeyboard()
+    .text("💬 Общение", "catalog:cat:chat").text("🌐 Поиск", "catalog:cat:search").row()
+    .text("🧠 Память", "catalog:cat:memory").text("🔥 Огонёк", "catalog:cat:habits").row()
+    .text("📝 Заметки", "catalog:cat:notes").text("🖼 Медиа", "catalog:cat:media").row()
+    .text("🎙 Голос", "catalog:cat:voice").text("📄 Файлы", "catalog:cat:files").row()
+    .text("🤖 ИИ-агенты", "catalog:cat:agent").text("🧰 Инструменты", "catalog:cat:tools").row()
+    .text("⚙️ Настройки", "catalog:cat:account").row()
+    .text("🏠 Главное меню", "catalog:exit");
+}
+function catalogCategoryKeyboard(key) {
+  const category = COMMAND_CATALOG[key];
+  const keyboard = new InlineKeyboard();
+  if (!category) return catalogHomeKeyboard();
+  for (const item of category.items) keyboard.text(item[1], "catalog:cmd:" + key + ":" + item[0]).row();
+  keyboard.text("⬅️ Все разделы", "catalog:home").text("🏠 Главное меню", "catalog:exit");
+  return keyboard;
+}
 function mainMenu() {
   return new InlineKeyboard()
-    .text("💬 Общение", "menu_chat")
-    .text("🌐 Поиск", "menu_search")
-    .row()
-    .text("🖼 Картинки", "menu_image")
-    .text("🎙 Голос", "menu_voice")
-    .row()
-    .text("📄 Создать документ", "menu_create")
-    .text("🤖 ИИ-агент", "menu_agent")
-    .row()
-    .text("⚡ OVERDRIVE", "menu_overdrive")
-    .row()
-    .text("🧰 Инструменты", "menu_tools")
-    .text("🎰 Рулетка", "menu_roulette")
-    .text("💎 Premium", "menu_premium")
-    .text("ℹ️ Возможности", "menu_features")
-    .text("📚 Все команды", "menu_commands")
-    .row()
+    .text("💬 Общение", "menu_chat").text("🌐 Поиск", "menu_search").row()
+    .text("🖼 Картинки", "menu_image").text("🎙 Голос", "menu_voice").row()
+    .text("📄 Создать документ", "menu_create").text("🤖 ИИ-агент", "menu_agent").row()
+    .text("⚡ OVERDRIVE", "menu_overdrive").row()
+    .text("🧰 Инструменты", "menu_tools").text("🎰 Рулетка", "menu_roulette").row()
+    .text("📚 Каталог функций", "catalog:home").text("💎 Premium", "menu_premium").row()
     .text("🔄 Сброс истории", "menu_reset");
 }
+
 
 // ======================================================
 // GROQ
@@ -5021,6 +5124,48 @@ bot.command("say", async ctx => {
 // ======================================================
 // MENU CALLBACKS
 // ======================================================
+
+bot.callbackQuery("catalog:home", async ctx => {
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageText("📚 <b>КАТАЛОГ NEXUS AI</b>\n\nВыбери раздел — внутри будут отдельные кнопки функций. Нажми на функцию, чтобы прочитать, что она делает, и скопировать команду.", { parse_mode: "HTML", reply_markup: catalogHomeKeyboard() });
+});
+
+bot.callbackQuery("catalog:exit", async ctx => {
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageText("🏠 <b>Главное меню NEXUS AI</b>\n\nВыбери, что хочешь сделать:", { parse_mode: "HTML", reply_markup: mainMenu() });
+});
+
+bot.callbackQuery(/^catalog:cat:([a-z]+)$/, async ctx => {
+  const key = ctx.match[1];
+  const category = COMMAND_CATALOG[key];
+  await ctx.answerCallbackQuery();
+  if (!category) return;
+  await ctx.editMessageText(category.title + "\n\nНажми на нужную функцию — покажу описание и пример использования.", { reply_markup: catalogCategoryKeyboard(key) });
+});
+
+bot.callbackQuery(/^catalog:cmd:([a-z]+):([a-z0-9]+)$/, async ctx => {
+  const key = ctx.match[1];
+  const id = ctx.match[2];
+  const category = COMMAND_CATALOG[key];
+  const item = category?.items.find(entry => entry[0] === id);
+  await ctx.answerCallbackQuery();
+  if (!item) return;
+  const [_, command, description, example] = item;
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: "📋 Скопировать команду", copy_text: { text: command } }],
+      [{ text: "⬅️ Назад к функциям", callback_data: "catalog:cat:" + key }],
+      [{ text: "📚 Все разделы", callback_data: "catalog:home" }]
+    ]
+  };
+  await ctx.editMessageText(
+    "✨ <b>" + command.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</b>\n\n" +
+    description + "\n\n" +
+    "🧪 <b>Пример:</b>\n<code>" + example.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</code>\n\n" +
+    "Нажми «Скопировать команду», затем вставь её в поле сообщения и допиши свои данные.",
+    { parse_mode: "HTML", reply_markup: keyboard }
+  );
+});
 
 bot.callbackQuery("menu_premium", async ctx => {
   await ctx.answerCallbackQuery();
