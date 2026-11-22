@@ -4965,9 +4965,8 @@ bot.command("menu", async ctx => {
 });
 
 bot.command("commands", async ctx => {
-  await ctx.reply(allCommandsText(), { parse_mode: "HTML" });
+  await ctx.reply("📚 <b>КАТАЛОГ NEXUS AI</b>\\n\\nВыбери раздел, затем нужную функцию. В карточке функции будут описание, пример и кнопка копирования команды.", { parse_mode: "HTML", reply_markup: catalogHomeKeyboard() });
 });
-
 bot.command("reset", async ctx => {
   histories.delete(ctx.from.id);
   if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") histories.delete("group:" + ctx.chat.id);
@@ -5273,9 +5272,8 @@ bot.callbackQuery("menu_tools", async ctx => {
 
 bot.callbackQuery("menu_commands", async ctx => {
   await ctx.answerCallbackQuery();
-  await ctx.reply(allCommandsText(), { parse_mode: "HTML" });
+  await ctx.reply("📚 <b>КАТАЛОГ NEXUS AI</b>\\n\\nВыбери раздел, затем нужную функцию. В карточке функции будут описание, пример и кнопка копирования команды.", { parse_mode: "HTML", reply_markup: catalogHomeKeyboard() });
 });
-
 bot.callbackQuery("menu_features", async ctx => {
   await ctx.answerCallbackQuery();
 
