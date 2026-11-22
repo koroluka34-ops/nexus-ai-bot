@@ -52,6 +52,9 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN);
 
+const { installStreakSuite } = require("./modules/streak-suite");
+installStreakSuite(bot);
+
 // Track private-chat activity. Proactive messages are on by default; users can opt out.
 bot.use(async (ctx, next) => {
   if (ctx.from && ctx.chat?.type === "private" && ctx.message && kvConfigured()) {
@@ -101,8 +104,6 @@ installKVCheck(bot);
 const { installHabitSuite } = require("./modules/habit-suite");
 installHabitSuite(bot);
 
-const { installStreakSuite } = require("./modules/streak-suite");
-installStreakSuite(bot);
 
 const { installUtilitySuite } = require("./modules/utility-suite");
 installUtilitySuite(bot);
