@@ -54,6 +54,8 @@ const bot = new Bot(BOT_TOKEN);
 
 const { installStreakSuite } = require("./modules/streak-suite");
 installStreakSuite(bot);
+const { installPairFireSuite, handleHttp: handlePairFireHttp } = require("./modules/pair-fire-suite");
+installPairFireSuite(bot);
 
 // Track private-chat activity. Proactive messages are on by default; users can opt out.
 bot.use(async (ctx, next) => {
@@ -1231,6 +1233,7 @@ function mainMenu() {
     .text("📄 Создать документ", "menu_create").text("🤖 ИИ-агент", "menu_agent").row()
     .text("⚡ OVERDRIVE", "menu_overdrive").row()
     .text("🧰 Инструменты", "menu_tools").text("🎰 Рулетка", "menu_roulette").row()
+    .text("🔥 Огонёк", "menu_fire").row()
     .text("📚 Каталог функций", "catalog:home").text("💎 Premium", "menu_premium").row()
     .text("🔄 Сброс истории", "menu_reset");
 }
@@ -6210,6 +6213,15 @@ async function start() {
     if (req.method === "GET" && req.url === "/touchpad") {
       res.writeHead(302, { Location: "/roulette", "Cache-Control": "no-store" });
       res.end();
+      return;
+    }
+    if (req.url === "/fire" || req.url.startsWith("/fire?") || req.url === "/fire/api") {
+      handlePairFireHttp(req, res).then(handled => {
+        if (!handled && !res.headersSent) { res.writeHead(404); res.end("Not found"); }
+      }).catch(error => {
+        console.error("Pair fire route:", error.message);
+        if (!res.headersSent) { res.writeHead(500); res.end("Internal error"); }
+      });
       return;
     }
     if (req.url === "/roulette" || req.url.startsWith("/roulette/")) {
