@@ -54,8 +54,6 @@ const bot = new Bot(BOT_TOKEN);
 
 const { installStreakSuite } = require("./modules/streak-suite");
 installStreakSuite(bot);
-const { installPairFireSuite, handleHttp: handlePairFireHttp } = require("./modules/pair-fire-suite");
-installPairFireSuite(bot);
 const { installTruthCheckSuite } = require("./modules/truth-check-suite");
 installTruthCheckSuite(bot, askAI, isAddressedToBot);
 
@@ -1149,7 +1147,6 @@ const COMMAND_CATALOG = {
     ["diary","/diary","Открыть дневник NEXUS.","/diary add Сегодня был хороший день"]
   ]},
   habits: { title: "🔥 Огонёк и привычки", items: [
-    ["fire","/fire","Открыть общий огонёк с приглашённым человеком.","/fire"],
     ["streak","/streak","Посмотреть серию дней общения с NEXUS.","/streak"],
     ["habit","/habit","Показать привычки и доступные действия.","/habit list"],
     ["habitadd","/habit add","Добавить привычку, которую хочешь выполнять регулярно.","/habit add Читать 10 страниц"],
@@ -1363,7 +1360,6 @@ function mainMenu() {
     .text("📄 Создать документ", "menu_create").text("🤖 ИИ-агент", "menu_agent").row()
     .text("⚡ OVERDRIVE", "menu_overdrive").row()
     .text("🧰 Инструменты", "menu_tools").text("🎰 Рулетка", "menu_roulette").row()
-    .text("🔥 Огонёк", "menu_fire").row()
     .text("📚 Каталог функций", "catalog:home").text("💎 Premium", "menu_premium").row()
     .text("🔄 Сброс истории", "menu_reset");
 }
@@ -6348,15 +6344,6 @@ async function start() {
     if (req.method === "GET" && req.url === "/touchpad") {
       res.writeHead(302, { Location: "/roulette", "Cache-Control": "no-store" });
       res.end();
-      return;
-    }
-    if (req.url === "/fire" || req.url.startsWith("/fire?") || req.url === "/fire/api") {
-      handlePairFireHttp(req, res).then(handled => {
-        if (!handled && !res.headersSent) { res.writeHead(404); res.end("Not found"); }
-      }).catch(error => {
-        console.error("Pair fire route:", error.message);
-        if (!res.headersSent) { res.writeHead(500); res.end("Internal error"); }
-      });
       return;
     }
     if (req.url === "/roulette" || req.url.startsWith("/roulette/")) {
