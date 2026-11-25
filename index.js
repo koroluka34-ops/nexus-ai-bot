@@ -56,6 +56,8 @@ const { installStreakSuite } = require("./modules/streak-suite");
 installStreakSuite(bot);
 const { installTruthCheckSuite } = require("./modules/truth-check-suite");
 installTruthCheckSuite(bot, askAI, isAddressedToBot);
+const { installReactionSuite } = require("./modules/reaction-suite");
+installReactionSuite(bot, { getProactiveRegistry, writeKvJson });
 
 // Track private-chat activity. Proactive messages are on by default; users can opt out.
 bot.use(async (ctx, next) => {
@@ -1159,7 +1161,11 @@ const COMMAND_CATALOG = {
     ["mood","/mood","Посмотреть текущий стиль и настроение NEXUS.","/mood"],
     ["translate","/translate","Перевести текст на нужный язык.","/translate английский Привет, как дела?"],
     ["summary","/summary","Кратко пересказать текст. Можно ответить командой на сообщение.","/summary"],
-    ["code","/code","Написать, объяснить или исправить программный код.","/code Найди ошибку в этом коде"]
+    ["code","/code","Написать, объяснить или исправить программный код.","/code Найди ошибку в этом коде"],
+    ["rewrite","/rewrite","Переписать текст яснее, грамотнее или в нужном стиле.","/rewrite Сделай текст дружелюбнее"],
+    ["ideas","/ideas","Получить 10 конкретных идей по теме или сообщению.","/ideas Идеи функций для бота"],
+    ["decision","/decision","Сравнить варианты и помочь выбрать лучший.","/decision Сравни A и B по цене и надёжности"],
+    ["explain","/explain","Объяснить тему простыми словами с примером.","/explain Что такое API?"]
   ]},
   search: { title: "🌐 Поиск и анализ", items: [
     ["research","/research","Найти информацию в интернете и собрать ответ с источниками.","/research Последние новости Minecraft"],
@@ -1242,7 +1248,10 @@ const COMMAND_CATALOG = {
     ["social","/social","Настроить время тишины перед инициативным сообщением.","/social 12"],
     ["proactive","/proactive","Посмотреть статус самостоятельных сообщений.","/proactive"],
     ["kvcheck","/kvcheck","Проверить сохранение данных в Cloudflare KV.","/kvcheck"],
-    ["nexushealth","/nexushealth","Показать техническое состояние бота.","/nexushealth"]
+    ["nexushealth","/nexushealth","Показать техническое состояние бота.","/nexushealth"],
+    ["reactions","/reactions","Показать статус автоматических реакций.","/reactions"],
+    ["reactions_on","/reactions_on","Включить автоматические реакции NEXUS на твои сообщения.","/reactions_on"],
+    ["reactions_off","/reactions_off","Выключить автоматические реакции NEXUS.","/reactions_off"]
   ]}
 };
 
@@ -3690,6 +3699,29 @@ bot.command("translate", async ctx => {
   );
 });
 
+bot.command("rewrite", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!source) return ctx.reply("Напиши текст или ответь командой на сообщение. Пример: /rewrite Сделай текст дружелюбнее");
+  await runTextTool(ctx, "✍️ Улучшаю текст...", "Перепиши текст ясно, естественно и грамотно. Сохрани исходный смысл и факты. Не добавляй выдуманных деталей. Если пользователь указал стиль — соблюдай его.", source);
+});
+
+bot.command("ideas", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!source) return ctx.reply("Укажи тему или ответь на сообщение. Пример: /ideas Идеи полезных функций для Telegram-бота");
+  await runTextTool(ctx, "💡 Подбираю идеи...", "Предложи 10 конкретных, разнообразных и реально применимых идей по теме. Для каждой дай короткое объяснение пользы. Избегай повторов и банальностей.", source);
+});
+
+bot.command("decision", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!source) return ctx.reply("Опиши варианты и критерии. Пример: /decision Что выбрать: A или B? Бюджет ограничен, важна надёжность.");
+  await runTextTool(ctx, "⚖️ Сравниваю варианты...", "Помоги принять решение. Сначала выдели критерии, затем честно сравни варианты, назови риски и выбери наиболее подходящий вариант с коротким объяснением. Если данных недостаточно, обозначь допущения.", source);
+});
+
+bot.command("explain", async ctx => {
+  const source = String(ctx.match || "").trim() || getRepliedText(ctx);
+  if (!source) return ctx.reply("Укажи тему или ответь командой на сообщение. Пример: /explain Что такое API?");
+  await runTextTool(ctx, "🧩 Объясняю просто...", "Объясни это простыми словами для новичка. Используй короткий пример из жизни, избегай лишнего жаргона и заверши одним предложением с главной мыслью.", source);
+});
 bot.command("summary", async ctx => {
   const source = String(ctx.match || "").trim() || getRepliedText(ctx);
   await runTextTool(
@@ -6492,7 +6524,16 @@ async function start() {
     if (renderUrl) {
       try {
         await bot.api.setWebhook(
-          `${renderUrl}${WEBHOOK_PATH}`
+          `${renderUrl}${WEBHOOK_PATH}`,
+          {
+            allowed_updates: [
+              "message", "edited_message", "channel_post", "edited_channel_post",
+              "inline_query", "chosen_inline_result", "callback_query",
+              "shipping_query", "pre_checkout_query", "poll", "poll_answer",
+              "my_chat_member", "chat_member", "chat_join_request",
+              "message_reaction"
+            ]
+          }
         );
 
         console.log("Telegram webhook connected!");
