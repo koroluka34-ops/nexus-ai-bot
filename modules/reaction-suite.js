@@ -129,7 +129,7 @@ function installReactionSuite(bot, { getProactiveRegistry, writeKvJson }) {
     const state = registry[String(ctx.from.id)] || {};
     await ctx.reply("✨ Автоматические реакции: " +
       (state.reactionsEnabled === false ? "выключены" : "включены") +
-      "\\n/reactions_on — включить\\n/reactions_off — выключить");
+      "\n/reactions_on — включить\n/reactions_off — выключить");
   });
   bot.command("reactions_on", ctx => setPreference(ctx, true));
   bot.command("reactions_off", ctx => setPreference(ctx, false));
