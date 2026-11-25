@@ -485,11 +485,25 @@ async function runProactiveCheck() {
       if (Number(state.lastSentAt || 0) > Number(state.lastSeenAt || 0)) {
         state.consecutiveIgnored = Math.min(10, Number(state.consecutiveIgnored || 0) + 1);
       }
-      const opener = await createProactiveOpener(id, state);
+      const memory = await loadMemory(id);
+      const promoCooldownMs = 7 * 24 * 60 * 60 * 1000;
+      const promoEligible = currentPlan(memory) === "free" &&
+        now - Number(state.lastPremiumPromoAt || 0) >= promoCooldownMs;
+      // Premium promo is occasionally used instead of a normal opener, never as an extra message.
+      const sendPremiumPromo = promoEligible && Math.random() < 0.22;
+      const promoMessages = [
+        "Кстати, если часто пользуешься NEXUS, не хочешь попробовать Premium? Там выше лимиты на ИИ, фото и видео. Тарифы: /premium",
+        "Маленький вопрос: не хотел попробовать NEXUS Premium? Он пригодится, если бесплатных лимитов иногда не хватает. Посмотреть: /premium",
+        "Если захочешь больше возможностей в NEXUS, есть Premium с увеличенными лимитами. Без давления — просто оставлю ссылку: /premium"
+      ];
+      const opener = sendPremiumPromo
+        ? promoMessages[Math.floor(Math.random() * promoMessages.length)]
+        : await createProactiveOpener(id, state);
       await bot.api.sendMessage(state.chatId, opener);
       addHistory(id, "assistant", opener);
       state.lastSentAt = now;
       state.lastProactiveMessage = opener;
+      if (sendPremiumPromo) state.lastPremiumPromoAt = now;
       state.nextProactiveAt = null;
       await writeKvJson("nexus:proactive:registry", registry);
     } catch (error) {
