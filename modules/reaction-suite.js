@@ -120,12 +120,38 @@ function installReactionSuite(bot) {
         const userId = String(ctx.from.id);
         const last = Number(autoReactCooldown.get(userId) || 0);
         if (Date.now() - last > 30 * 1000) {
-          const emoji = pickReaction(message.text);
-          if (emoji) {
-            await ctx.api.setMessageReaction(ctx.chat.id, message.message_id, [
-              { type: "emoji", emoji }
-            ]);
-            autoReactCooldown.set(userId, Date.now());
+          const desiredEmoji = pickReaction(message.text);
+          if (desiredEmoji) {
+            const chatInfo = await ctx.api.getChat(ctx.chat.id);
+            const allowed = Array.isArray(chatInfo.available_reactions)
+              ? chatInfo.available_reactions
+                  .filter(item => item.type === "emoji")
+                  .map(item => item.emoji)
+              : null;
+            const candidates = allowed
+              ? [...new Set([desiredEmoji, ...allowed])]
+              : [...new Set([desiredEmoji, "👍", "❤️", "🔥", "🤔", "😂"])];
+            let applied = false;
+            for (const emoji of candidates) {
+              try {
+                await ctx.api.setMessageReaction(ctx.chat.id, message.message_id, [
+                  { type: "emoji", emoji }
+                ]);
+                autoReactCooldown.set(userId, Date.now());
+                applied = true;
+                break;
+              } catch (error) {
+                console.warn("AUTO REACTION candidate " + emoji + ":", error.message);
+                if (!String(error.message || "").includes("REACTION_INVALID")) break;
+              }
+            }
+            if (!applied) {
+              console.warn("AUTO REACTION: no allowed emoji worked; chat:", JSON.stringify({
+                type: chatInfo.type,
+                can_react_to_messages: chatInfo.can_react_to_messages,
+                available_reactions: chatInfo.available_reactions
+              }));
+            }
           }
         }
       } catch (error) {
