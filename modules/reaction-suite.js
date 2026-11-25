@@ -75,11 +75,29 @@ function installReactionSuite(bot) {
             .replace(/(?:поставь|поставить|кинь|добавь)\s+(?:мне\s+)?реакц(?:ию|июшку)/iu, "")
             .replace(/реакц(?:ию|июшку)\s+на\s+(?:моё|мое)\s+сообщение/iu, "")
             .trim();
-          const emoji = pickReaction(cleanText) || "😂";
-          await ctx.api.setMessageReaction(ctx.chat.id, target.message_id, [
-            { type: "emoji", emoji }
-          ]);
-          await ctx.reply("Поставил реакцию " + emoji);
+          const desiredEmoji = pickReaction(cleanText) || "😂";
+          const chatInfo = await ctx.api.getChat(ctx.chat.id);
+          const allowed = Array.isArray(chatInfo.available_reactions)
+            ? chatInfo.available_reactions
+                .filter(item => item.type === "emoji")
+                .map(item => item.emoji)
+            : null;
+          const emoji = allowed
+            ? (allowed.includes(desiredEmoji) ? desiredEmoji : allowed[0])
+            : desiredEmoji;
+          if (!emoji) {
+            await ctx.reply("В этом чате сейчас отключены реакции. Включи их в настройках Telegram — тогда смогу ставить их под сообщениями.");
+            return;
+          }
+          try {
+            await ctx.api.setMessageReaction(ctx.chat.id, target.message_id, [
+              { type: "emoji", emoji }
+            ]);
+            await ctx.reply("Поставил реакцию " + emoji);
+          } catch (error) {
+            console.warn("EXPLICIT REACTION:", error.message);
+            await ctx.reply("Telegram не разрешил эту реакцию. Проверь, включены ли реакции в настройках чата.");
+          }
           return;
         }
 
