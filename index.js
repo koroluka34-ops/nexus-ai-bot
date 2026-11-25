@@ -3550,19 +3550,29 @@ bot.command("cancelreminder", async ctx => {
   await ctx.reply(saved ? "🗑 Напоминание отменено." : "❌ Не удалось сохранить изменение в Cloudflare KV.");
 });
 
+const reminderDeliveryLocks = new Set();
+
 async function deliverDueReminders(userId) {
-  const memory = await loadMemory(userId);
-  const now = Date.now();
-  const due = (memory.reminders || []).filter(x => Number(x.dueAt) <= now);
-  if (!due.length) return;
-  memory.reminders = (memory.reminders || []).filter(x => Number(x.dueAt) > now);
-  if (!await saveMemory(userId)) return;
-  for (const item of due) {
-    try {
-      await bot.api.sendMessage(item.chatId, "⏰ НАПОМИНАНИЕ\n\n" + item.message);
-    } catch (error) {
-      console.error("Reminder delivery:", error.message);
+  if (reminderDeliveryLocks.has(userId)) return;
+  reminderDeliveryLocks.add(userId);
+  try {
+    const memory = await loadMemory(userId);
+    const now = Date.now();
+    const due = (memory.reminders || []).filter(x => Number(x.dueAt) <= now);
+    if (!due.length) return;
+    memory.reminders = (memory.reminders || []).filter(x => Number(x.dueAt) > now);
+    if (!await saveMemory(userId)) return;
+    for (const item of due) {
+      try {
+        await bot.api.sendMessage(item.chatId, item.message.startsWith("⏰ Таймер завершён!")
+          ? item.message
+          : "⏰ НАПОМИНАНИЕ\n\n" + item.message);
+      } catch (error) {
+        console.error("Reminder delivery:", error.message);
+      }
     }
+  } finally {
+    reminderDeliveryLocks.delete(userId);
   }
 }
 
@@ -6087,6 +6097,7 @@ bot.on("message:text", async ctx => {
       await ctx.reply("Не смог сохранить таймер: хранилище недоступно, поэтому не буду обещать уведомление.");
       return;
     }
+    setTimeout(() => deliverDueReminders(userId).catch(error => console.error("Timer delivery:", error.message)), Math.max(0, dueAt - Date.now())).unref?.();
     await ctx.reply("⏱ Таймер запущен на " + prettyDuration + ". Я сам напишу сюда, когда время выйдет.\nID: " + id);
     return;
   }
