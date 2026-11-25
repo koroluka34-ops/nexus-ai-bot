@@ -68,12 +68,12 @@ function installReactionSuite(bot) {
     if (message?.text && ctx.from && ctx.chat?.type === "private" &&
         !message.text.startsWith("/") && !message.text.startsWith("!")) {
       try {
-        const explicitRequest = /(?:поставь|поставить|кинь|добавь)\\s+(?:мне\\s+)?реакц(?:ию|июшку)|реакц(?:ию|июшку)\\s+на\\s+(?:моё|мое)\\s+сообщение/iu.test(message.text);
+        const explicitRequest = /(?:поставь|поставить|кинь|добавь)\s+(?:мне\s+)?реакц(?:ию|июшку)|реакц(?:ию|июшку)\s+на\s+(?:моё|мое)\s+сообщение/iu.test(message.text);
         if (explicitRequest) {
           const target = message.reply_to_message || message;
           const cleanText = message.text
-            .replace(/(?:поставь|поставить|кинь|добавь)\\s+(?:мне\\s+)?реакц(?:ию|июшку)/iu, "")
-            .replace(/реакц(?:ию|июшку)\\s+на\\s+(?:моё|мое)\\s+сообщение/iu, "")
+            .replace(/(?:поставь|поставить|кинь|добавь)\s+(?:мне\s+)?реакц(?:ию|июшку)/iu, "")
+            .replace(/реакц(?:ию|июшку)\s+на\s+(?:моё|мое)\s+сообщение/iu, "")
             .trim();
           const emoji = pickReaction(cleanText) || "😂";
           await ctx.api.setMessageReaction(ctx.chat.id, target.message_id, [
