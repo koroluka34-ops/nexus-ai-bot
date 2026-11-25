@@ -503,6 +503,26 @@ async function runProactiveCheck() {
   }
 }
 
+let autonomousTickRunning = false;
+
+async function runAutonomousTick() {
+  if (autonomousTickRunning) return;
+  autonomousTickRunning = true;
+  try {
+    await runProactiveCheck();
+    if (!kvConfigured()) return;
+    const registry = await getProactiveRegistry();
+    for (const [userId, state] of Object.entries(registry)) {
+      if (!state || !state.chatId) continue;
+      await deliverDueReminders(userId).catch(error =>
+        console.error("AUTONOMOUS REMINDER:", error.message)
+      );
+    }
+  } finally {
+    autonomousTickRunning = false;
+  }
+}
+
 async function getNexusAdmins() {
   const value = await readKvJson("nexus:admins", []);
   const disabled = await readKvJson("nexus:admins:disabled", []);
@@ -6226,11 +6246,11 @@ bot.on("message:text", async ctx => {
 async function start() {
   await bot.init();
 
-  // Check every five minutes while the Render instance is awake.
+  // Check durable reminders and proactive messages every minute while awake.
   setInterval(() => {
-    runProactiveCheck().catch(error => console.error("PROACTIVE LOOP:", error.message));
-  }, 5 * 60 * 1000);
-  runProactiveCheck().catch(error => console.error("PROACTIVE START:", error.message));
+    runAutonomousTick().catch(error => console.error("AUTONOMOUS LOOP:", error.message));
+  }, 60 * 1000);
+  runAutonomousTick().catch(error => console.error("AUTONOMOUS START:", error.message));
 
 
   // Native Telegram "/" command menu with short Russian descriptions.
@@ -6397,7 +6417,7 @@ async function start() {
       return;
     }
     if (req.method === "GET" && req.url === "/heartbeat") {
-      runProactiveCheck().catch(error => console.error("HEARTBEAT:", error.message));
+      runAutonomousTick().catch(error => console.error("HEARTBEAT:", error.message));
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
       return res.end("NEXUS heartbeat OK");
     }
