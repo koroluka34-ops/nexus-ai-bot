@@ -1,5 +1,5 @@
 const sentMessages = new Map();
-const autoReactCooldown = new Map();
+const autoReactSkip = new Map();
 const MAX_TRACKED = 2500;
 
 function reactionKey(chatId, messageId) {
@@ -12,8 +12,8 @@ function pickReaction(text) {
   if (/(ахах|хах|лол|смешно|😂|🤣)/u.test(value)) return "😂";
   if (/(круто|класс|заебись|отлично|супер|огонь|🔥)/u.test(value)) return "🔥";
   if (/[?？]/u.test(value)) return "🤔";
-  // Not every message gets a reaction: leave ordinary messages alone most of the time.
-  if (Math.random() < 0.22) return Math.random() < 0.5 ? "👍" : "🤔";
+  // Ordinary messages can also get a reaction, but not all of them.
+  if (Math.random() < 0.5) return Math.random() < 0.5 ? "👍" : "🤔";
   return null;
 }
 
@@ -118,8 +118,10 @@ function installReactionSuite(bot) {
         }
 
         const userId = String(ctx.from.id);
-        const last = Number(autoReactCooldown.get(userId) || 0);
-        if (Date.now() - last > 30 * 1000) {
+        const skipRemaining = Number(autoReactSkip.get(userId) || 0);
+        if (skipRemaining > 0) {
+          autoReactSkip.set(userId, skipRemaining - 1);
+        } else {
           const desiredEmoji = pickReaction(message.text);
           if (desiredEmoji) {
             const chatInfo = await ctx.api.getChat(ctx.chat.id);
@@ -137,7 +139,8 @@ function installReactionSuite(bot) {
                 await ctx.api.setMessageReaction(ctx.chat.id, message.message_id, [
                   { type: "emoji", emoji }
                 ]);
-                autoReactCooldown.set(userId, Date.now());
+                // After reacting, skip either one or two of the next messages.
+                autoReactSkip.set(userId, Math.random() < 0.5 ? 1 : 2);
                 applied = true;
                 break;
               } catch (error) {
