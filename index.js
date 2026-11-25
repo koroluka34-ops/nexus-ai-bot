@@ -6063,7 +6063,7 @@ bot.on("message:text", async ctx => {
   const addressedQuestion = ctx.message.text.trim();
 
   // Handle natural-language timers locally; never send timer requests to the chat model.
-  const timerMatch = addressedQuestion.match(/(?:поставь|запусти|включи|создай|сделай)?\\s*(?:мне\\s+)?(?:таймер|напоминание)\\s+(?:на|через)\\s+(\\d+)\\s*(секунд(?:у|ы)?|сек|с|минут(?:у|ы)?|мин|минута|час(?:а|ов)?|ч)\\b/i)
+  const timerMatch = addressedQuestion.match(/(?:поставь|запусти|включи|создай|сделай)?\\s*(?:мне\\s+)?(?:таймер|напоминание)\\s+(?:на|через)\\s+(\\d+)\\s*(секунд(?:у|ы)?|сек|с|минут(?:у|ы)?|мин|минута|час(?:а|ов)?|ч)(?=$|\\s|[.!?,])/i)
     || addressedQuestion.match(/(?:напомни|напоминание)\\s+через\\s+(\\d+)\\s*(секунд(?:у|ы)?|сек|с|минут(?:у|ы)?|мин|минута|час(?:а|ов)?|ч)\\b/i);
   if (timerMatch) {
     const amount = Math.max(1, Math.min(10080, Number(timerMatch[1])));
