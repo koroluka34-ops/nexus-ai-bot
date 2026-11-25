@@ -82,21 +82,37 @@ function installReactionSuite(bot) {
                 .filter(item => item.type === "emoji")
                 .map(item => item.emoji)
             : null;
-          const emoji = allowed
-            ? (allowed.includes(desiredEmoji) ? desiredEmoji : allowed[0])
-            : desiredEmoji;
-          if (!emoji) {
-            await ctx.reply("В этом чате сейчас отключены реакции. Включи их в настройках Telegram — тогда смогу ставить их под сообщениями.");
+          const candidates = allowed
+            ? [...new Set([desiredEmoji, ...allowed])]
+            : [...new Set([desiredEmoji, "👍", "❤️", "🔥", "🤔", "😂"])];
+          if (!candidates.length) {
+            await ctx.reply("В этом чате Telegram не сообщил доступных реакций.");
             return;
           }
-          try {
-            await ctx.api.setMessageReaction(ctx.chat.id, target.message_id, [
-              { type: "emoji", emoji }
-            ]);
-            await ctx.reply("Поставил реакцию " + emoji);
-          } catch (error) {
-            console.warn("EXPLICIT REACTION:", error.message);
-            await ctx.reply("Telegram не разрешил эту реакцию. Проверь, включены ли реакции в настройках чата.");
+          let appliedEmoji = null;
+          let lastReactionError = null;
+          for (const emoji of candidates) {
+            try {
+              await ctx.api.setMessageReaction(ctx.chat.id, target.message_id, [
+                { type: "emoji", emoji }
+              ]);
+              appliedEmoji = emoji;
+              break;
+            } catch (error) {
+              lastReactionError = error;
+              console.warn("EXPLICIT REACTION candidate " + emoji + ":", error.message);
+              if (!String(error.message || "").includes("REACTION_INVALID")) break;
+            }
+          }
+          if (appliedEmoji) {
+            await ctx.reply("Поставил реакцию " + appliedEmoji);
+          } else {
+            console.warn("EXPLICIT REACTION failed; chat:", JSON.stringify({
+              type: chatInfo.type,
+              can_react_to_messages: chatInfo.can_react_to_messages,
+              available_reactions: chatInfo.available_reactions
+            }), "last:", lastReactionError?.message);
+            await ctx.reply("Telegram отклонил все доступные варианты реакции для этого сообщения. Я записал подробности ошибки — нужно проверить ограничение самого чата.");
           }
           return;
         }
