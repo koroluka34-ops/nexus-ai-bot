@@ -1,0 +1,6 @@
+name = "nexus-autonomous-heartbeat"
+main = "nexus-heartbeat-worker.js"
+compatibility_date = "2026-11-25"
+
+[triggers]
+crons = ["* * * * *"]
