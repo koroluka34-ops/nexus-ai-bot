@@ -2499,13 +2499,13 @@ async function deliverAnswer(ctx, userId, result) {
   // Remove unsolicited model-generated Premium ad footers; subscription information
   // remains intact when the user explicitly asks about /premium or billing.
   let rawAnswer = String(result.answer || "");
-  const asksPremium = /(?:\\/premium|тариф|подписк|лимит|оплат|stars)/iu.test(
+  const asksPremium = /(?:\/premium|тариф|подписк|лимит|оплат|stars)/iu.test(
     String(ctx.message?.text || ctx.message?.caption || "")
   );
   if (!asksPremium) {
     rawAnswer = rawAnswer
-      .replace(/(?:^|\\n)\\s*(?:💎\\s*)?NEXUS Premium[^\\n]*(?:\\n[^\\n]*(?:посмотри тарифы|повышенн(?:ые|ых) лимит|приоритет ИИ)[^\\n]*)?/giu, "")
-      .replace(/(?:^|\\n)\\s*💎\\s*NEXUS Premium[^\\n]*(?:\\n[^\\n]*)?/giu, "")
+      .replace(/(?:^|\n)\s*(?:💎\s*)?NEXUS Premium[^\n]*(?:\n[^\n]*(?:посмотри тарифы|повышенн(?:ые|ых) лимит|приоритет ИИ)[^\n]*)?/giu, "")
+      .replace(/(?:^|\n)\s*💎\s*NEXUS Premium[^\n]*(?:\n[^\n]*)?/giu, "")
       .trim();
   }
   const answer = cleanMarkdownBold(rawAnswer);
@@ -6213,7 +6213,7 @@ bot.on("message:text", async ctx => {
   }
 
   // A direct invitation to hear the user's joke deserves a natural, immediate reply.
-  if (/^(?:а\\s+)?хочешь\\s+(?:одну\\s+)?шутку[?!.,\\s]*$/iu.test(addressedQuestion)) {
+  if (/^(?:а\s+)?хочешь\s+(?:одну\s+)?шутку[?!.,\s]*$/iu.test(addressedQuestion)) {
     await ctx.reply("Конечно, выкладывай 😈");
     return;
   }
