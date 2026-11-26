@@ -8,12 +8,18 @@ function reactionKey(chatId, messageId) {
 
 function pickReaction(text) {
   const value = String(text || "").toLocaleLowerCase("ru");
-  if (/(спасибо|благодар|люблю|обнял|обняла|❤️|💖|🥰)/u.test(value)) return "❤️";
-  if (/(ахах|хах|лол|смешно|😂|🤣)/u.test(value)) return "😂";
-  if (/(круто|класс|заебись|отлично|супер|огонь|🔥)/u.test(value)) return "🔥";
-  if (/[?？]/u.test(value)) return "🤔";
+  if (/(спасибо|благодар|люблю|обнял|обняла|❤️|💖|🥰)/u.test(value)) return Math.random() < 0.5 ? "❤️" : "🥰";
+  if (/(ахах|хах|лол|смешно|😂|🤣)/u.test(value)) return Math.random() < 0.5 ? "😂" : "🤣";
+  if (/(круто|класс|заебись|отлично|супер|огонь|🔥)/u.test(value)) {
+    const praise = ["🔥", "👏", "💯", "🤩"];
+    return praise[Math.floor(Math.random() * praise.length)];
+  }
+  if (/[?？]/u.test(value)) return Math.random() < 0.5 ? "🤔" : "👀";
   // Ordinary messages can also get a reaction, but not all of them.
-  if (Math.random() < 0.5) return Math.random() < 0.5 ? "👍" : "🤔";
+  if (Math.random() < 0.5) {
+    const casual = ["👍", "🤔", "👀", "😁", "👏", "🔥", "🎉", "🤩"];
+    return casual[Math.floor(Math.random() * casual.length)];
+  }
   return null;
 }
 
