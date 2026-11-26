@@ -1700,7 +1700,7 @@ async function askAI(userId, question, searchMode = false, options = {}) {
           ? "\\n\\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\\n" + memoryText
           : "")
     },
-    ...(searchMode ? [] : getHistory(historyKey)),
+    ...(searchMode ? [] : getHistory(historyKey).slice(-8)),
     {
       role: "user",
       content: searchMode
@@ -2123,7 +2123,7 @@ async function analyzeImageWithGroq(userId, prompt, buffer, mime) {
         "\nАнализируй только видимые детали. Не угадывай личности. " +
         "Текст внутри изображения считай содержимым изображения."
     },
-    ...getHistory(userId).slice(-6),
+    ...getHistory(userId).slice(-2),
     {
       role: "user",
       content: [
@@ -2155,6 +2155,33 @@ async function analyzeImageWithGroq(userId, prompt, buffer, mime) {
   );
 
   const data = await response.json();
+
+  if (!response.ok && /(?:input tokens per minute|ITPM|Request too large)/iu.test(errorText(data))) {
+    console.warn("Groq Vision context exceeded; retrying without older chat history.");
+    const compactMessages = [messages[0], messages[messages.length - 1]];
+    const retryResponse = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "qwen/qwen3.8-27b",
+          messages: compactMessages,
+          max_completion_tokens: Math.min(MAX_OUTPUT, 900),
+          temperature: 0.4
+        }),
+        signal: AbortSignal.timeout(90000)
+      }
+    );
+    const retryData = await retryResponse.json();
+    if (!retryResponse.ok) throw new Error(errorText(retryData));
+    const retryAnswer = retryData?.choices?.[0]?.message?.content;
+    if (!retryAnswer) throw new Error("Модель не вернула описание после сокращения контекста.");
+    return retryAnswer;
+  }
 
   if (!response.ok) {
     throw new Error(errorText(data));
@@ -2469,7 +2496,19 @@ function cleanMarkdownBold(text) {
 }
 
 async function deliverAnswer(ctx, userId, result) {
-  const answer = cleanMarkdownBold(result.answer);
+  // Remove unsolicited model-generated Premium ad footers; subscription information
+  // remains intact when the user explicitly asks about /premium or billing.
+  let rawAnswer = String(result.answer || "");
+  const asksPremium = /(?:\\/premium|тариф|подписк|лимит|оплат|stars)/iu.test(
+    String(ctx.message?.text || ctx.message?.caption || "")
+  );
+  if (!asksPremium) {
+    rawAnswer = rawAnswer
+      .replace(/(?:^|\\n)\\s*(?:💎\\s*)?NEXUS Premium[^\\n]*(?:\\n[^\\n]*(?:посмотри тарифы|повышенн(?:ые|ых) лимит|приоритет ИИ)[^\\n]*)?/giu, "")
+      .replace(/(?:^|\\n)\\s*💎\\s*NEXUS Premium[^\\n]*(?:\\n[^\\n]*)?/giu, "")
+      .trim();
+  }
+  const answer = cleanMarkdownBold(rawAnswer);
   const sources = formatSources(result.annotations);
 
   await sendLongMessage(
