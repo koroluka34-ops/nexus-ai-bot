@@ -6180,6 +6180,38 @@ bot.on("message:text", async ctx => {
   }
   const addressedQuestion = ctx.message.text.trim();
 
+  // If the user replies to a photo with a follow-up question, analyze that
+  // exact replied-to image again instead of losing the visual context.
+  const repliedPhoto = ctx.message.reply_to_message?.photo;
+  if (repliedPhoto?.length) {
+    if (busyUsers.has(userId)) {
+      await ctx.reply("⏳ Подожди предыдущий запрос.");
+      return;
+    }
+    busyUsers.add(userId);
+    const imageStatus = await ctx.reply("🖼 Смотрю на фото из твоего ответа...");
+    try {
+      const photo = repliedPhoto[repliedPhoto.length - 1];
+      const buffer = await downloadTelegramFile(ctx, photo.file_id, MAX_IMAGE_BYTES);
+      const imageAnswer = await analyzeImageWithGroq(
+        userId,
+        "Ответь на вопрос пользователя по изображению. Если он просит название мода/предмета, внимательно прочитай видимый текст и назови наиболее вероятное название; если надпись нечёткая, честно укажи это. Вопрос: " + addressedQuestion,
+        buffer,
+        "image/jpeg"
+      );
+      addHistory(userId, "user", "[Вопрос по изображению] " + addressedQuestion);
+      addHistory(userId, "assistant", imageAnswer);
+      await ctx.api.deleteMessage(ctx.chat.id, imageStatus.message_id).catch(() => {});
+      await deliverAnswer(ctx, userId, { answer: imageAnswer, annotations: [], provider: "Groq Vision" });
+    } catch (error) {
+      await ctx.api.editMessageText(ctx.chat.id, imageStatus.message_id,
+        "❌ Ошибка анализа изображения: " + String(error.message).slice(0, 1200)).catch(() => {});
+    } finally {
+      busyUsers.delete(userId);
+    }
+    return;
+  }
+
   // A direct invitation to hear the user's joke deserves a natural, immediate reply.
   if (/^(?:а\\s+)?хочешь\\s+(?:одну\\s+)?шутку[?!.,\\s]*$/iu.test(addressedQuestion)) {
     await ctx.reply("Конечно, выкладывай 😈");
