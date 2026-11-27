@@ -1425,12 +1425,12 @@ function shouldAutoSearch(question) {
   const value = String(question || "").toLocaleLowerCase("ru").trim();
   if (!value || value.length < 5) return false;
 
-  // Weather and forecasts are always time-sensitive, including misspelled place names.
-  const weatherIntent = /\\bпогод\\w*|\\bтемператур\\w*|\\bпрогноз\\w*|\\bдожд\\w*|\\bснег\\w*|\\bветер\\w*|\\bосадк\\w*|какая\\s+(?:сейчас\\s+)?погод|сколько\\s+градус/iu.test(value);
+  // Weather and forecasts are always time-sensitive, even when a place name is misspelled.
+  const weatherIntent = /погод\w*|температур\w*|прогноз\w*|дожд\w*|снег\w*|ветер\w*|осадк\w*|какая\s+(?:сейчас\s+)?погод|сколько\s+градус/iu.test(value);
   if (weatherIntent) return true;
 
-  // Explicit requests for current or recently changed information.
-  const freshIntent = /\\bсейчас\\b|\\bсегодня\\b|\\bсегодняшн\\w*|\\bсвеж\\w*|\\bпоследн\\w*|\\bактуальн\\w*|\\bна\\s+данный\\s+момент\\b|\\bв\\s+реальном\\s+времени\\b|\\bна\\s+этой\\s+неделе\\b|\\bв\\s+2026\\b|\\bновост\\w*|\\bкурс\\s+(?:доллара|евро|валют)|\\bцена\\s+(?:биткоина|акций|золота)|\\bсколько\\s+стоит\\b|\\bоткрыто\\s+сейчас\\b|\\bработает\\s+сейчас\\b/iu.test(value);
+  // Search when the user asks for information that changes over time.
+  const freshIntent = /сейчас|сегодня|сегодняшн\w*|свеж\w*|последн\w*|актуальн\w*|на\s+данный\s+момент|в\s+реальном\s+времени|на\s+этой\s+неделе|в\s+этом\s+году|новост\w*|курс\s+(?:доллара|евро|валют)|цена\s+(?:биткоина|акций|золота)|сколько\s+стоит|открыто\s+сейчас|работает\s+сейчас/iu.test(value);
   return freshIntent;
 }
 
