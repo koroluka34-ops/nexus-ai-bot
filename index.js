@@ -1476,7 +1476,7 @@ function formatSources(annotations, options = {}) {
   return (
     "\n\n🔗 Источники:\n" +
     sources.slice(0, limit).map((source, index) =>
-      \`\${index + 1}. \${source.title}\n\${source.url}\`
+      String(index + 1) + ". " + source.title + "\n" + source.url
     ).join("\n\n")
   );
 }
