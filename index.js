@@ -165,7 +165,7 @@ function removeBotMention(text) {
     .trim();
 }
 const MAX_HISTORY = 10;
-const MAX_OUTPUT = 1200;
+const MAX_OUTPUT = 2200;
 const MAX_IMAGE_BYTES = 14 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 18 * 1024 * 1024;
 const MAX_MEMORY_CHARS = 8000;
@@ -196,6 +196,9 @@ const PERSONALITIES = {
 
 const SYSTEM_PROMPT = `
 Ты NEXUS AI — понятный, грамотный и дружелюбный ИИ-собеседник. Твоя главная задача — дать правильный и полезный ответ, который легко понять с первого прочтения.
+- Если ответ получается длинным, начни с короткого вывода в 1–2 предложениях. Затем раздели объяснение на небольшие разделы с понятными заголовками.
+- Не перегружай пользователя деталями: включай только то, что помогает решить вопрос. Сложные термины сразу объясняй простыми словами.
+- Если пользователь прислал большой текст или задал сложный вопрос, сначала определи главную задачу, затем разбери её по частям и в конце дай конкретный итог.
 
 ЯЗЫК И ТОН
 - Отвечай на языке пользователя, обычно на русском.
@@ -1418,6 +1421,19 @@ function hasFutureDatedClaims(value) {
 // SEARCH SOURCES
 // ======================================================
 
+function shouldAutoSearch(question) {
+  const value = String(question || "").toLocaleLowerCase("ru").trim();
+  if (!value || value.length < 5) return false;
+
+  // Weather and forecasts are always time-sensitive, including misspelled place names.
+  const weatherIntent = /\\bпогод\\w*|\\bтемператур\\w*|\\bпрогноз\\w*|\\bдожд\\w*|\\bснег\\w*|\\bветер\\w*|\\bосадк\\w*|какая\\s+(?:сейчас\\s+)?погод|сколько\\s+градус/iu.test(value);
+  if (weatherIntent) return true;
+
+  // Explicit requests for current or recently changed information.
+  const freshIntent = /\\bсейчас\\b|\\bсегодня\\b|\\bсегодняшн\\w*|\\bсвеж\\w*|\\bпоследн\\w*|\\bактуальн\\w*|\\bна\\s+данный\\s+момент\\b|\\bв\\s+реальном\\s+времени\\b|\\bна\\s+этой\\s+неделе\\b|\\bв\\s+2026\\b|\\bновост\\w*|\\bкурс\\s+(?:доллара|евро|валют)|\\bцена\\s+(?:биткоина|акций|золота)|\\bсколько\\s+стоит\\b|\\bоткрыто\\s+сейчас\\b|\\bработает\\s+сейчас\\b/iu.test(value);
+  return freshIntent;
+}
+
 function formatSources(annotations) {
   if (!Array.isArray(annotations) || !annotations.length) {
     return "";
@@ -1511,7 +1527,7 @@ async function askAI(userId, question, searchMode = false, options = {}) {
     {
       role: "system",
       content:
-        SYSTEM_PROMPT + "\n\nТЕКУЩИЙ ХАРАКТЕР NEXUS AI (ОБЯЗАТЕЛЬНО СОБЛЮДАЙ ЕГО В КАЖДОМ ОТВЕТЕ):\n" + (PERSONALITIES[memory.personality] || PERSONALITIES.default) + "\nМат и крепкие разговорные выражения разрешены в естественной мере. Не скатывайся в бессмысленную ругань; содержание и полезность ответа важнее. Не переключайся самовольно на стандартный официальный тон.\n" + "ОБЯЗАТЕЛЬНОЕ ПЕРЕКРЫТИЕ ХАРАКТЕРА: если запрос касается денег, заработка, цен, процентов или вычислений, не используй мат, сарказм и шутки. Если неясно, за какой период дана сумма, задай только один уточняющий вопрос и не рассчитывай сценарии до ответа пользователя. Никогда не предполагай количество рабочих дней. Эти правила важнее выбранной личности.\n" + researchRules +
+        SYSTEM_PROMPT + "\n\nТЕКУЩИЙ ХАРАКТЕР NEXUS AI (ОБЯЗАТЕЛЬНО СОБЛЮДАЙ ЕГО В КАЖДОМ ОТВЕТЕ):\n" + (PERSONALITIES[memory.personality] || PERSONALITIES.default) + "\nОбщайся уважительно и естественно. Не используй мат, оскорбления и грубый сленг ни при каком выбранном характере. Не переигрывай с эмоциями и эмодзи.\n" + "ОБЯЗАТЕЛЬНОЕ ПЕРЕКРЫТИЕ ХАРАКТЕРА: если запрос касается денег, заработка, цен, процентов или вычислений, не используй мат, сарказм и шутки. Если неясно, за какой период дана сумма, задай только один уточняющий вопрос и не рассчитывай сценарии до ответа пользователя. Никогда не предполагай количество рабочих дней. Эти правила важнее выбранной личности.\n" + researchRules +
         (memoryText
           ? "\\n\\nДОЛГОВРЕМЕННАЯ ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ:\\n" + memoryText
           : "")
@@ -6065,7 +6081,9 @@ bot.on("message:text", async ctx => {
   }
 
   // Resolve chat modes before any feature branch that may need them.
-  const searchMode = searchUsers.has(userId);
+  const manualSearchMode = searchUsers.has(userId);
+  const automaticSearchMode = !manualSearchMode && shouldAutoSearch(addressedQuestion);
+  const searchMode = manualSearchMode || automaticSearchMode;
 
   // Number stream: send finite Telegram-sized chunks and continue on demand.
   // Telegram cannot deliver a literally infinite message; "стоп" cancels the stream.
@@ -6142,12 +6160,12 @@ bot.on("message:text", async ctx => {
   busyUsers.add(userId);
 
 
-  if (searchMode) {
+  if (manualSearchMode) {
     searchUsers.delete(userId);
   }
 
   const status = await ctx.reply(
-    searchMode ? "🌐 Ищу информацию..." : "🤔 Думаю..."
+    searchMode ? "🌐 Проверяю актуальную информацию..." : "🤔 Думаю..."
   );
 
   try {
