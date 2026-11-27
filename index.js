@@ -1450,9 +1450,7 @@ function weatherPlaceTerms(question) {
     .replace(/[^\p{L}\p{N}\s-]/gu, " ")
     .split(/[\s-]+/)
     .filter(word => word.length >= 4)
-    .map(word => [...new Set([word.slice(0, 4), transliterate(word).slice(0, 4)])])
-    .flat()
-    .filter(Boolean);
+    .map(word => [...new Set([word.slice(0, 4), transliterate(word).slice(0, 4)])].filter(Boolean));
 }
 
 function formatSources(annotations, options = {}) {
@@ -1468,7 +1466,7 @@ function formatSources(annotations, options = {}) {
     if (sources.some(source => source.url === url)) continue;
     if (options.weather && (
       !weatherTerms.length ||
-      !weatherTerms.every(term => (title + " " + url).toLocaleLowerCase("ru").includes(term))
+      !weatherTerms.every(alternatives => alternatives.some(term => (title + " " + url).toLocaleLowerCase("ru").includes(term)))
     )) continue;
     sources.push({ title, url });
   }
