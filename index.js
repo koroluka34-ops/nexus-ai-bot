@@ -1434,34 +1434,51 @@ function shouldAutoSearch(question) {
   return freshIntent;
 }
 
-function formatSources(annotations) {
-  if (!Array.isArray(annotations) || !annotations.length) {
-    return "";
-  }
+function weatherPlaceTerms(question) {
+  const text = String(question || "").toLocaleLowerCase("ru");
+  const match = text.match(/(?:^|\s)(?:в|для|около|возле)\s+(.+?)(?=\s+(?:на|с|сейчас|завтра|сегодня|послезавтра)\b|[?!.,]|$)/iu);
+  if (!match) return [];
+  const transliterate = value => value
+    .replace(/ё/g, "е")
+    .replace(/[а-я]/g, ch => ({
+      а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ж:"zh",з:"z",и:"i",й:"y",
+      к:"k",л:"l",м:"m",н:"n",о:"o",п:"p",р:"r",с:"s",т:"t",у:"u",
+      ф:"f",х:"kh",ц:"ts",ч:"ch",ш:"sh",щ:"shch",ъ:"",ы:"y",ь:"",
+      э:"e",ю:"yu",я:"ya"
+    })[ch] || ch);
+  return match[1]
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .split(/[\s-]+/)
+    .filter(word => word.length >= 4)
+    .map(word => [...new Set([word.slice(0, 4), transliterate(word).slice(0, 4)])])
+    .flat()
+    .filter(Boolean);
+}
 
+function formatSources(annotations, options = {}) {
+  if (!Array.isArray(annotations) || !annotations.length) return "";
   const sources = [];
+  const weatherTerms = options.weather ? weatherPlaceTerms(options.question) : [];
 
   for (const item of annotations) {
     const citation = item.url_citation || item;
-
     const url = citation.url;
     const title = citation.title || citation.name || "Источник";
-
-    if (
-      typeof url === "string" &&
-      /^https?:\/\//i.test(url) &&
-      !sources.some(x => x.url === url)
-    ) {
-      sources.push({ title, url });
-    }
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) continue;
+    if (sources.some(source => source.url === url)) continue;
+    if (options.weather && (
+      !weatherTerms.length ||
+      !weatherTerms.every(term => (title + " " + url).toLocaleLowerCase("ru").includes(term))
+    )) continue;
+    sources.push({ title, url });
   }
 
   if (!sources.length) return "";
-
+  const limit = options.weather ? 2 : 3;
   return (
     "\n\n🔗 Источники:\n" +
-    sources.slice(0, 8).map((x, i) =>
-      `${i + 1}. ${x.title}\n${x.url}`
+    sources.slice(0, limit).map((source, index) =>
+      \`\${index + 1}. \${source.title}\n\${source.url}\`
     ).join("\n\n")
   );
 }
@@ -2338,9 +2355,17 @@ function cleanMarkdownBold(text) {
 }
 
 async function deliverAnswer(ctx, userId, result) {
-  // Remove unsolicited model-generated Premium ad footers; subscription information
-  // remains intact when the user explicitly asks about /premium or billing.
+  // Remove model-written weather bibliographies; only structured, location-matched
+  // browser-search links are allowed to appear in the final weather answer.
   let rawAnswer = String(result.answer || "");
+  const userQuestion = String(ctx.message?.text || ctx.message?.caption || "");
+  const isWeatherQuestion = /погод\w*|температур\w*|прогноз\w*|дожд\w*|снег\w*|ветер\w*|осадк\w*/iu.test(userQuestion);
+  if (isWeatherQuestion) {
+    rawAnswer = rawAnswer
+      .replace(/(?:^|\n)\s*(?:🔗\s*)?Источники\s*:?\s*[\s\S]*$/iu, "")
+      .replace(/【[^】]*†L\d+(?:-L?\d+)?】/g, "")
+      .trim();
+  }
   const asksPremium = /(?:\/premium|тариф|подписк|лимит|оплат|stars)/iu.test(
     String(ctx.message?.text || ctx.message?.caption || "")
   );
@@ -2351,7 +2376,7 @@ async function deliverAnswer(ctx, userId, result) {
       .trim();
   }
   const answer = cleanMarkdownBold(rawAnswer);
-  const sources = formatSources(result.annotations);
+  const sources = formatSources(result.annotations, { weather: isWeatherQuestion, question: userQuestion });
 
   await sendLongMessage(
     ctx,
